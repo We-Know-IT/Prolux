@@ -43,6 +43,9 @@ export default function AdminDashboard() {
   const [calMonth, setCalMonth]     = useState(new Date().getMonth())
   const [calYear, setCalYear]       = useState(new Date().getFullYear())
   const [chartPeriod, setChartPeriod] = useState<'week' | 'month'>('week')
+  const [editBudget, setEditBudget]     = useState(false)
+  const [budgetInput, setBudgetInput]   = useState<Record<string, string>>({})
+  const [savingBudget, setSavingBudget] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const now   = new Date()
@@ -73,6 +76,7 @@ export default function AdminDashboard() {
         const map: Record<string, number> = {}
         for (const row of b as any[]) map[row.salesperson] = row.budget
         setBudgets(map)
+        setBudgetInput(Object.fromEntries(SALESPEOPLE.map(sp => [sp, map[sp] ? String(map[sp]) : ''])))
       }
       if (r) setReminders(r)
       if (a) setActivities(a)
@@ -80,6 +84,27 @@ export default function AdminDashboard() {
   }, [])
 
   useEffect(() => { drawChart() }, [orders, chartPeriod])
+
+  async function saveBudgets() {
+    setSavingBudget(true)
+    const sb = createClient()
+    const rows = SALESPEOPLE
+      .map(sp => ({ salesperson: sp, year, month, budget: parseInt(budgetInput[sp] || '0') || 0 }))
+      .filter(r => r.budget > 0)
+    await sb.from('sales_budgets').upsert(rows, { onConflict: 'salesperson,year,month' })
+    const removed = SALESPEOPLE.filter(sp => !(parseInt(budgetInput[sp] || '0') > 0))
+    for (const sp of removed) {
+      await sb.from('sales_budgets').delete().eq('salesperson', sp).eq('year', year).eq('month', month)
+    }
+    const newBudgets: Record<string, number> = {}
+    for (const sp of SALESPEOPLE) {
+      const v = parseInt(budgetInput[sp] || '0')
+      if (v > 0) newBudgets[sp] = v
+    }
+    setBudgets(newBudgets)
+    setSavingBudget(false)
+    setEditBudget(false)
+  }
 
   function drawChart() {
     const canvas = canvasRef.current
@@ -279,10 +304,32 @@ export default function AdminDashboard() {
               <Target size={14} color="var(--gold)" />
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.09em' }}>Budget — {monthNames[month]}</span>
             </div>
-            <Link href="/crm/dashboard" style={{ fontSize: 11, color: 'var(--gold)', textDecoration: 'none', fontWeight: 600 }}>Redigera →</Link>
+            <button onClick={() => setEditBudget(e => !e)}
+              style={{ fontSize: 11, padding: '4px 10px', background: 'rgba(232,184,75,.1)', border: '1px solid rgba(232,184,75,.2)', borderRadius: 6, color: 'var(--gold)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 600 }}>
+              {editBudget ? 'Avbryt' : 'Sätt budget'}
+            </button>
           </div>
 
-          {totalBudget > 0 ? (
+          {editBudget ? (
+            <div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+                {SALESPEOPLE.map(sp => (
+                  <div key={sp}>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }}>{sp}</label>
+                    <div style={{ position: 'relative' }}>
+                      <input type="number" placeholder="0" value={budgetInput[sp] || ''} onChange={e => setBudgetInput(b => ({ ...b, [sp]: e.target.value }))}
+                        style={{ width: '100%', padding: '8px 32px 8px 10px', background: 'var(--bg4)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 7, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+                      <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'var(--text3)' }}>kr</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button onClick={saveBudgets} disabled={savingBudget}
+                style={{ width: '100%', padding: '9px 20px', background: 'var(--gold)', border: 'none', borderRadius: 7, color: '#111', fontSize: 13, fontWeight: 700, cursor: savingBudget ? 'default' : 'pointer', fontFamily: 'var(--font-sans)', opacity: savingBudget ? 0.7 : 1 }}>
+                {savingBudget ? 'Sparar...' : 'Spara budget'}
+              </button>
+            </div>
+          ) : totalBudget > 0 ? (
             <>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
                 {SALESPEOPLE.filter(sp => budgets[sp]).map(sp => {
@@ -323,9 +370,10 @@ export default function AdminDashboard() {
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
               <Target size={28} color="rgba(232,184,75,.25)" />
               <div style={{ fontSize: 13, color: 'var(--text3)', textAlign: 'center' }}>Ingen budget satt</div>
-              <Link href="/crm/dashboard" style={{ fontSize: 12, color: 'var(--gold)', textDecoration: 'none', fontWeight: 600, padding: '6px 14px', background: 'rgba(232,184,75,.08)', border: '1px solid rgba(232,184,75,.2)', borderRadius: 7 }}>
+              <button onClick={() => setEditBudget(true)}
+                style={{ fontSize: 12, color: 'var(--gold)', background: 'rgba(232,184,75,.08)', border: '1px solid rgba(232,184,75,.2)', borderRadius: 7, padding: '6px 14px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
                 Sätt budget →
-              </Link>
+              </button>
             </div>
           )}
         </div>
