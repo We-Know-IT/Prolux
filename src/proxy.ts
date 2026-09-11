@@ -1,9 +1,42 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { cookieDomainForHost } from '@/lib/supabase/cookie-domain'
+
+// Same codebase, same deployment — split crm/admin from the webshop by hostname.
+const CRM_HOSTS = ['crm.proluxshine.com']
+const WWW_HOSTS = ['proluxshine.com', 'www.proluxshine.com']
+
+// Paths allowed to load on crm.proluxshine.com without a redirect.
+// Admin/CMS lives here too — Bashar's team manages products, orders etc.
+// from crm.proluxshine.com, and since it's the same Supabase database,
+// changes show up on www.proluxshine.com immediately.
+const CRM_ALLOWED_PREFIXES = ['/crm', '/admin', '/login', '/auth']
 
 export async function proxy(request: NextRequest) {
+  const host = request.headers.get('host')?.toLowerCase().split(':')[0] ?? ''
+  const { pathname, search } = request.nextUrl
+
+  // Local dev / preview deployments (e.g. *.vercel.app) skip domain routing.
+  const isCrmHost = CRM_HOSTS.includes(host)
+  const isWwwHost = WWW_HOSTS.includes(host)
+
+  if (isCrmHost) {
+    if (pathname === '/') {
+      return NextResponse.redirect(new URL('/crm/dashboard', request.url))
+    }
+    const allowed = CRM_ALLOWED_PREFIXES.some(p => pathname.startsWith(p))
+    if (!allowed) {
+      return NextResponse.redirect(new URL(`https://www.proluxshine.com${pathname}${search}`))
+    }
+  }
+
+  if (isWwwHost && (pathname.startsWith('/crm') || pathname.startsWith('/admin'))) {
+    return NextResponse.redirect(new URL(`https://crm.proluxshine.com${pathname}${search}`))
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
+  const cookieDomain = cookieDomainForHost(host)
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -14,7 +47,7 @@ export async function proxy(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, cookieDomain ? { ...options, domain: cookieDomain } : options)
           )
         },
       },
@@ -22,11 +55,10 @@ export async function proxy(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  const path = request.nextUrl.pathname
   const role: string | undefined = user?.user_metadata?.role
 
   // Redirect logged-in users away from login
-  if (path === '/login' && user) {
+  if (pathname === '/login' && user) {
     if (role === 'admin') return NextResponse.redirect(new URL('/admin/dashboard', request.url))
     if (role === 'crm')   return NextResponse.redirect(new URL('/crm/dashboard', request.url))
     return NextResponse.redirect(new URL('/portal/dashboard', request.url))
@@ -34,16 +66,16 @@ export async function proxy(request: NextRequest) {
 
   // Protect all app routes
   const protectedPaths = ['/portal', '/admin', '/crm']
-  const isProtected = protectedPaths.some(p => path.startsWith(p))
+  const isProtected = protectedPaths.some(p => pathname.startsWith(p))
   if (isProtected && !user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
   // Role-based access control
-  if (user && path.startsWith('/admin') && role !== 'admin') {
+  if (user && pathname.startsWith('/admin') && role !== 'admin') {
     return NextResponse.redirect(new URL('/login', request.url))
   }
-  if (user && path.startsWith('/crm') && role !== 'admin' && role !== 'crm') {
+  if (user && pathname.startsWith('/crm') && role !== 'admin' && role !== 'crm') {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
