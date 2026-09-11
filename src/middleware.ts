@@ -6,7 +6,10 @@ const CRM_HOSTS = ['crm.proluxshine.com']
 const WWW_HOSTS = ['proluxshine.com', 'www.proluxshine.com']
 
 // Paths allowed to load on crm.proluxshine.com without a redirect.
-const CRM_ALLOWED_PREFIXES = ['/crm', '/login', '/auth']
+// Admin/CMS lives here too — Bashar's team manages products, orders etc.
+// from crm.proluxshine.com, and since it's the same Supabase database,
+// changes show up on www.proluxshine.com immediately.
+const CRM_ALLOWED_PREFIXES = ['/crm', '/admin', '/login', '/auth']
 
 export function middleware(req: NextRequest) {
   const host = req.headers.get('host')?.toLowerCase().split(':')[0] ?? ''
@@ -28,7 +31,7 @@ export function middleware(req: NextRequest) {
   }
 
   if (isWwwHost) {
-    if (pathname.startsWith('/crm')) {
+    if (pathname.startsWith('/crm') || pathname.startsWith('/admin')) {
       return NextResponse.redirect(new URL(`https://crm.proluxshine.com${pathname}${search}`))
     }
   }
