@@ -9,6 +9,23 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
+  const [forgotMode, setForgotMode] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotMsg, setForgotMsg]     = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
+
+  async function handleForgotPassword(e: React.FormEvent) {
+    e.preventDefault()
+    setForgotLoading(true)
+    setForgotMsg('')
+    const supabase = createClient()
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+      redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
+    })
+    setForgotLoading(false)
+    if (error) setForgotMsg('Något gick fel: ' + error.message)
+    else setForgotMsg('Om adressen finns hos oss har vi skickat en återställningslänk till din e-post.')
+  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -70,46 +87,89 @@ export default function LoginPage() {
           padding: '32px 28px',
         }}>
           <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 400, color: 'var(--text)', marginBottom: 6, letterSpacing: '-.01em' }}>
-            Logga in
+            {forgotMode ? 'Återställ lösenord' : 'Logga in'}
           </h1>
-          <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 28 }}>B2B-portal för återförsäljare</p>
+          <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 28 }}>
+            {forgotMode ? 'Ange din e-post för att få en återställningslänk' : 'B2B-portal för återförsäljare'}
+          </p>
 
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            <div>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 7, textTransform: 'uppercase', letterSpacing: '.08em' }}>E-post</label>
-              <input
-                type="email" value={email} onChange={e => setEmail(e.target.value)} required
-                placeholder="namn@foretag.se"
-                style={inp}
-                onFocus={e => { e.currentTarget.style.borderColor = 'rgba(232,184,75,.35)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(232,184,75,.08)' }}
-                onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,.08)'; e.currentTarget.style.boxShadow = 'none' }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 7, textTransform: 'uppercase', letterSpacing: '.08em' }}>Lösenord</label>
-              <input
-                type="password" value={password} onChange={e => setPassword(e.target.value)} required
-                placeholder="••••••••"
-                style={inp}
-                onFocus={e => { e.currentTarget.style.borderColor = 'rgba(232,184,75,.35)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(232,184,75,.08)' }}
-                onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,.08)'; e.currentTarget.style.boxShadow = 'none' }}
-              />
-            </div>
-            {error && <div style={{ fontSize: 12, color: 'var(--red)', background: 'rgba(224,82,82,.08)', border: '1px solid rgba(224,82,82,.2)', borderRadius: 6, padding: '8px 12px' }}>{error}</div>}
-            <button
-              type="submit" disabled={loading}
-              style={{
-                width: '100%', padding: '13px',
-                background: loading ? 'rgba(232,184,75,.5)' : 'linear-gradient(135deg, #E8B84B 0%, #F5CC6A 50%, #D4A33C 100%)',
-                color: '#0D0A00', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 14,
-                letterSpacing: '.03em', border: 'none', borderRadius: 8, cursor: loading ? 'default' : 'pointer',
-                boxShadow: loading ? 'none' : '0 2px 16px rgba(232,184,75,.3)',
-                transition: 'all .18s',
-              }}
-            >
-              {loading ? 'Loggar in…' : 'Logga in'}
-            </button>
-          </form>
+          {forgotMode ? (
+            <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 7, textTransform: 'uppercase', letterSpacing: '.08em' }}>E-post</label>
+                <input
+                  type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} required
+                  placeholder="namn@foretag.se"
+                  style={inp}
+                />
+              </div>
+              {forgotMsg && <div style={{ fontSize: 12, color: 'var(--text2)', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 6, padding: '8px 12px' }}>{forgotMsg}</div>}
+              <button
+                type="submit" disabled={forgotLoading}
+                style={{
+                  width: '100%', padding: '13px',
+                  background: forgotLoading ? 'rgba(232,184,75,.5)' : 'linear-gradient(135deg, #E8B84B 0%, #F5CC6A 50%, #D4A33C 100%)',
+                  color: '#0D0A00', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 14,
+                  letterSpacing: '.03em', border: 'none', borderRadius: 8, cursor: forgotLoading ? 'default' : 'pointer',
+                  boxShadow: forgotLoading ? 'none' : '0 2px 16px rgba(232,184,75,.3)',
+                  transition: 'all .18s',
+                }}
+              >
+                {forgotLoading ? 'Skickar…' : 'Skicka återställningslänk'}
+              </button>
+              <button
+                type="button" onClick={() => { setForgotMode(false); setForgotMsg('') }}
+                style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-sans)', padding: 0 }}
+              >
+                ← Tillbaka till inloggning
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 7, textTransform: 'uppercase', letterSpacing: '.08em' }}>E-post</label>
+                <input
+                  type="email" value={email} onChange={e => setEmail(e.target.value)} required
+                  placeholder="namn@foretag.se"
+                  style={inp}
+                  onFocus={e => { e.currentTarget.style.borderColor = 'rgba(232,184,75,.35)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(232,184,75,.08)' }}
+                  onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,.08)'; e.currentTarget.style.boxShadow = 'none' }}
+                />
+              </div>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 7 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Lösenord</label>
+                  <button
+                    type="button" onClick={() => { setForgotMode(true); setForgotEmail(email); setError('') }}
+                    style={{ background: 'none', border: 'none', color: 'var(--gold)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-sans)', padding: 0 }}
+                  >
+                    Glömt lösenord?
+                  </button>
+                </div>
+                <input
+                  type="password" value={password} onChange={e => setPassword(e.target.value)} required
+                  placeholder="••••••••"
+                  style={inp}
+                  onFocus={e => { e.currentTarget.style.borderColor = 'rgba(232,184,75,.35)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(232,184,75,.08)' }}
+                  onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,.08)'; e.currentTarget.style.boxShadow = 'none' }}
+                />
+              </div>
+              {error && <div style={{ fontSize: 12, color: 'var(--red)', background: 'rgba(224,82,82,.08)', border: '1px solid rgba(224,82,82,.2)', borderRadius: 6, padding: '8px 12px' }}>{error}</div>}
+              <button
+                type="submit" disabled={loading}
+                style={{
+                  width: '100%', padding: '13px',
+                  background: loading ? 'rgba(232,184,75,.5)' : 'linear-gradient(135deg, #E8B84B 0%, #F5CC6A 50%, #D4A33C 100%)',
+                  color: '#0D0A00', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 14,
+                  letterSpacing: '.03em', border: 'none', borderRadius: 8, cursor: loading ? 'default' : 'pointer',
+                  boxShadow: loading ? 'none' : '0 2px 16px rgba(232,184,75,.3)',
+                  transition: 'all .18s',
+                }}
+              >
+                {loading ? 'Loggar in…' : 'Logga in'}
+              </button>
+            </form>
+          )}
         </div>
 
         {/* Demo hint */}

@@ -10,7 +10,7 @@ const WWW_HOSTS = ['proluxshine.com', 'www.proluxshine.com']
 // Admin/CMS lives here too — Bashar's team manages products, orders etc.
 // from crm.proluxshine.com, and since it's the same Supabase database,
 // changes show up on www.proluxshine.com immediately.
-const CRM_ALLOWED_PREFIXES = ['/crm', '/admin', '/login', '/auth']
+const CRM_ALLOWED_PREFIXES = ['/crm', '/admin', '/login', '/auth', '/reset-password']
 
 export async function proxy(request: NextRequest) {
   const host = request.headers.get('host')?.toLowerCase().split(':')[0] ?? ''
