@@ -133,7 +133,11 @@ export function PublicShell({ children }: { children: ReactNode }) {
     if (!regForm.company.trim()) { setRegError('Företagsnamn krävs'); return }
     setRegLoading(true); setRegError('')
     const sb = createClient()
-    const { data, error: signUpErr } = await sb.auth.signUp({ email: regForm.email, password: regForm.password })
+    const { data, error: signUpErr } = await sb.auth.signUp({
+      email: regForm.email,
+      password: regForm.password,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    })
     if (signUpErr) { setRegError(signUpErr.message); setRegLoading(false); return }
     if (data.user) {
       const { data: custData, error: custErr } = await sb.from('customers').insert({

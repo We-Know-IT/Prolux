@@ -18,9 +18,13 @@ export default function LoginPage() {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) { setError('Fel lösenord eller e-post. Försök igen.'); setLoading(false); return }
     const role = data.user?.user_metadata?.role
-    if (role === 'admin') window.location.href = '/admin/dashboard'
-    else if (role === 'crm') window.location.href = '/crm/dashboard'
-    else window.location.href = '/portal/dashboard'
+    const path = role === 'admin' ? '/admin/dashboard' : role === 'crm' ? '/crm/dashboard' : '/portal/dashboard'
+    const targetHost = role === 'admin' || role === 'crm' ? 'crm.proluxshine.com' : 'www.proluxshine.com'
+    const currentHost = window.location.hostname
+    const PROD_HOSTS = ['proluxshine.com', 'www.proluxshine.com', 'crm.proluxshine.com']
+    window.location.href = PROD_HOSTS.includes(currentHost) && currentHost !== targetHost
+      ? `https://${targetHost}${path}`
+      : path
   }
 
   const inp: React.CSSProperties = {
