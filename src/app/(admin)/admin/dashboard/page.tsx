@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt } from '@/lib/utils'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, Trophy, ArrowRight, Calendar, ChevronLeft, ChevronRight, Activity } from 'lucide-react'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -32,6 +33,7 @@ function workingDaysInMonth(year: number, month: number) {
 }
 
 export default function AdminDashboard() {
+  const router = useRouter()
   const [orders, setOrders]       = useState<any[]>([])
   const [products, setProducts]   = useState<any[]>([])
   const [customers, setCustomers] = useState<any[]>([])
@@ -46,6 +48,12 @@ export default function AdminDashboard() {
   const [editBudget, setEditBudget]     = useState(false)
   const [budgetInput, setBudgetInput]   = useState<Record<string, string>>({})
   const [savingBudget, setSavingBudget] = useState(false)
+  const [selectedDay, setSelectedDay]   = useState<string | null>(null)
+  const [showAddReminder, setShowAddReminder] = useState(false)
+  const [remTitle, setRemTitle]         = useState('')
+  const [remCustomer, setRemCustomer]   = useState('')
+  const [remPriority, setRemPriority]   = useState<'low' | 'normal' | 'high'>('normal')
+  const [savingReminder, setSavingReminder] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const now   = new Date()
@@ -104,6 +112,30 @@ export default function AdminDashboard() {
     setBudgets(newBudgets)
     setSavingBudget(false)
     setEditBudget(false)
+  }
+
+  async function saveReminder() {
+    if (!remTitle.trim() || !selectedDay) return
+    setSavingReminder(true)
+    const sb = createClient()
+    const { data, error } = await sb.from('reminders').insert({
+      customer_id: remCustomer || null,
+      title: remTitle.trim(),
+      due_date: selectedDay,
+      priority: remPriority,
+      status: 'upcoming',
+    }).select('id,title,due_date,priority,customers(company)').single()
+    setSavingReminder(false)
+    if (!error && data) {
+      setReminders(rs => [...rs, data as any].sort((a, b) => a.due_date.localeCompare(b.due_date)))
+      setRemTitle(''); setRemCustomer(''); setRemPriority('normal'); setShowAddReminder(false)
+    }
+  }
+
+  async function deleteReminder(id: string) {
+    const sb = createClient()
+    await sb.from('reminders').delete().eq('id', id)
+    setReminders(rs => rs.filter(r => r.id !== id))
   }
 
   function drawChart() {
@@ -398,7 +430,7 @@ export default function AdminDashboard() {
             </thead>
             <tbody>
               {orders.slice(0, 7).map(o => (
-                <tr key={o.id}>
+                <tr key={o.id} onClick={() => router.push(`/admin/orders?order=${o.id}`)} style={{ cursor: 'pointer' }}>
                   <td style={{ padding: '10px 0', borderBottom: '1px solid var(--line2)' }}>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--gold)', fontWeight: 500 }}>#{o.order_nr}</span>
                   </td>
@@ -430,7 +462,7 @@ export default function AdminDashboard() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               {deals.slice(0, 6).map((d, i) => (
-                <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: i < Math.min(deals.length, 6) - 1 ? '1px solid rgba(255,255,255,.04)' : 'none' }}>
+                <div key={d.id} onClick={() => router.push(`/crm/pipeline?deal=${d.id}`)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: i < Math.min(deals.length, 6) - 1 ? '1px solid rgba(255,255,255,.04)' : 'none', cursor: 'pointer' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.title}</div>
                     <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>{d.stage} · {d.assigned_to || '—'}</div>
@@ -471,18 +503,45 @@ export default function AdminDashboard() {
                 const dayRems = remindersByDate[ds] || []
                 const isToday = ds === todayStr
                 const isPast  = ds < todayStr
+                const isSelected = ds === selectedDay
                 return (
-                  <div key={idx} title={dayRems.map(r => r.title).join(', ')} style={{ borderRadius: 5, padding: '3px 2px', textAlign: 'center', background: isToday ? 'rgba(232,184,75,.12)' : 'transparent', border: isToday ? '1px solid rgba(232,184,75,.25)' : '1px solid transparent' }}>
+                  <button key={idx} onClick={() => setSelectedDay(isSelected ? null : ds)} title={dayRems.map(r => r.title).join(', ')}
+                    style={{ borderRadius: 5, padding: '3px 2px', textAlign: 'center', cursor: 'pointer', background: isSelected ? 'rgba(232,184,75,.2)' : isToday ? 'rgba(232,184,75,.12)' : 'transparent', border: isSelected ? '1px solid rgba(232,184,75,.5)' : isToday ? '1px solid rgba(232,184,75,.25)' : '1px solid transparent', fontFamily: 'inherit' }}>
                     <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--gold)' : isPast ? 'var(--text3)' : 'var(--text)' }}>{day}</div>
                     {dayRems.length > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'center', gap: 2, marginTop: 1 }}>
                         {dayRems.slice(0, 2).map((r, i) => <div key={i} style={{ width: 4, height: 4, borderRadius: '50%', background: PRIORITY_DOT[r.priority] || 'var(--blue)' }} />)}
                       </div>
                     )}
-                  </div>
+                  </button>
                 )
               })}
             </div>
+
+            {/* Selected day detail */}
+            {selectedDay && (
+              <div style={{ borderTop: '1px solid rgba(255,255,255,.05)', padding: '12px 12px 14px' }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 8 }}>
+                  {new Date(selectedDay + 'T12:00:00').toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </div>
+                {(remindersByDate[selectedDay] || []).length === 0 ? (
+                  <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 8 }}>Inga påminnelser denna dag</div>
+                ) : (remindersByDate[selectedDay] || []).map(r => (
+                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0' }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: PRIORITY_DOT[r.priority], flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, color: 'var(--text)' }}>{r.title}</div>
+                      {r.customers?.company && <div style={{ fontSize: 10, color: 'var(--text3)' }}>{r.customers.company}</div>}
+                    </div>
+                    <button onClick={() => deleteReminder(r.id)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 2, flexShrink: 0 }}>×</button>
+                  </div>
+                ))}
+                <button onClick={() => setShowAddReminder(true)}
+                  style={{ marginTop: 8, fontSize: 11, padding: '5px 12px', background: 'rgba(232,184,75,.1)', border: '1px solid rgba(232,184,75,.2)', borderRadius: 6, color: 'var(--gold)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                  + Lägg till aktivitet
+                </button>
+              </div>
+            )}
           </div>
           {/* Upcoming reminders list */}
           <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -580,6 +639,50 @@ export default function AdminDashboard() {
           .dash-chart-row { grid-template-columns: 1fr !important; }
         }
       `}</style>
+
+      {/* Add reminder modal */}
+      {showAddReminder && selectedDay && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ ...card, width: '100%', maxWidth: 400, padding: '26px 26px 22px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+                Ny aktivitet — {new Date(selectedDay + 'T12:00:00').toLocaleDateString('sv-SE', { day: 'numeric', month: 'long' })}
+              </h3>
+              <button onClick={() => setShowAddReminder(false)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer' }}>×</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.05em' }}>Titel</label>
+                <input value={remTitle} onChange={e => setRemTitle(e.target.value)} placeholder="Vad ska göras?"
+                  style={{ width: '100%', padding: '9px 12px', background: 'var(--bg4)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 7, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.05em' }}>Kund (valfritt)</label>
+                <select value={remCustomer} onChange={e => setRemCustomer(e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', background: 'var(--bg4)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 7, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}>
+                  <option value="">— Ingen kund —</option>
+                  {customers.map(c => <option key={c.id} value={c.id}>{c.company}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.05em' }}>Prioritet</label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {(['low', 'normal', 'high'] as const).map(p => (
+                    <button key={p} onClick={() => setRemPriority(p)}
+                      style={{ flex: 1, padding: '7px 0', fontSize: 12, background: remPriority === p ? `${PRIORITY_DOT[p]}22` : 'rgba(255,255,255,.03)', border: `1px solid ${remPriority === p ? PRIORITY_DOT[p] + '66' : 'rgba(255,255,255,.08)'}`, borderRadius: 6, color: remPriority === p ? PRIORITY_DOT[p] : 'var(--text3)', cursor: 'pointer', fontWeight: remPriority === p ? 700 : 400, fontFamily: 'var(--font-sans)' }}>
+                      {p === 'low' ? 'Låg' : p === 'normal' ? 'Normal' : 'Hög'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button onClick={saveReminder} disabled={savingReminder || !remTitle.trim()}
+                style={{ width: '100%', padding: '10px 0', marginTop: 4, background: 'var(--gold)', border: 'none', borderRadius: 8, color: '#111', fontSize: 14, fontWeight: 700, cursor: savingReminder ? 'default' : 'pointer', opacity: !remTitle.trim() ? 0.5 : 1 }}>
+                {savingReminder ? 'Sparar...' : 'Spara aktivitet'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

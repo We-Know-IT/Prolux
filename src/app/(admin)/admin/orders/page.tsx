@@ -58,6 +58,9 @@ export default function AdminOrders() {
       .then(({ data }) => {
         setOrders(data || [])
         setFiltered(data || [])
+        const wantedId = new URLSearchParams(window.location.search).get('order')
+        const wanted = wantedId && data?.find(o => o.id === wantedId)
+        if (wanted) openOrder(wanted)
       })
   }, [])
 

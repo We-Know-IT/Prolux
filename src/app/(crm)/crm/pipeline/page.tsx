@@ -29,6 +29,7 @@ export default function CrmPipelinePage() {
   const [newCust, setNewCust] = useState({ company: '', contact_name: '', email: '', price_list_id: 'Standard' })
   const [savingCust, setSavingCust] = useState(false)
   const [toast, setToast] = useState('')
+  const [highlightDeal, setHighlightDeal] = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -38,6 +39,14 @@ export default function CrmPipelinePage() {
       if (d.data) setDeals(d.data)
       if (c.data) setCustomers(c.data as Customer[])
       setLoading(false)
+      const wantedId = new URLSearchParams(window.location.search).get('deal')
+      if (wantedId) {
+        setHighlightDeal(wantedId)
+        setTimeout(() => {
+          document.getElementById(`deal-${wantedId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
+        }, 100)
+        setTimeout(() => setHighlightDeal(null), 3000)
+      }
     })
   }, [])
 
@@ -131,11 +140,16 @@ export default function CrmPipelinePage() {
               </div>
               <div style={{ flex: 1, overflowY: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {columnDeals.map(d => (
-                  <div key={d.id}
+                  <div key={d.id} id={`deal-${d.id}`}
                     draggable
                     onDragStart={() => setDragging(d.id)}
                     onDragEnd={() => setDragging(null)}
-                    style={{ background: 'var(--bg4)', border: `1px solid ${dragging === d.id ? color : 'var(--line)'}`, borderRadius: 10, padding: 14, cursor: 'grab', transition: 'all .15s' }}
+                    style={{
+                      background: highlightDeal === d.id ? 'rgba(232,184,75,.1)' : 'var(--bg4)',
+                      border: `1px solid ${highlightDeal === d.id ? 'var(--gold)' : dragging === d.id ? color : 'var(--line)'}`,
+                      borderRadius: 10, padding: 14, cursor: 'grab', transition: 'all .15s',
+                      boxShadow: highlightDeal === d.id ? '0 0 0 3px rgba(232,184,75,.2)' : 'none',
+                    }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4 }}>{d.title}</span>
