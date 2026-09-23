@@ -76,7 +76,7 @@ function ProductRow({ p, selectedCustomer, getQty, addToCart, updateQty, badge }
 export default function CrmOrdersPage() {
   const searchParams = useSearchParams()
   const autoSelectedRef = useRef(false)
-  const [view, setView]                   = useState<View>('new')
+  const [view, setView]                   = useState<View>(() => searchParams.get('view') === 'history' ? 'history' : 'new')
   const [orders, setOrders]               = useState<(Order & { customers?: Customer })[]>([])
   const [customers, setCustomers]         = useState<Customer[]>([])
   const [products, setProducts]           = useState<Product[]>([])

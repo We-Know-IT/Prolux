@@ -178,7 +178,7 @@ export default function CrmDashboardPage() {
         {[
           { label: 'Pipeline',  sub: 'Deals & offerter',    href: '/crm/pipeline',  icon: GitBranch },
           { label: 'Kunder',    sub: 'Kundkort & historik', href: '/crm/customers', icon: Users },
-          { label: 'Ordrar',    sub: 'Orderhistorik',       href: '/crm/orders',    icon: ShoppingBag },
+          { label: 'Ordrar',    sub: 'Orderhistorik',       href: '/crm/orders?view=history', icon: ShoppingBag },
           { label: 'Produkter', sub: 'Katalog & priser',    href: '/crm/orders',    icon: Package },
         ].map(({ label, sub, href, icon: Icon }) => (
           <Link key={label} href={href} style={{ ...glass, padding: '16px 18px', textDecoration: 'none', display: 'block' }}>

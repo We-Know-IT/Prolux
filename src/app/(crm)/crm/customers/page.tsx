@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Customer } from '@/types'
 import { formatDate } from '@/lib/utils'
@@ -9,6 +10,7 @@ import Link from 'next/link'
 const supabase = createClient()
 
 export default function CrmCustomersPage() {
+  const router = useRouter()
   const [customers, setCustomers]     = useState<Customer[]>([])
   const [allReminders, setAllReminders] = useState<{ customer_id: string; due_date: string }[]>([])
   const [loading, setLoading]         = useState(true)
@@ -109,10 +111,10 @@ export default function CrmCustomersPage() {
         ) : filtered.map((c, i) => {
           const overdueCount = allReminders.filter(r => r.customer_id === c.id && r.due_date < today).length
           return (
-            <div key={c.id} style={{
+            <div key={c.id} onClick={() => router.push(`/crm/customers/${c.id}`)} style={{
               display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px',
               borderBottom: i < filtered.length - 1 ? '1px solid var(--line)' : 'none',
-              background: 'transparent', transition: 'background .1s',
+              background: 'transparent', transition: 'background .1s', cursor: 'pointer',
             }}
               onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,.03)'}
               onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
