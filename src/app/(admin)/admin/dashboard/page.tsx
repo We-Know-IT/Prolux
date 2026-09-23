@@ -138,6 +138,12 @@ export default function AdminDashboard() {
     setReminders(rs => rs.filter(r => r.id !== id))
   }
 
+  async function markReminderDone(id: string) {
+    const sb = createClient()
+    await sb.from('reminders').update({ status: 'done' }).eq('id', id)
+    setReminders(rs => rs.filter(r => r.id !== id))
+  }
+
   function drawChart() {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -533,6 +539,7 @@ export default function AdminDashboard() {
                       <div style={{ fontSize: 12, color: 'var(--text)' }}>{r.title}</div>
                       {r.customers?.company && <div style={{ fontSize: 10, color: 'var(--text3)' }}>{r.customers.company}</div>}
                     </div>
+                    <button onClick={() => markReminderDone(r.id)} style={{ fontSize: 10, padding: '3px 8px', background: 'rgba(76,175,125,.1)', border: '1px solid rgba(76,175,125,.2)', borderRadius: 5, color: 'var(--green)', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>Klar</button>
                     <button onClick={() => deleteReminder(r.id)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 2, flexShrink: 0 }}>×</button>
                   </div>
                 ))}

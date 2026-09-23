@@ -230,7 +230,7 @@ export default function CustomerDetailPage() {
     background: 'var(--bg3)', border: '1px solid var(--line)', borderRadius: 12,
   }
 
-  const NoteForm = () => (
+  const noteForm = (
     <div style={{ ...card, padding: 16, marginBottom: 14 }}>
       <textarea value={noteText} onChange={e => setNoteText(e.target.value)}
         placeholder="Skriv anteckning, samtalsnotis, mötesinformation..." rows={3}
@@ -248,7 +248,7 @@ export default function CustomerDetailPage() {
     </div>
   )
 
-  const ReminderForm = () => (
+  const reminderForm = (
     <div style={{ ...card, padding: 16, marginBottom: 14 }}>
       <input value={reminderText} onChange={e => setReminderText(e.target.value)} placeholder="Vad ska du komma ihåg?"
         style={{ width: '100%', padding: '9px 12px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none', marginBottom: 10, boxSizing: 'border-box' }} />
@@ -408,7 +408,7 @@ export default function CustomerDetailPage() {
             {/* Activity log preview */}
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Senaste aktiviteter</div>
-              <NoteForm />
+              {noteForm}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {activities.slice(0, 4).map(a => (
                   <div key={a.id} style={{ ...card, border: `1px solid ${activityColor[a.type]}28`, padding: '10px 14px' }}>
@@ -556,7 +556,7 @@ export default function CustomerDetailPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
           <div>
             <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Anteckningar & aktiviteter</h3>
-            <NoteForm />
+            {noteForm}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {activities.map(a => (
                 <div key={a.id} style={{ ...card, border: `1px solid ${activityColor[a.type]}28`, padding: '12px 14px' }}>
@@ -578,7 +578,7 @@ export default function CustomerDetailPage() {
             <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
               <Bell size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} color="var(--gold)" />Påminnelser
             </h3>
-            <ReminderForm />
+            {reminderForm}
             {overdueReminders.length > 0 && (
               <div style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>Försenade</div>

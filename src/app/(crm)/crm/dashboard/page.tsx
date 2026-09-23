@@ -256,41 +256,45 @@ export default function CrmDashboardPage() {
                 </div>
               </div>
             )}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', marginBottom: 14 }}>
-              {SALESPEOPLE.filter(sp => budgets[sp]).map(sp => {
-                const spBudget   = budgets[sp]
-                const spAchieved = achieved[sp] || 0
-                const spPct      = Math.min((spAchieved / spBudget) * 100, 100)
-                const isMe       = sp === firstName
-                const isGreen    = spAchieved >= spBudget
-                return (
-                  <div key={sp} style={{ background: isMe ? 'rgba(232,184,75,.05)' : 'rgba(255,255,255,.03)', border: `1px solid ${isMe ? 'rgba(232,184,75,.15)' : 'rgba(255,255,255,.06)'}`, borderRadius: 8, padding: '10px 13px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: isMe ? 'var(--gold)' : 'var(--text2)' }}>{sp}{isMe ? ' (du)' : ''}</span>
-                      <span style={{ fontSize: 11, color: isGreen ? 'var(--green)' : 'var(--text3)' }}>{fmt(spAchieved)} / {fmt(spBudget)} kr</span>
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>
-                      {Math.round(spPct)}% av budget · dagsmål <span style={{ color: isMe ? 'var(--gold)' : 'var(--text2)', fontWeight: 600 }}>{fmt(Math.round(spBudget / workDays))} kr</span>
-                    </div>
-                    <div style={{ height: 3, background: 'rgba(255,255,255,.06)', borderRadius: 2 }}>
-                      <div style={{ height: '100%', width: `${spPct}%`, background: isGreen ? 'var(--green)' : isMe ? 'var(--gold)' : 'rgba(74,143,212,.7)', borderRadius: 2 }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-            <div style={{ display: 'flex', gap: 24, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,.06)' }}>
-              {[
-                { label: 'Total månadsbudget', value: `${fmt(totalBudget)} kr` },
-                { label: 'Teamets stängda affärer', value: `${fmt(Object.values(achieved).reduce((a,b) => a+b, 0))} kr` },
-                { label: 'Arbetsdagar kvar', value: `${workDays - daysPassed} av ${workDays}` },
-              ].map(({ label, value }) => (
-                <div key={label}>
-                  <div style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 2 }}>{label}</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{value}</div>
+            {isAdmin && (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', marginBottom: 14 }}>
+                  {SALESPEOPLE.filter(sp => budgets[sp]).map(sp => {
+                    const spBudget   = budgets[sp]
+                    const spAchieved = achieved[sp] || 0
+                    const spPct      = Math.min((spAchieved / spBudget) * 100, 100)
+                    const isMe       = sp === firstName
+                    const isGreen    = spAchieved >= spBudget
+                    return (
+                      <div key={sp} style={{ background: isMe ? 'rgba(232,184,75,.05)' : 'rgba(255,255,255,.03)', border: `1px solid ${isMe ? 'rgba(232,184,75,.15)' : 'rgba(255,255,255,.06)'}`, borderRadius: 8, padding: '10px 13px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: isMe ? 'var(--gold)' : 'var(--text2)' }}>{sp}{isMe ? ' (du)' : ''}</span>
+                          <span style={{ fontSize: 11, color: isGreen ? 'var(--green)' : 'var(--text3)' }}>{fmt(spAchieved)} / {fmt(spBudget)} kr</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>
+                          {Math.round(spPct)}% av budget · dagsmål <span style={{ color: isMe ? 'var(--gold)' : 'var(--text2)', fontWeight: 600 }}>{fmt(Math.round(spBudget / workDays))} kr</span>
+                        </div>
+                        <div style={{ height: 3, background: 'rgba(255,255,255,.06)', borderRadius: 2 }}>
+                          <div style={{ height: '100%', width: `${spPct}%`, background: isGreen ? 'var(--green)' : isMe ? 'var(--gold)' : 'rgba(74,143,212,.7)', borderRadius: 2 }} />
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-              ))}
-            </div>
+                <div style={{ display: 'flex', gap: 24, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,.06)' }}>
+                  {[
+                    { label: 'Total månadsbudget', value: `${fmt(totalBudget)} kr` },
+                    { label: 'Teamets stängda affärer', value: `${fmt(Object.values(achieved).reduce((a,b) => a+b, 0))} kr` },
+                    { label: 'Arbetsdagar kvar', value: `${workDays - daysPassed} av ${workDays}` },
+                  ].map(({ label, value }) => (
+                    <div key={label}>
+                      <div style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 2 }}>{label}</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: 13, padding: '12px 0' }}>
