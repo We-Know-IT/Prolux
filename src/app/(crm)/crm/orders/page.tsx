@@ -1,8 +1,8 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { Fragment, useEffect, useState, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Product, Customer, Category, CartItem, Order, OrderStatus, ORDER_STATUS_LABEL } from '@/types'
+import { Product, Customer, Category, CartItem, Order, OrderItem, OrderStatus, ORDER_STATUS_LABEL } from '@/types'
 import { custPrice, fmt, formatDate } from '@/lib/utils'
 import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star } from 'lucide-react'
 
@@ -90,6 +90,8 @@ export default function CrmOrdersPage() {
   const [productSearch, setProductSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [toast, setToast]                 = useState('')
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null)
+  const [orderItemsById, setOrderItemsById] = useState<Record<string, OrderItem[]>>({})
   const [discount, setDiscount]           = useState('')
   const [discountEnabled, setDiscountEnabled] = useState(false)
   const [isMobile, setIsMobile]           = useState(false)
@@ -156,6 +158,14 @@ export default function CrmOrdersPage() {
       setLastBought([])
       setRecommendations([])
     }
+  }
+
+  async function toggleOrderExpand(orderId: string) {
+    if (expandedOrderId === orderId) { setExpandedOrderId(null); return }
+    setExpandedOrderId(orderId)
+    if (orderItemsById[orderId]) return
+    const { data } = await supabase.from('order_items').select('*').eq('order_id', orderId)
+    if (data) setOrderItemsById(items => ({ ...items, [orderId]: data as OrderItem[] }))
   }
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 3000) }
@@ -262,19 +272,44 @@ export default function CrmOrdersPage() {
           <tbody>
             {loading ? (
               <tr><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: 'var(--text3)' }}>Laddar...</td></tr>
-            ) : orders.map(o => (
-              <tr key={o.id} style={{ borderBottom: '1px solid var(--border2)' }}>
-                <td style={{ padding: '12px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text3)' }}>#{o.order_nr}</td>
-                <td style={{ padding: '12px 16px', color: 'var(--text2)' }}>{formatDate(o.created_at)}</td>
-                <td style={{ padding: '12px 16px', color: 'var(--text)', fontWeight: 500 }}>{(o as any).customers?.company || '—'}</td>
-                <td style={{ padding: '12px 16px', color: 'var(--gold)', fontWeight: 700 }}>{fmt(o.total)} kr</td>
-                <td style={{ padding: '12px 16px' }}>
-                  <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: 'rgba(76,175,125,.12)', color: 'var(--green)', fontWeight: 700 }}>
-                    {ORDER_STATUS_LABEL[o.status] || o.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
+            ) : orders.map(o => {
+              const expanded = expandedOrderId === o.id
+              const items = orderItemsById[o.id]
+              return (
+                <Fragment key={o.id}>
+                  <tr onClick={() => toggleOrderExpand(o.id)} style={{ borderBottom: expanded ? 'none' : '1px solid var(--border2)', cursor: 'pointer', background: expanded ? 'rgba(232,184,75,.04)' : 'transparent' }}>
+                    <td style={{ padding: '12px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text3)' }}>#{o.order_nr}</td>
+                    <td style={{ padding: '12px 16px', color: 'var(--text2)' }}>{formatDate(o.created_at)}</td>
+                    <td style={{ padding: '12px 16px', color: 'var(--text)', fontWeight: 500 }}>{(o as any).customers?.company || '—'}</td>
+                    <td style={{ padding: '12px 16px', color: 'var(--gold)', fontWeight: 700 }}>{fmt(o.total)} kr</td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: 'rgba(76,175,125,.12)', color: 'var(--green)', fontWeight: 700 }}>
+                        {ORDER_STATUS_LABEL[o.status] || o.status}
+                      </span>
+                    </td>
+                  </tr>
+                  {expanded && (
+                    <tr style={{ borderBottom: '1px solid var(--border2)' }}>
+                      <td colSpan={5} style={{ padding: '4px 16px 16px', background: 'rgba(232,184,75,.02)' }}>
+                        {!items ? (
+                          <div style={{ fontSize: 12, color: 'var(--text3)', padding: '8px 0' }}>Laddar produkter...</div>
+                        ) : items.length === 0 ? (
+                          <div style={{ fontSize: 12, color: 'var(--text3)', padding: '8px 0' }}>Inga produktrader</div>
+                        ) : (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingTop: 8 }}>
+                            {items.map(item => (
+                              <span key={item.id} style={{ fontSize: 11, padding: '3px 8px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 5, color: 'var(--text2)' }}>
+                                {item.product_name} ×{item.qty}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              )
+            })}
             {!loading && orders.length === 0 && (
               <tr><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: 'var(--text3)' }}>Inga ordrar</td></tr>
             )}
