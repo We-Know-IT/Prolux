@@ -15,6 +15,27 @@ const inputStyle: React.CSSProperties = {
   fontFamily: 'var(--font-sans)', fontSize: 14, outline: 'none', boxSizing: 'border-box',
 }
 
+function ListEditor({ items, onChange, placeholder }: { items: string[]; onChange: (items: string[]) => void; placeholder?: string }) {
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      {items.map((item, i) => (
+        <div key={i} style={{ display: 'flex', gap: 8 }}>
+          <input style={inputStyle} value={item} placeholder={placeholder}
+            onChange={e => onChange(items.map((it, idx) => idx === i ? e.target.value : it))} />
+          <button type="button" onClick={() => onChange(items.filter((_, idx) => idx !== i))}
+            style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', flexShrink: 0 }}>
+            <Trash2 size={15} />
+          </button>
+        </div>
+      ))}
+      <button type="button" onClick={() => onChange([...items, ''])}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 6, color: 'var(--text2)', fontSize: 12, cursor: 'pointer', width: 'fit-content' }}>
+        <Plus size={13} /> Lägg till
+      </button>
+    </div>
+  )
+}
+
 function ImageUploadField({ value, onChange, bucket }: { value: string; onChange: (url: string) => void; bucket: string }) {
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -78,6 +99,9 @@ export default function AdminContentHem() {
   }
   function removeCategory(i: number) {
     setForm(f => ({ ...f, categories: f.categories.filter((_, idx) => idx !== i) }))
+  }
+  function updateFeature(i: number, field: 'icon' | 'title' | 'desc', value: string) {
+    setForm(f => ({ ...f, why: { ...f.why, features: f.why.features.map((ft, idx) => idx === i ? { ...ft, [field]: value } : ft) } }))
   }
 
   const sectionCard: React.CSSProperties = { background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: '22px 24px', marginBottom: 20 }
@@ -144,9 +168,86 @@ export default function AdminContentHem() {
               </div>
             </div>
           ))}
-          <button onClick={addCategory} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 7, color: 'var(--text2)', fontSize: 13, cursor: 'pointer' }}>
+          <button onClick={addCategory} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 7, color: 'var(--text2)', fontSize: 13, cursor: 'pointer', marginBottom: 28 }}>
             <Plus size={14} /> Lägg till kategori
           </button>
+
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Pro Center-banner</h2>
+          <div style={sectionCard}>
+            <div style={{ display: 'grid', gap: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div>
+                  {label('Etikett')}
+                  <input style={inputStyle} value={form.proCenter.eyebrow} onChange={e => setForm(f => ({ ...f, proCenter: { ...f.proCenter, eyebrow: e.target.value } }))} />
+                </div>
+                <div>
+                  {label('Badge (liten text på bilden)')}
+                  <input style={inputStyle} value={form.proCenter.badge} onChange={e => setForm(f => ({ ...f, proCenter: { ...f.proCenter, badge: e.target.value } }))} />
+                </div>
+              </div>
+              <div>
+                {label('Rubrik')}
+                <input style={inputStyle} value={form.proCenter.heading} onChange={e => setForm(f => ({ ...f, proCenter: { ...f.proCenter, heading: e.target.value } }))} />
+              </div>
+              <div>
+                {label('Brödtext')}
+                <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={form.proCenter.sub} onChange={e => setForm(f => ({ ...f, proCenter: { ...f.proCenter, sub: e.target.value } }))} />
+              </div>
+              <div>
+                {label('Punktlista')}
+                <ListEditor items={form.proCenter.bullets} onChange={bullets => setForm(f => ({ ...f, proCenter: { ...f.proCenter, bullets } }))} placeholder="T.ex. Snabba leveranser" />
+              </div>
+              <div>
+                {label('Knapptext')}
+                <input style={inputStyle} value={form.proCenter.ctaLabel} onChange={e => setForm(f => ({ ...f, proCenter: { ...f.proCenter, ctaLabel: e.target.value } }))} />
+              </div>
+            </div>
+          </div>
+
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Brand story</h2>
+          <div style={sectionCard}>
+            <div style={{ display: 'grid', gap: 14 }}>
+              <div>
+                {label('Etikett')}
+                <input style={inputStyle} value={form.brandStory.eyebrow} onChange={e => setForm(f => ({ ...f, brandStory: { ...f.brandStory, eyebrow: e.target.value } }))} />
+              </div>
+              <div>
+                {label('Rubrik')}
+                <input style={inputStyle} value={form.brandStory.heading} onChange={e => setForm(f => ({ ...f, brandStory: { ...f.brandStory, heading: e.target.value } }))} />
+              </div>
+              <div>
+                {label('Brödtextstycken')}
+                <ListEditor items={form.brandStory.paragraphs} onChange={paragraphs => setForm(f => ({ ...f, brandStory: { ...f.brandStory, paragraphs } }))} placeholder="Stycke..." />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div>
+                  {label('Flik 1 (fet/aktiv)')}
+                  <input style={inputStyle} value={form.brandStory.brand1} onChange={e => setForm(f => ({ ...f, brandStory: { ...f.brandStory, brand1: e.target.value } }))} />
+                </div>
+                <div>
+                  {label('Flik 2')}
+                  <input style={inputStyle} value={form.brandStory.brand2} onChange={e => setForm(f => ({ ...f, brandStory: { ...f.brandStory, brand2: e.target.value } }))} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Varför ProLux — rutnät</h2>
+          <div style={sectionCard}>
+            <div style={{ marginBottom: 16 }}>
+              {label('Rubrik')}
+              <input style={inputStyle} value={form.why.heading} onChange={e => setForm(f => ({ ...f, why: { ...f.why, heading: e.target.value } }))} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              {form.why.features.map((ft, i) => (
+                <div key={i} style={{ display: 'grid', gap: 8, padding: 14, background: 'var(--bg4)', borderRadius: 8 }}>
+                  <input style={inputStyle} value={ft.icon} onChange={e => updateFeature(i, 'icon', e.target.value)} placeholder="Emoji, t.ex. 🛡️" />
+                  <input style={inputStyle} value={ft.title} onChange={e => updateFeature(i, 'title', e.target.value)} placeholder="Titel" />
+                  <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={ft.desc} onChange={e => updateFeature(i, 'desc', e.target.value)} placeholder="Beskrivning" />
+                </div>
+              ))}
+            </div>
+          </div>
         </>
       )}
 

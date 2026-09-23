@@ -17,9 +17,36 @@ export interface CategoryCard {
   name: string
   img: string
 }
+export interface WhyFeature {
+  icon: string
+  title: string
+  desc: string
+}
+export interface ProCenterContent {
+  eyebrow: string
+  heading: string
+  sub: string
+  bullets: string[]
+  ctaLabel: string
+  badge: string
+}
+export interface BrandStoryContent {
+  eyebrow: string
+  heading: string
+  paragraphs: string[]
+  brand1: string
+  brand2: string
+}
+export interface WhyContent {
+  heading: string
+  features: WhyFeature[]
+}
 export interface HomeContent {
   hero: HeroSlide[]
   categories: CategoryCard[]
+  proCenter: ProCenterContent
+  brandStory: BrandStoryContent
+  why: WhyContent
 }
 
 export const DEFAULT_HOME: HomeContent = {
@@ -38,6 +65,33 @@ export const DEFAULT_HOME: HomeContent = {
     { name: 'Paket',          img: 'https://fopshubqliboxgokbhnr.supabase.co/storage/v1/object/public/category-images/category-paket.png' },
     { name: 'Hemstäd',        img: 'https://fopshubqliboxgokbhnr.supabase.co/storage/v1/object/public/category-images/category-hemstad.png' },
   ],
+  proCenter: {
+    eyebrow: 'B2B Portal',
+    heading: 'Pro Center – för företag & proffs',
+    sub: 'Vi erbjuder förmånliga priser, snabba leveranser och personlig service för verkstäder, bilvårdare och återförsäljare.',
+    bullets: ['Förmånliga villkor', 'Snabba leveranser', 'Dedikerad support', 'Prov & testprodukter'],
+    ctaLabel: 'Bli företagskund',
+    badge: 'ProLuxShine',
+  },
+  brandStory: {
+    eyebrow: 'Exklusiva agenturer',
+    heading: 'Italiensk passion & precision i varje droppe',
+    paragraphs: [
+      'ProLux Shine är stor distributör av de anrika varumärkena Virtus och Frescura. Frescura har i över 50 år lett utvecklingen av biologiskt nedbrytbara, pH-balanserade rengöringssystem för fordon över hela Europa.',
+      'Tillsammans med Virtus avancerade polermedel och lackskydd erbjuder vi ett komplett system som tillgodoser bilvårdsförens extremaste krav på prestanda och finish.',
+    ],
+    brand1: 'FRESCURA',
+    brand2: 'VIRTUS PRO',
+  },
+  why: {
+    heading: 'Varför välja ProLux Shine?',
+    features: [
+      { icon: '🛡️', title: 'Säker för alla ytor',   desc: 'Sammansättningarna ger extremt effektiva formuleringar utformade för att ge utmärkt skydd mot känsliga material.' },
+      { icon: '⚗️', title: 'pH-balanserat',          desc: 'Perfekt komponerat pH-värden som inte skadar lackytan, även vid hög koncentration.' },
+      { icon: '⚡', title: 'Effektiv avfettning',     desc: 'Våra lättlösliga enskilda och kalklettnings löser på föroreningsrester med överväldigande kraft.' },
+      { icon: '🏆', title: 'Högsta kvalitet',         desc: 'Formulerat och tillverkat i Italien av ledande kemister med högsta certifieringar.' },
+    ],
+  },
 }
 
 export const TAG_COLORS: Record<string, string> = {

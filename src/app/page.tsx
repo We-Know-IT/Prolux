@@ -993,21 +993,21 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, transparent 60%, #0D0F13 100%)' }} />
             {/* PRO CENTER badge overlay */}
             <div style={{ position: 'absolute', bottom: 24, left: 24, background: '#C9971A', color: '#111', fontSize: 11, fontWeight: 800, padding: '6px 14px', borderRadius: 6, textTransform: 'uppercase', letterSpacing: '.1em' }}>
-              ProLuxShine
+              {siteHome.proCenter.badge}
             </div>
           </div>
           {/* Right — text */}
           <Reveal>
             <div style={{ padding: '48px 40px 48px 48px' }}>
-              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.22em' }}>B2B Portal</p>
+              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.22em' }}>{siteHome.proCenter.eyebrow}</p>
               <h2 style={{ margin: '0 0 12px', fontFamily: 'var(--font-serif)', fontSize: 'clamp(24px,3vw,38px)', fontWeight: 700, color: '#F0EDE8', lineHeight: 1.1 }}>
-                Pro Center – för företag & proffs
+                {siteHome.proCenter.heading}
               </h2>
               <p style={{ margin: '0 0 24px', fontSize: 14, color: 'rgba(240,237,232,.55)', lineHeight: 1.7, maxWidth: 480 }}>
-                Vi erbjuder förmånliga priser, snabba leveranser och personlig service för verkstäder, bilvårdare och återförsäljare.
+                {siteHome.proCenter.sub}
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 24px', marginBottom: 28 }}>
-                {['Förmånliga villkor', 'Snabba leveranser', 'Dedikerad support', 'Prov & testprodukter'].map(item => (
+                {siteHome.proCenter.bullets.map(item => (
                   <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'rgba(240,237,232,.65)' }}>
                     <Check size={14} color="#C9971A" strokeWidth={2.5} />
                     {item}
@@ -1016,7 +1016,7 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
               </div>
               {!authUser ? (
                 <button onClick={openLogin} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 26px', borderRadius: 7, background: '#C9971A', color: '#111', fontSize: 14, fontWeight: 800, border: 'none', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '.06em', boxShadow: '0 4px 16px rgba(201,151,26,.3)' }}>
-                  Bli företagskund <ArrowRight size={15} />
+                  {siteHome.proCenter.ctaLabel} <ArrowRight size={15} />
                 </button>
               ) : (
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 7, background: 'rgba(201,151,26,.12)', border: '1px solid rgba(201,151,26,.25)', color: '#C9971A', fontSize: 13, fontWeight: 600 }}>
@@ -1046,22 +1046,21 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
           </Reveal>
           <Reveal delay={100}>
             <div>
-              <p style={{ fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.14em', marginBottom: 14 }}>Exklusiva agenturer</p>
+              <p style={{ fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.14em', marginBottom: 14 }}>{siteHome.brandStory.eyebrow}</p>
               <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(24px,3.5vw,40px)', fontWeight: 700, color: '#111', margin: '0 0 18px', lineHeight: 1.15 }}>
-                Italiensk passion &amp; precision i varje droppe
+                {siteHome.brandStory.heading}
               </h2>
-              <p style={{ fontSize: 14, color: '#555', lineHeight: 1.8, marginBottom: 20 }}>
-                ProLux Shine är stor distributör av de anrika varumärkena Virtus och Frescura. Frescura har i över 50 år lett utvecklingen av biologiskt nedbrytbara, pH-balanserade rengöringssystem för fordon över hela Europa.
-              </p>
-              <p style={{ fontSize: 14, color: '#555', lineHeight: 1.8, marginBottom: 28 }}>
-                Tillsammans med Virtus avancerade polermedel och lackskydd erbjuder vi ett komplett system som tillgodoser bilvårdsförens extremaste krav på prestanda och finish.
-              </p>
+              {siteHome.brandStory.paragraphs.map((p, i) => (
+                <p key={i} style={{ fontSize: 14, color: '#555', lineHeight: 1.8, marginBottom: i === siteHome.brandStory.paragraphs.length - 1 ? 28 : 20 }}>
+                  {p}
+                </p>
+              ))}
               <div style={{ display: 'flex', gap: 24 }}>
                 <div style={{ paddingBottom: 8, borderBottom: '2px solid #111', cursor: 'pointer' }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>FRESCURA</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>{siteHome.brandStory.brand1}</span>
                 </div>
                 <div style={{ paddingBottom: 8, borderBottom: '2px solid transparent', cursor: 'pointer' }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#aaa' }}>VIRTUS PRO</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#aaa' }}>{siteHome.brandStory.brand2}</span>
                 </div>
               </div>
             </div>
@@ -1073,15 +1072,10 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
       <section style={{ background: '#f9f9f9', padding: '64px 24px', borderTop: '1px solid #ebebeb' }}>
         <div style={{ maxWidth: 1160, margin: '0 auto' }}>
           <h2 style={{ fontSize: 'clamp(20px, 2.5vw, 28px)', fontWeight: 800, color: '#111', marginBottom: 36, textAlign: 'center' }}>
-            Varför välja ProLux Shine?
+            {siteHome.why.heading}
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 28 }} className="features-grid">
-            {[
-              { icon: '🛡️', title: 'Säker för alla ytor', desc: 'Sammansättningarna ger extremt effektiva formuleringar utformade för att ge utmärkt skydd mot känsliga material.' },
-              { icon: '⚗️', title: 'pH-balanserat', desc: 'Perfekt komponerat pH-värden som inte skadar lackytan, även vid hög koncentration.' },
-              { icon: '⚡', title: 'Effektiv avfettning', desc: 'Våra lättlösliga enskilda och kalklettnings löser på föroreningsrester med överväldigande kraft.' },
-              { icon: '🏆', title: 'Högsta kvalitet', desc: 'Formulerat och tillverkat i Italien av ledande kemister med högsta certifieringar.' },
-            ].map(f => (
+            {siteHome.why.features.map(f => (
               <Reveal key={f.title}>
                 <div style={{ background: '#fff', borderRadius: 12, padding: '28px 24px', border: '1px solid #e8e8e8' }}>
                   <div style={{ fontSize: 32, marginBottom: 14 }}>{f.icon}</div>
