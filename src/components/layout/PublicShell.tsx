@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Menu, X, ChevronRight, ShoppingCart, User, LogOut, Package, ChevronDown, Minus, Plus, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt } from '@/lib/utils'
+import { getSiteContent, DEFAULT_CONTACT, ContactContent } from '@/lib/site-content'
 import type { User as SupaUser } from '@supabase/supabase-js'
 
 export const LoginModalContext = createContext<() => void>(() => {})
@@ -76,9 +77,14 @@ export function PublicShell({ children }: { children: ReactNode }) {
   const [regLoading, setRegLoading] = useState(false)
   const [regError, setRegError] = useState('')
   const [regDone, setRegDone] = useState(false)
+  const [contact, setContact] = useState<ContactContent>(DEFAULT_CONTACT)
 
   // Cart state
   const [cartItems, setCartItems] = useState<CartItem[]>([])
+
+  useEffect(() => {
+    getSiteContent('contact', DEFAULT_CONTACT).then(setContact)
+  }, [])
 
   useEffect(() => {
     const sb = createClient()
@@ -586,8 +592,8 @@ export function PublicShell({ children }: { children: ReactNode }) {
                 Exklusiv distributör för premium bilvårdssystem i Norden. Vi levererar prestanda och resultat till professionella användare.
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
-                <a href="mailto:info@proluxshine.com" style={{ fontSize: 14, color: 'rgba(255,255,255,.6)', textDecoration: 'none' }}>info@proluxshine.com</a>
-                <a href="tel:+46700000000" style={{ fontSize: 14, color: 'rgba(255,255,255,.6)', textDecoration: 'none' }}>+46 70-000 00 00</a>
+                <a href={`mailto:${contact.email}`} style={{ fontSize: 14, color: 'rgba(255,255,255,.6)', textDecoration: 'none' }}>{contact.email}</a>
+                <a href={`tel:${contact.phone.replace(/[^+\d]/g, '')}`} style={{ fontSize: 14, color: 'rgba(255,255,255,.6)', textDecoration: 'none' }}>{contact.phone}</a>
               </div>
               <div style={{ display: 'flex', gap: 14 }}>
                 {['IG', 'FB', 'YT'].map(s => (

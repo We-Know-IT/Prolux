@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { PublicShell, useLoginModal } from '@/components/layout/PublicShell'
 import { ArrowRight, ChevronRight, Check, Phone, Mail, MapPin } from 'lucide-react'
 import { useRef, useEffect, useState } from 'react'
+import { getSiteContent, DEFAULT_OM_OSS, DEFAULT_CONTACT, OmOssContent as OmOssPageData, ContactContent } from '@/lib/site-content'
 
 function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -23,6 +24,13 @@ function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
 
 function OmOssContent() {
   const openLogin = useLoginModal()
+  const [content, setContent] = useState<OmOssPageData>(DEFAULT_OM_OSS)
+  const [contact, setContact] = useState<ContactContent>(DEFAULT_CONTACT)
+
+  useEffect(() => {
+    getSiteContent('om_oss', DEFAULT_OM_OSS).then(setContent)
+    getSiteContent('contact', DEFAULT_CONTACT).then(setContact)
+  }, [])
 
   return (
     <div style={{ paddingTop: 64, background: '#fff' }}>
@@ -37,12 +45,12 @@ function OmOssContent() {
             <ChevronRight size={12} />
             <span>Om Prolux</span>
           </div>
-          <p style={{ margin: '0 0 16px', fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.22em' }}>Om oss</p>
-          <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(36px,5vw,60px)', fontWeight: 700, color: '#F0EDE8', margin: '0 0 20px', lineHeight: 1.08, letterSpacing: '-.02em' }}>
-            Professionell bilvård,<br />direkt från källan
+          <p style={{ margin: '0 0 16px', fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.22em' }}>{content.hero.label}</p>
+          <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(36px,5vw,60px)', fontWeight: 700, color: '#F0EDE8', margin: '0 0 20px', lineHeight: 1.08, letterSpacing: '-.02em', whiteSpace: 'pre-line' }}>
+            {content.hero.heading}
           </h1>
           <p style={{ fontSize: 16, color: 'rgba(240,237,232,.6)', lineHeight: 1.75, margin: 0, maxWidth: 520, marginInline: 'auto' }}>
-            ProLuxShine är Sveriges exklusiva importör av Virtus och Frescura — två av Italiens ledande varumärken för professionell bilvård.
+            {content.hero.sub}
           </p>
         </div>
       </section>
@@ -53,22 +61,16 @@ function OmOssContent() {
           <Reveal>
             <div>
               <p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.18em' }}>Vår historia</p>
-              <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(28px,4vw,44px)', fontWeight: 700, color: '#111', margin: '0 0 20px', lineHeight: 1.1, letterSpacing: '-.02em' }}>
-                Grundat av proffs,<br />för proffs
+              <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(28px,4vw,44px)', fontWeight: 700, color: '#111', margin: '0 0 20px', lineHeight: 1.1, letterSpacing: '-.02em', whiteSpace: 'pre-line' }}>
+                {content.historia.heading}
               </h2>
-              <p style={{ fontSize: 15, color: '#666', lineHeight: 1.8, margin: '0 0 16px' }}>
-                ProLuxShine grundades med en enkel idé: att ge svenska bilverkstäder, bilvårdare och detailers tillgång till samma produkter som proffsen i Europa använder.
-              </p>
-              <p style={{ fontSize: 15, color: '#666', lineHeight: 1.8, margin: '0 0 32px' }}>
-                Genom exklusiva avtal med Virtus och Frescura kan vi erbjuda produkter av högsta kvalitet till konkurrenskraftiga B2B-priser — med personlig service och snabba leveranser som standard.
-              </p>
+              {content.historia.paragraphs.map((p, i) => (
+                <p key={i} style={{ fontSize: 15, color: '#666', lineHeight: 1.8, margin: i === content.historia.paragraphs.length - 1 ? '0 0 32px' : '0 0 16px' }}>
+                  {p}
+                </p>
+              ))}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {[
-                  'Exklusiv importör av Virtus & Frescura i Sverige',
-                  'Personlig säljare för varje kund',
-                  'Prislista A, B eller C — anpassat för din volym',
-                  '1–2 dagars leveranstid på hela sortimentet',
-                ].map(item => (
+                {content.historia.punkter.map(item => (
                   <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#F5F2ED', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <Check size={11} color="#C9971A" strokeWidth={2.5} />
@@ -82,12 +84,7 @@ function OmOssContent() {
           {/* Right side: stats */}
           <Reveal delay={150}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              {[
-                { value: '240+', label: 'Aktiva B2B-kunder', sub: 'i Sverige och Norden' },
-                { value: '50+',  label: 'Produkter',          sub: 'från Virtus & Frescura' },
-                { value: '2',    label: 'Varumärken',          sub: 'Italiens bästa' },
-                { value: '40%',  label: 'Max B2B-rabatt',      sub: 'för A-kunder' },
-              ].map(({ value, label, sub }) => (
+              {content.stats.map(({ value, label, sub }) => (
                 <div key={label} style={{ padding: '28px 24px', border: '1.5px solid rgba(0,0,0,.08)', borderRadius: 14, background: '#F8F5F0' }}>
                   <div style={{ fontFamily: 'var(--font-serif)', fontSize: 40, fontWeight: 400, color: '#C9971A', lineHeight: 1, marginBottom: 8 }}>{value}</div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginBottom: 3 }}>{label}</div>
@@ -109,22 +106,7 @@ function OmOssContent() {
             </div>
           </Reveal>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }} className="brand-grid">
-            {[
-              {
-                name: 'Virtus',
-                tagline: 'Precision utan kompromiss',
-                desc: 'Virtus representerar det absolut bästa inom professionell bilvård — keramiska beläggningar, enzymrengöring och detailingprodukter för de som kräver perfektion i varje detalj.',
-                items: ['Keramisk coating', 'Enzymbaserade tvättmedel', 'Professionella polish & kompositioner', 'Lackskydd & glansmedel'],
-                img: 'https://proluxshine.com/wp-content/uploads/2025/11/df6ba40f-5d3d-4c32-8cfd-55f9c68de3e7.png',
-              },
-              {
-                name: 'Frescura',
-                tagline: 'Effektivitet i varje droppe',
-                desc: 'Frescura är valet för de som jobbar med höga volymer och kräver konsekvent professionell kvalitet dag efter dag. Kostnadseffektiva lösningar utan att kompromissa med resultatet.',
-                items: ['Alkaliska avfettningsmedel', 'pH-neutrala bilvårdsprodukter', 'Fälg- och däckvård', 'Interiör- & exteriörrengöring'],
-                img: 'https://proluxshine.com/wp-content/uploads/2025/11/a7ffd562-2bb4-4699-aaeb-ce4da03ba0ac.png',
-              },
-            ].map((b, i) => (
+            {content.brands.map((b, i) => (
               <Reveal key={b.name} delay={i * 100}>
                 <div style={{ background: '#fff', border: '1.5px solid rgba(0,0,0,.08)', borderRadius: 16, overflow: 'hidden' }}>
                   <div style={{ height: 200, background: '#F0EDE8', overflow: 'hidden' }}>
@@ -168,9 +150,9 @@ function OmOssContent() {
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                 {[
-                  { icon: Phone, label: 'Telefon', value: '+46 (0)8 123 456 78', sub: 'Mån–fre 08–17' },
-                  { icon: Mail,  label: 'E-post',  value: 'info@proluxshine.com', sub: 'Svar inom 24h' },
-                  { icon: MapPin, label: 'Adress', value: 'Stockholm, Sverige', sub: 'Lagerhållning & kontor' },
+                  { icon: Phone, label: 'Telefon', value: contact.phone, sub: contact.hours },
+                  { icon: Mail,  label: 'E-post',  value: contact.email, sub: 'Svar inom 24h' },
+                  { icon: MapPin, label: 'Adress', value: contact.address, sub: 'Lagerhållning & kontor' },
                 ].map(({ icon: Icon, label, value, sub }) => (
                   <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
                     <div style={{ width: 44, height: 44, borderRadius: 10, background: '#F5F2ED', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -218,10 +200,10 @@ function OmOssContent() {
         <Reveal>
           <div style={{ maxWidth: 600, margin: '0 auto', textAlign: 'center' }}>
             <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(28px,4vw,44px)', fontWeight: 700, color: '#F0EDE8', margin: '0 0 14px', lineHeight: 1.1 }}>
-              Redo att komma igång?
+              {content.cta.heading}
             </h2>
             <p style={{ fontSize: 15, color: 'rgba(240,237,232,.55)', margin: '0 0 32px', lineHeight: 1.7 }}>
-              Logga in på din portal eller kontakta oss för att diskutera ett B2B-avtal.
+              {content.cta.sub}
             </p>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button onClick={openLogin} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '13px 30px', borderRadius: 8, background: '#C9971A', color: '#111', fontSize: 14, fontWeight: 800, border: 'none', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '.06em' }}>

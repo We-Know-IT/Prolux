@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { PublicShell, useLoginModal, usePublicCart } from '@/components/layout/PublicShell'
 import { fmt, formatDate } from '@/lib/utils'
+import { getSiteContent, DEFAULT_HOME, HomeContent as SiteHomeContent } from '@/lib/site-content'
 import {
   ArrowRight, ChevronRight, Package, Truck, Shield, Phone,
   ShoppingCart, ShoppingBag, ExternalLink, Star, User, Lock, Save, Check, ClipboardList, RefreshCw
@@ -379,22 +380,16 @@ function PortalHome({ user, products }: { user: SupaUser; products: any[] }) {
 }
 
 /* ─── Hero Slider ─────────────────────────────────────── */
-const HERO_IMAGES = [
-  'https://fopshubqliboxgokbhnr.supabase.co/storage/v1/object/public/hero-images/hero-1.png',
-  'https://fopshubqliboxgokbhnr.supabase.co/storage/v1/object/public/hero-images/hero-2.png',
-  'https://fopshubqliboxgokbhnr.supabase.co/storage/v1/object/public/hero-images/hero-3.png',
-]
-
 const HERO_TEXT = [
   { label: 'Kvalitetsgaranti från Italien', heading: 'Prolux Shine', sub: 'Premiumleverantör av italienska bilvårdsprodukter — skapade för proffs och entusiaster.' },
   { label: 'Professionell bilvård', heading: 'Rätt teknik.\nRätt produkter.', sub: 'Komplett sortiment för handtvätt, maskinpolering och lackskydd.' },
   { label: 'Fälg & Exteriör', heading: 'Rena fälgar.\nKlara resultat.', sub: 'Starka rengöringsmedel formulerade för professionella biltvättar och detailingföretag.' },
 ]
 
-function HeroSlider({ openLogin, loggedIn, heroImages }: { openLogin: () => void; loggedIn?: boolean; heroImages: string[] }) {
+function HeroSlider({ openLogin, loggedIn, heroImages, heroText }: { openLogin: () => void; loggedIn?: boolean; heroImages: string[]; heroText: typeof HERO_TEXT }) {
   const [current, setCurrent] = useState(0)
   const slides = heroImages.length >= 3 ? heroImages.slice(0, 3) : heroImages.length > 0 ? [heroImages[0], heroImages[0], heroImages[0]] : []
-  const total = HERO_TEXT.length
+  const total = heroText.length
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -403,7 +398,7 @@ function HeroSlider({ openLogin, loggedIn, heroImages }: { openLogin: () => void
     return () => clearInterval(t)
   }, [total])
 
-  const slide = HERO_TEXT[current]
+  const slide = heroText[current]
 
   return (
     <section style={{ position: 'relative', height: 'clamp(560px, 80vh, 860px)', overflow: 'hidden', marginTop: 0 }}>
@@ -843,17 +838,6 @@ function CustomerPortalSection({ customer, authUser, openLogin }: { customer: an
 ════════════════════════════════════════════════════════ */
 const BADGES = ['Storsäljare', 'Storsäljare', 'Nyhet', 'Storsäljare', 'Nyhet', 'Storsäljare', 'Storsäljare', 'Nyhet', 'Storsäljare', 'Nyhet', 'Storsäljare', 'Nyhet']
 
-const BASE = 'https://fopshubqliboxgokbhnr.supabase.co/storage/v1/object/public/category-images'
-const CAT_CARDS = [
-  { name: 'Exteriör',         img: `${BASE}/category-exterior.png` },
-  { name: 'Interiör',         img: `${BASE}/category-interior.png` },
-  { name: 'Polering',         img: `${BASE}/category-polering.png` },
-  { name: 'Högtryckstvätt',   img: `${BASE}/category-hoftryckstvatt.png` },
-  { name: 'Torkdukar',        img: `${BASE}/category-torkdukar.png` },
-  { name: 'Tillbehör',        img: `${BASE}/category-tillbehor.png` },
-  { name: 'Paket',            img: `${BASE}/category-paket.png` },
-  { name: 'Hemstäd',          img: `${BASE}/category-hemstad.png` },
-]
 
 const GUIDES = [
   { title: 'Så tvättar du bilen på rätt sätt', desc: 'Steg-för-steg-guide för en säker och effektiv handtvätt.', img: 'https://proluxshine.com/wp-content/uploads/2025/11/a7ffd562-2bb4-4699-aaeb-ce4da03ba0ac.png' },
@@ -868,6 +852,11 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
   const cart = usePublicCart()
   const priceList = customer?.price_list_id || 'Standard'
   const heroImg = products.find(p => p.image_url)?.image_url || null
+  const [siteHome, setSiteHome] = useState<SiteHomeContent>(DEFAULT_HOME)
+
+  useEffect(() => {
+    getSiteContent('home', DEFAULT_HOME).then(setSiteHome)
+  }, [])
 
   return (
     <>
@@ -889,7 +878,7 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
       </div>
 
       {/* ── HERO — image slider ── */}
-      <HeroSlider openLogin={openLogin} loggedIn={!!authUser} heroImages={HERO_IMAGES} />
+      <HeroSlider openLogin={openLogin} loggedIn={!!authUser} heroImages={siteHome.hero.map(h => h.image_url)} heroText={siteHome.hero} />
 
       {/* ── TRUST STRIP ── */}
       <section style={{ background: 'transparent', borderBottom: '1px solid rgba(0,0,0,.07)' }}>
@@ -913,7 +902,7 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
           <h2 style={{ margin: '0 0 24px', fontSize: 22, fontWeight: 800, color: '#111' }}>Utvalda kategorier</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }} className="cat-grid">
-            {CAT_CARDS.map((cat, i) => (
+            {siteHome.categories.map((cat, i) => (
               <Reveal key={cat.name} delay={i * 50}>
                 <Link href="/produkter" style={{ display: 'block', position: 'relative', borderRadius: 12, overflow: 'hidden', textDecoration: 'none', aspectRatio: '16/10', background: '#1a1a1a', transition: 'transform .2s' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'scale(1.02)' }}

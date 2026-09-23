@@ -3,106 +3,26 @@ export const dynamic = 'force-dynamic'
 
 import { PublicShell } from '@/components/layout/PublicShell'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { getSiteContent, DEFAULT_GUIDES, GuidesContent, GuideItem, TAG_COLORS } from '@/lib/site-content'
 
-const CATEGORIES = ['Alla', 'Tvätt', 'Polering', 'Interiör', 'Lackskydd', 'Fälgar']
-
-const GUIDES = [
-  {
-    id: 1,
-    title: 'Så tvättar du bilen på rätt sätt',
-    category: 'Tvätt',
-    desc: 'Lär dig grunderna i biltvätt – rätt teknik, rätt produkter och i rätt ordning. Undvik swirl-märken och skydda lacken.',
-    bg: 'linear-gradient(135deg, #0a1628 0%, #1a2a4a 60%, #0d1520 100%)',
-    emoji: '🚗',
-    readTime: '5 min',
-    tag: 'Nybörjare',
-    tagColor: '#4CAF7D',
-  },
-  {
-    id: 2,
-    title: 'Polering – välj rätt pad och polermedel',
-    category: 'Polering',
-    desc: 'En komplett guide till maskinpolering. Vi går igenom skillnaderna mellan cutting, polishing och finishing pads.',
-    bg: 'linear-gradient(135deg, #1a0a28 0%, #2d1a4a 60%, #1a0d20 100%)',
-    emoji: '✨',
-    readTime: '8 min',
-    tag: 'Avancerad',
-    tagColor: '#4A8FD4',
-  },
-  {
-    id: 3,
-    title: 'Interiörrengöring som gör skillnad',
-    category: 'Interiör',
-    desc: 'Steg för steg: hur du rengör instrumentbräda, knappar, säten och mattor till showroom-standard.',
-    bg: 'linear-gradient(135deg, #0a2010 0%, #1a4a2a 60%, #0d2015 100%)',
-    emoji: '🪑',
-    readTime: '6 min',
-    tag: 'Nybörjare',
-    tagColor: '#4CAF7D',
-  },
-  {
-    id: 4,
-    title: 'Lackskydd – så håller det längre',
-    category: 'Lackskydd',
-    desc: 'Vax, sealant eller keramiskt skydd? Vi förklarar skillnaderna och hjälper dig välja rätt för din situation.',
-    bg: 'linear-gradient(135deg, #1a1400 0%, #3a2e00 60%, #1a1200 100%)',
-    emoji: '🛡️',
-    readTime: '7 min',
-    tag: 'Mellansteg',
-    tagColor: '#E8B84B',
-  },
-  {
-    id: 5,
-    title: 'Fälgrengöring utan att skada lacken',
-    category: 'Fälgar',
-    desc: 'Bromsdamm och smuts sätter sig hårt på fälgar. Lär dig rätt teknik och produkter för att tvätta säkert.',
-    bg: 'linear-gradient(135deg, #1a0a0a 0%, #3a1515 60%, #1a0808 100%)',
-    emoji: '🔩',
-    readTime: '4 min',
-    tag: 'Nybörjare',
-    tagColor: '#4CAF7D',
-  },
-  {
-    id: 6,
-    title: 'Avfettning innan polering',
-    category: 'Polering',
-    desc: 'Varför du alltid måste avfetta lacken ordentligt innan du polerar – och vilka produkter vi rekommenderar.',
-    bg: 'linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 60%, #080820 100%)',
-    emoji: '⚗️',
-    readTime: '3 min',
-    tag: 'Tips',
-    tagColor: '#9BA0AB',
-  },
-  {
-    id: 7,
-    title: 'Tvåhinkmetoden – minska risken för repor',
-    category: 'Tvätt',
-    desc: 'Tvåhinkmetoden är standard hos proffs. Så här fungerar det och varför du bör börja använda den direkt.',
-    bg: 'linear-gradient(135deg, #0a1a28 0%, #1a2e4a 60%, #0d1828 100%)',
-    emoji: '🪣',
-    readTime: '4 min',
-    tag: 'Tips',
-    tagColor: '#9BA0AB',
-  },
-  {
-    id: 8,
-    title: 'Keramiskt lackskydd – komplett guide',
-    category: 'Lackskydd',
-    desc: 'Allt du behöver veta om keramiska beläggningar: förberedelse, applicering, härdning och skötsel.',
-    bg: 'linear-gradient(135deg, #1a1200 0%, #2e2000 60%, #181000 100%)',
-    emoji: '💎',
-    readTime: '12 min',
-    tag: 'Avancerad',
-    tagColor: '#4A8FD4',
-  },
-]
+function guideBg(tag: string) {
+  const color = TAG_COLORS[tag] || TAG_COLORS.Tips
+  return `linear-gradient(135deg, #0a0c10 0%, ${color}22 60%, #0a0c10 100%)`
+}
 
 export default function GuiderPage() {
+  const [guides, setGuides] = useState<GuideItem[]>(DEFAULT_GUIDES.items)
   const [activeCategory, setActiveCategory] = useState('Alla')
   const [search, setSearch] = useState('')
 
-  const filtered = GUIDES.filter(g => {
+  useEffect(() => {
+    getSiteContent<GuidesContent>('guides', DEFAULT_GUIDES).then(c => setGuides(c.items))
+  }, [])
+
+  const categories = ['Alla', ...Array.from(new Set(guides.map(g => g.category).filter(Boolean)))]
+
+  const filtered = guides.filter(g => {
     const matchCat = activeCategory === 'Alla' || g.category === activeCategory
     const matchSearch = !search || g.title.toLowerCase().includes(search.toLowerCase()) || g.desc.toLowerCase().includes(search.toLowerCase())
     return matchCat && matchSearch
@@ -150,7 +70,7 @@ export default function GuiderPage() {
 
           {/* Category filter */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 40 }}>
-            {CATEGORIES.map(cat => (
+            {categories.map(cat => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
@@ -187,10 +107,10 @@ export default function GuiderPage() {
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 32px rgba(0,0,0,0.4)' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}
                 >
-                  <div style={{ position: 'relative', aspectRatio: '16/9', overflow: 'hidden', background: guide.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ position: 'relative', aspectRatio: '16/9', overflow: 'hidden', background: guideBg(guide.tag), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <span style={{ fontSize: 56, opacity: 0.6 }}>{guide.emoji}</span>
                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 60%)' }} />
-                    <span style={{ position: 'absolute', top: 12, left: 12, background: guide.tagColor, color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, letterSpacing: '0.05em' }}>
+                    <span style={{ position: 'absolute', top: 12, left: 12, background: TAG_COLORS[guide.tag] || TAG_COLORS.Tips, color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, letterSpacing: '0.05em' }}>
                       {guide.tag}
                     </span>
                     <span style={{ position: 'absolute', top: 12, right: 12, background: 'rgba(0,0,0,0.6)', color: '#9BA0AB', fontSize: 11, padding: '3px 10px', borderRadius: 20 }}>
