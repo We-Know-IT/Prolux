@@ -11,13 +11,13 @@ const SECTIONS = [
 
 export default function AdminContentHub() {
   return (
-    <div style={{ padding: 32, maxWidth: 900 }}>
+    <div style={{ padding: 'clamp(16px,4vw,32px)', maxWidth: 900 }}>
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Innehåll</h1>
         <p style={{ color: 'var(--text2)', fontSize: 13, margin: '4px 0 0' }}>Redigera texten och bilderna på webbshopen (www.proluxshine.com) — publiceras direkt.</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 14 }}>
+      <div className="grid-2" style={{ gap: 14 }}>
         {SECTIONS.map(({ href, label, desc, icon: Icon }) => (
           <Link key={href} href={href} style={{
             display: 'flex', gap: 16, alignItems: 'flex-start', textDecoration: 'none',

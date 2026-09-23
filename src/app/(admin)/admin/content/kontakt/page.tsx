@@ -34,7 +34,7 @@ export default function AdminContentKontakt() {
   }
 
   return (
-    <div style={{ padding: 32, maxWidth: 640 }}>
+    <div style={{ padding: 'clamp(16px,4vw,32px)', maxWidth: 640 }}>
       <Link href="/admin/content" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text3)', textDecoration: 'none', marginBottom: 16 }}>
         <ChevronLeft size={14} /> Innehåll
       </Link>

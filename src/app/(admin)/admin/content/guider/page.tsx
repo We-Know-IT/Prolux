@@ -44,11 +44,11 @@ export default function AdminContentGuider() {
   function removeGuide(i: number) { setItems(list => list.filter((_, idx) => idx !== i)) }
 
   return (
-    <div style={{ padding: 32, maxWidth: 760 }}>
+    <div style={{ padding: 'clamp(16px,4vw,32px)', maxWidth: 760 }}>
       <Link href="/admin/content" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text3)', textDecoration: 'none', marginBottom: 16 }}>
         <ChevronLeft size={14} /> Innehåll
       </Link>
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Guider</h1>
           <p style={{ color: 'var(--text2)', fontSize: 13, margin: '4px 0 0' }}>Artiklarna som visas på /guider</p>
@@ -78,7 +78,7 @@ export default function AdminContentGuider() {
                     <Trash2 size={13} /> Ta bort
                   </button>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+                <div className="grid-2" style={{ gap: 14, marginBottom: 14 }}>
                   <div>
                     {label('Titel')}
                     <input style={inputStyle} value={g.title} onChange={e => update(i, 'title', e.target.value)} />
@@ -92,7 +92,7 @@ export default function AdminContentGuider() {
                   {label('Beskrivning')}
                   <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={g.desc} onChange={e => update(i, 'desc', e.target.value)} />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+                <div className="grid-3" style={{ gap: 14 }}>
                   <div>
                     {label('Emoji')}
                     <input style={inputStyle} value={g.emoji} onChange={e => update(i, 'emoji', e.target.value)} placeholder="🚗" />

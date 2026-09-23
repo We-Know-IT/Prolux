@@ -268,3 +268,10 @@ input, select, textarea, button { font-family: inherit; }
   border-color: var(--gold-b);
   box-shadow: 0 0 0 3px rgba(232,184,75,.08);
 }
+
+/* ── Responsive form grids (admin) — stack to 1 column on phones ── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+@media (max-width: 600px) {
+  .grid-2, .grid-3 { grid-template-columns: 1fr !important; }
+}

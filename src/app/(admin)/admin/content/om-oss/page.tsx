@@ -58,9 +58,9 @@ function ImageUploadField({ value, onChange }: { value: string; onChange: (url: 
   return (
     <div>
       {label('Bild')}
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         {value && <img src={value} alt="" style={{ width: 56, height: 56, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />}
-        <input style={{ ...inputStyle, flex: 1 }} value={value} onChange={e => onChange(e.target.value)} placeholder="https://..." />
+        <input style={{ ...inputStyle, flex: 1, minWidth: 160 }} value={value} onChange={e => onChange(e.target.value)} placeholder="https://..." />
         <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 6, color: 'var(--text2)', fontSize: 13, cursor: 'pointer', flexShrink: 0 }}>
           {uploading ? <Loader size={14} /> : <Upload size={14} />} Ladda upp
@@ -101,11 +101,11 @@ export default function AdminContentOmOss() {
   }
 
   return (
-    <div style={{ padding: 32, maxWidth: 760 }}>
+    <div style={{ padding: 'clamp(16px,4vw,32px)', maxWidth: 760 }}>
       <Link href="/admin/content" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text3)', textDecoration: 'none', marginBottom: 16 }}>
         <ChevronLeft size={14} /> Innehåll
       </Link>
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Om oss</h1>
           <p style={{ color: 'var(--text2)', fontSize: 13, margin: '4px 0 0' }}>Innehållet på /om-oss</p>
@@ -160,7 +160,7 @@ export default function AdminContentOmOss() {
 
           <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Statistik (4 rutor)</h2>
           <div style={sectionCard}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div className="grid-2" style={{ gap: 16 }}>
               {form.stats.map((s, i) => (
                 <div key={i} style={{ display: 'grid', gap: 8 }}>
                   <input style={inputStyle} value={s.value} onChange={e => updateStat(i, 'value', e.target.value)} placeholder="Värde, t.ex. 240+" />
@@ -176,7 +176,7 @@ export default function AdminContentOmOss() {
             <div key={i} style={sectionCard}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gold)', marginBottom: 14 }}>{b.name || `Varumärke ${i + 1}`}</div>
               <div style={{ display: 'grid', gap: 14 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div className="grid-2" style={{ gap: 14 }}>
                   <div>
                     {label('Namn')}
                     <input style={inputStyle} value={b.name} onChange={e => updateBrand(i, 'name', e.target.value)} />
