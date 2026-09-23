@@ -4,13 +4,14 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
-import { LayoutDashboard, ShoppingBag, Users, Tag, Megaphone, Zap, LogOut, UserCog, Menu, X, GitBranch, CalendarDays, StickyNote, Bell } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, Users, Tag, Megaphone, Zap, LogOut, UserCog, Menu, X, GitBranch, CalendarDays, StickyNote, Bell, FileText } from 'lucide-react'
 
 const ADMIN_NAV = [
   { href: '/admin/dashboard',  label: 'Översikt',  icon: LayoutDashboard },
   { href: '/admin/orders',     label: 'Ordrar',    icon: ShoppingBag },
   { href: '/admin/customers',  label: 'Kunder',    icon: Users },
   { href: '/admin/products',   label: 'Produkter', icon: Tag },
+  { href: '/admin/content',    label: 'Innehåll',  icon: FileText },
   { href: '/admin/campaigns',  label: 'Kampanjer', icon: Megaphone },
   { href: '/admin/staff',      label: 'Team',      icon: UserCog },
 ]
