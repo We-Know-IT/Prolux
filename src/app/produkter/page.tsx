@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PublicShell, useLoginModal, usePublicCart } from '@/components/layout/PublicShell'
 import { fmt } from '@/lib/utils'
-import { Search, Package, ShoppingCart, ChevronRight, Star, SlidersHorizontal, X, ChevronLeft } from 'lucide-react'
+import { Search, Package, ShoppingCart, ChevronRight, ChevronLeft, LayoutGrid } from 'lucide-react'
 import Link from 'next/link'
 
 const DISCOUNT: Record<string, number> = { A: 0.40, B: 0.30, C: 0.20, Standard: 0 }
@@ -134,7 +134,7 @@ function ProductsContent() {
               border: selectedCat === 'all' ? '2.5px solid #E8B84B' : '2px solid #e0e0e0',
               transition: 'all .2s', overflow: 'hidden',
             }}>
-              <span style={{ fontSize: 36 }}>🏪</span>
+              <LayoutGrid size={30} strokeWidth={1.5} color="#555" />
             </div>
             <span style={{ fontSize: 13, color: selectedCat === 'all' ? '#111' : '#555', fontWeight: selectedCat === 'all' ? 700 : 500, textAlign: 'center', lineHeight: 1.3 }}>Alla</span>
           </button>

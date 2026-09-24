@@ -106,7 +106,7 @@ export interface GuideItem {
   title: string
   category: string
   desc: string
-  emoji: string
+  emoji: string   // icon key, see lib/feature-icons (named emoji for older content)
   readTime: string
   tag: string
 }
@@ -116,14 +116,14 @@ export interface GuidesContent {
 
 export const DEFAULT_GUIDES: GuidesContent = {
   items: [
-    { id: '1', title: 'Så tvättar du bilen på rätt sätt',            category: 'Tvätt',      desc: 'Lär dig grunderna i biltvätt – rätt teknik, rätt produkter och i rätt ordning. Undvik swirl-märken och skydda lacken.',                     emoji: '🚗', readTime: '5 min',  tag: 'Nybörjare' },
-    { id: '2', title: 'Polering – välj rätt pad och polermedel',     category: 'Polering',   desc: 'En komplett guide till maskinpolering. Vi går igenom skillnaderna mellan cutting, polishing och finishing pads.',                             emoji: '✨', readTime: '8 min',  tag: 'Avancerad' },
-    { id: '3', title: 'Interiörrengöring som gör skillnad',          category: 'Interiör',   desc: 'Steg för steg: hur du rengör instrumentbräda, knappar, säten och mattor till showroom-standard.',                                            emoji: '🪑', readTime: '6 min',  tag: 'Nybörjare' },
-    { id: '4', title: 'Lackskydd – så håller det längre',            category: 'Lackskydd',  desc: 'Vax, sealant eller keramiskt skydd? Vi förklarar skillnaderna och hjälper dig välja rätt för din situation.',                                emoji: '🛡️', readTime: '7 min',  tag: 'Mellansteg' },
-    { id: '5', title: 'Fälgrengöring utan att skada lacken',         category: 'Fälgar',     desc: 'Bromsdamm och smuts sätter sig hårt på fälgar. Lär dig rätt teknik och produkter för att tvätta säkert.',                                    emoji: '🔩', readTime: '4 min',  tag: 'Nybörjare' },
-    { id: '6', title: 'Avfettning innan polering',                   category: 'Polering',   desc: 'Varför du alltid måste avfetta lacken ordentligt innan du polerar – och vilka produkter vi rekommenderar.',                                  emoji: '⚗️', readTime: '3 min',  tag: 'Tips' },
-    { id: '7', title: 'Tvåhinkmetoden – minska risken för repor',    category: 'Tvätt',      desc: 'Tvåhinkmetoden är standard hos proffs. Så här fungerar det och varför du bör börja använda den direkt.',                                    emoji: '🪣', readTime: '4 min',  tag: 'Tips' },
-    { id: '8', title: 'Keramiskt lackskydd – komplett guide',        category: 'Lackskydd',  desc: 'Allt du behöver veta om keramiska beläggningar: förberedelse, applicering, härdning och skötsel.',                                          emoji: '💎', readTime: '12 min', tag: 'Avancerad' },
+    { id: '1', title: 'Så tvättar du bilen på rätt sätt',            category: 'Tvätt',      desc: 'Lär dig grunderna i biltvätt – rätt teknik, rätt produkter och i rätt ordning. Undvik swirl-märken och skydda lacken.',                     emoji: 'car', readTime: '5 min',  tag: 'Nybörjare' },
+    { id: '2', title: 'Polering – välj rätt pad och polermedel',     category: 'Polering',   desc: 'En komplett guide till maskinpolering. Vi går igenom skillnaderna mellan cutting, polishing och finishing pads.',                             emoji: 'sparkles', readTime: '8 min',  tag: 'Avancerad' },
+    { id: '3', title: 'Interiörrengöring som gör skillnad',          category: 'Interiör',   desc: 'Steg för steg: hur du rengör instrumentbräda, knappar, säten och mattor till showroom-standard.',                                            emoji: 'armchair', readTime: '6 min',  tag: 'Nybörjare' },
+    { id: '4', title: 'Lackskydd – så håller det längre',            category: 'Lackskydd',  desc: 'Vax, sealant eller keramiskt skydd? Vi förklarar skillnaderna och hjälper dig välja rätt för din situation.',                                emoji: 'shield', readTime: '7 min',  tag: 'Mellansteg' },
+    { id: '5', title: 'Fälgrengöring utan att skada lacken',         category: 'Fälgar',     desc: 'Bromsdamm och smuts sätter sig hårt på fälgar. Lär dig rätt teknik och produkter för att tvätta säkert.',                                    emoji: 'wrench', readTime: '4 min',  tag: 'Nybörjare' },
+    { id: '6', title: 'Avfettning innan polering',                   category: 'Polering',   desc: 'Varför du alltid måste avfetta lacken ordentligt innan du polerar – och vilka produkter vi rekommenderar.',                                  emoji: 'flask', readTime: '3 min',  tag: 'Tips' },
+    { id: '7', title: 'Tvåhinkmetoden – minska risken för repor',    category: 'Tvätt',      desc: 'Tvåhinkmetoden är standard hos proffs. Så här fungerar det och varför du bör börja använda den direkt.',                                    emoji: 'droplets', readTime: '4 min',  tag: 'Tips' },
+    { id: '8', title: 'Keramiskt lackskydd – komplett guide',        category: 'Lackskydd',  desc: 'Allt du behöver veta om keramiska beläggningar: förberedelse, applicering, härdning och skötsel.',                                          emoji: 'gem', readTime: '12 min', tag: 'Avancerad' },
   ],
 }
 

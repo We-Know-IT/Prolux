@@ -1,6 +1,7 @@
-import { ShieldCheck, FlaskConical, Zap, Trophy, Droplets, Leaf, Sparkles, Truck, Award, Car, type LucideIcon } from 'lucide-react'
+import { ShieldCheck, FlaskConical, Zap, Trophy, Droplets, Leaf, Sparkles, Truck, Award, Car, Armchair, Wrench, Gem, type LucideIcon } from 'lucide-react'
 
-// Icons the "Varför välja ProLux Shine?" cards can use (chosen in admin).
+// Icons for content edited in admin: the "Varför välja ProLux Shine?" cards
+// and the guides. Stored as the key (e.g. 'shield').
 export const FEATURE_ICONS: Record<string, { label: string; Icon: LucideIcon }> = {
   shield:   { label: 'Sköld',       Icon: ShieldCheck },
   flask:    { label: 'Kolv',        Icon: FlaskConical },
@@ -12,10 +13,16 @@ export const FEATURE_ICONS: Record<string, { label: string; Icon: LucideIcon }> 
   truck:    { label: 'Leverans',    Icon: Truck },
   award:    { label: 'Utmärkelse',  Icon: Award },
   car:      { label: 'Bil',         Icon: Car },
+  armchair: { label: 'Interiör',    Icon: Armchair },
+  wrench:   { label: 'Verktyg',     Icon: Wrench },
+  gem:      { label: 'Ädelsten',    Icon: Gem },
 }
 
 // Content saved before icons replaced emojis still maps to an icon.
-const LEGACY: Record<string, string> = { '🛡️': 'shield', '🛡': 'shield', '⚗️': 'flask', '⚗': 'flask', '⚡': 'zap', '🏆': 'trophy' }
+const LEGACY: Record<string, string> = {
+  '🛡️': 'shield', '🛡': 'shield', '⚗️': 'flask', '⚗': 'flask', '⚡': 'zap', '🏆': 'trophy',
+  '🚗': 'car', '✨': 'sparkles', '🪑': 'armchair', '🔩': 'wrench', '🪣': 'droplets', '💎': 'gem',
+}
 
 export function featureIconKey(key: string | null | undefined): string | undefined {
   return key ? (FEATURE_ICONS[key] ? key : LEGACY[key.trim()]) : undefined

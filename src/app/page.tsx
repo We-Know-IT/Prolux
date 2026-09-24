@@ -9,7 +9,7 @@ import { fmt, formatDate } from '@/lib/utils'
 import { getSiteContent, DEFAULT_HOME, HomeContent as SiteHomeContent } from '@/lib/site-content'
 import {
   ArrowRight, ChevronRight, Package, Truck, Shield, Phone,
-  ShoppingCart, ShoppingBag, ExternalLink, Star, User, Lock, Save, Check, ClipboardList, RefreshCw
+  ShoppingCart, ShoppingBag, ExternalLink, Star, User, Lock, Save, Check, ClipboardList, RefreshCw, Sparkles
 } from 'lucide-react'
 import type { User as SupaUser } from '@supabase/supabase-js'
 import OrderTracking from '@/components/portal/OrderTracking'
@@ -17,15 +17,6 @@ import { userRole } from '@/lib/roles'
 import { featureIcon } from '@/lib/feature-icons'
 
 const DISCOUNT: Record<string, number> = { A: 0.40, B: 0.30, C: 0.20, Standard: 0 }
-
-const CATEGORIES = [
-  { name: 'Exteriör', emoji: '🚗' },
-  { name: 'Interiör', emoji: '🪑' },
-  { name: 'Tvätt & Rengöring', emoji: '🫧' },
-  { name: 'Vax & Polish', emoji: '✨' },
-  { name: 'Fälgvård', emoji: '🔩' },
-  { name: 'Avfettning', emoji: '⚗️' },
-]
 
 const TRUST = [
   { icon: Truck,  title: '1–2 dagars leverans', sub: 'Snabb och säker frakt' },
@@ -1028,7 +1019,7 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
                   style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 24 }}
                 />
               ) : (
-                <div style={{ fontSize: 80 }}>✨</div>
+                <Sparkles size={72} strokeWidth={1} color="#bbb" />
               )}
             </div>
           </Reveal>

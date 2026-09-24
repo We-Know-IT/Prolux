@@ -5,6 +5,8 @@ import { PublicShell } from '@/components/layout/PublicShell'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { getSiteContent, DEFAULT_GUIDES, GuidesContent, GuideItem, TAG_COLORS } from '@/lib/site-content'
+import { SearchX } from 'lucide-react'
+import { featureIcon } from '@/lib/feature-icons'
 
 function guideBg(tag: string) {
   const color = TAG_COLORS[tag] || TAG_COLORS.Tips
@@ -97,7 +99,7 @@ export default function GuiderPage() {
           {/* Grid */}
           {filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '80px 0', color: '#5C6270' }}>
-              <p style={{ fontSize: 40, marginBottom: 12 }}>🔍</p>
+              <SearchX size={40} strokeWidth={1.5} style={{ display: 'block', margin: '0 auto 12px' }} />
               <p style={{ fontSize: 16 }}>Inga guider matchade sökningen.</p>
             </div>
           ) : (
@@ -108,7 +110,7 @@ export default function GuiderPage() {
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}
                 >
                   <div style={{ position: 'relative', aspectRatio: '16/9', overflow: 'hidden', background: guideBg(guide.tag), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: 56, opacity: 0.6 }}>{guide.emoji}</span>
+                    {(() => { const Icon = featureIcon(guide.emoji); return <Icon size={52} strokeWidth={1.25} color="rgba(255,255,255,.75)" /> })()}
                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 60%)' }} />
                     <span style={{ position: 'absolute', top: 12, left: 12, background: TAG_COLORS[guide.tag] || TAG_COLORS.Tips, color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, letterSpacing: '0.05em' }}>
                       {guide.tag}

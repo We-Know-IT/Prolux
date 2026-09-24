@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, Save, Plus, Trash2 } from 'lucide-react'
 import { getSiteContent, saveSiteContent, DEFAULT_GUIDES, GuidesContent, GuideItem, TAG_COLORS } from '@/lib/site-content'
+import { FEATURE_ICONS, featureIconKey } from '@/lib/feature-icons'
 
 function label(s: string) {
   return <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase' as const, letterSpacing: '.06em', marginBottom: 6 }}>{s}</label>
@@ -15,7 +16,7 @@ const inputStyle: React.CSSProperties = {
 }
 
 function newGuide(): GuideItem {
-  return { id: Date.now().toString(36), title: '', category: '', desc: '', emoji: '✨', readTime: '5 min', tag: 'Tips' }
+  return { id: Date.now().toString(36), title: '', category: '', desc: '', emoji: 'sparkles', readTime: '5 min', tag: 'Tips' }
 }
 
 export default function AdminContentGuider() {
@@ -94,8 +95,11 @@ export default function AdminContentGuider() {
                 </div>
                 <div className="grid-3" style={{ gap: 14 }}>
                   <div>
-                    {label('Emoji')}
-                    <input style={inputStyle} value={g.emoji} onChange={e => update(i, 'emoji', e.target.value)} placeholder="🚗" />
+                    {label('Ikon')}
+                    <select style={inputStyle} value={featureIconKey(g.emoji) || ''} onChange={e => update(i, 'emoji', e.target.value)}>
+                      {!featureIconKey(g.emoji) && <option value="">Välj ikon…</option>}
+                      {Object.entries(FEATURE_ICONS).map(([key, { label: l }]) => <option key={key} value={key}>{l}</option>)}
+                    </select>
                   </div>
                   <div>
                     {label('Lästid')}

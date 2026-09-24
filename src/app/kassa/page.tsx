@@ -7,11 +7,16 @@ import { PublicShell, useLoginModal, usePublicCart } from '@/components/layout/P
 import { fmt } from '@/lib/utils'
 import { Package, Minus, Plus, Trash2, FileText, CheckCircle, ArrowLeft, Tag, X } from 'lucide-react'
 
+// Matches the free-shipping promise on the site. The cost below it is not
+// set yet, so it is shown as added on top.
+const FREE_SHIPPING_FROM = 2000
+
 interface Totals { subtotal: number; discount: number; vat: number; total: number }
 
 const EMPTY_FORM = {
   company: '', org_nr: '', contact_name: '', email: '', phone: '',
   address: '', zip: '', city: '', reference: '', invoice_email: '', message: '',
+  website: '',   // honeypot: hidden from people, bots fill it in and the order is rejected
 }
 
 const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: '#555', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.07em' }
@@ -151,6 +156,11 @@ function CheckoutContent() {
       <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 34, fontWeight: 400, color: '#111', margin: '0 0 22px' }}>Kassa</h1>
 
       <form onSubmit={placeOrder} className="kassa-grid" noValidate>
+        <div aria-hidden="true" style={{ position: 'absolute', left: -10000, top: 'auto', width: 1, height: 1, overflow: 'hidden' }}>
+          <label htmlFor="k-website">Lämna tomt</label>
+          <input id="k-website" name="website" type="text" tabIndex={-1} autoComplete="off"
+            value={form.website} onChange={e => setForm(f => ({ ...f, website: e.target.value }))} />
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {!cart.authLoading && !cart.authUser && (
             <div style={{ ...card, padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -255,7 +265,13 @@ function CheckoutContent() {
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Delsumma exkl. moms</span><span style={{ color: '#111' }}>{fmt(totals.subtotal)} kr</span></div>
                 {totals.discount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#1F7A4D' }}><span>Kampanjrabatt</span><span>−{fmt(totals.discount)} kr</span></div>}
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Moms 25 %</span><span style={{ color: '#111' }}>{fmt(totals.vat)} kr</span></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Frakt</span><span style={{ color: '#111' }}>Enligt överenskommelse</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Frakt</span>
+                  <span style={{ color: totals.subtotal >= FREE_SHIPPING_FROM ? '#1F7A4D' : '#111' }}>{totals.subtotal >= FREE_SHIPPING_FROM ? 'Fri frakt' : 'Tillkommer'}</span>
+                </div>
+                {totals.subtotal < FREE_SHIPPING_FROM && (
+                  <div style={{ fontSize: 12, color: '#666' }}>Fri frakt från {fmt(FREE_SHIPPING_FROM)} kr exkl. moms – {fmt(FREE_SHIPPING_FROM - totals.subtotal)} kr kvar.</div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, paddingTop: 10, borderTop: '1px solid rgba(0,0,0,.07)', fontSize: 17, fontWeight: 700, color: '#111' }}>
                   <span>Totalt inkl. moms</span><span style={{ color: '#C9971A' }}>{fmt(totals.total)} kr</span>
                 </div>

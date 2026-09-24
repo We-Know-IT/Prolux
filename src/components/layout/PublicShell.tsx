@@ -3,7 +3,7 @@ import { ReactNode, useState, useEffect, createContext, useContext, useCallback,
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { Menu, X, ChevronRight, ShoppingCart, User, LogOut, Package, ChevronDown, Minus, Plus, Trash2, FileText } from 'lucide-react'
+import { Menu, X, ChevronRight, ShoppingCart, User, LogOut, Package, ChevronDown, Minus, Plus, Trash2, FileText, MailCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt } from '@/lib/utils'
 import { getSiteContent, DEFAULT_CONTACT, ContactContent } from '@/lib/site-content'
@@ -654,7 +654,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
               </>
             ) : regDone ? (
               <div style={{ textAlign: 'center', padding: '24px 0' }}>
-                <div style={{ fontSize: 40, marginBottom: 16 }}>📬</div>
+                <MailCheck size={40} strokeWidth={1.5} color="#C9971A" style={{ display: 'block', margin: '0 auto 16px' }} />
                 <div style={{ fontSize: 17, fontWeight: 700, color: '#111', marginBottom: 10 }}>Kolla din inkorg!</div>
                 <p style={{ fontSize: 13, color: '#666', lineHeight: 1.7, margin: '0 0 20px' }}>
                   Vi har skickat en bekräftelse till <strong>{regForm.email}</strong>.<br />

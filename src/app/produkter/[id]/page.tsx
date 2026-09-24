@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PublicShell, usePublicCart } from '@/components/layout/PublicShell'
 import { fmt } from '@/lib/utils'
-import { ShoppingCart, Truck, RotateCcw, ShieldCheck, Star, ChevronRight, Minus, Plus } from 'lucide-react'
+import { ShoppingCart, Truck, ShieldCheck, ChevronRight, Minus, Plus, Package } from 'lucide-react'
 import Link from 'next/link'
 
 const DISCOUNT: Record<string, number> = { A: 0.40, B: 0.30, C: 0.20, Standard: 0 }
@@ -21,7 +21,7 @@ function ProductDetailContent() {
   const [customer, setCustomer] = useState<any>(null)
   const [loading, setLoading]   = useState(true)
   const [qty, setQty]           = useState(1)
-  const [activeTab, setActiveTab] = useState<'beskrivning'|'specifikationer'|'omdomen'>('beskrivning')
+  const [activeTab, setActiveTab] = useState<'beskrivning'|'specifikationer'>('beskrivning')
   const [added, setAdded]       = useState(false)
 
   useEffect(() => {
@@ -98,7 +98,7 @@ function ProductDetailContent() {
               {product.image_url ? (
                 <img src={product.image_url} alt={product.name} style={{ maxWidth: '85%', maxHeight: '85%', objectFit: 'contain' }} />
               ) : (
-                <div style={{ fontSize: 80 }}>📦</div>
+                <Package size={72} strokeWidth={1} color="#bbb" />
               )}
             </div>
             {/* Thumbnails */}
@@ -119,15 +119,6 @@ function ProductDetailContent() {
             <h1 style={{ fontSize: 'clamp(24px, 3vw, 36px)', fontWeight: 800, color: '#111', margin: '0 0 10px', lineHeight: 1.15 }}>
               {product.name}
             </h1>
-
-            {/* Rating */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 24 }}>
-              <div style={{ display: 'flex', gap: 2 }}>
-                {[...Array(5)].map((_, i) => <Star key={i} size={14} fill={i < 4 ? '#E8B84B' : '#e0e0e0'} color={i < 4 ? '#E8B84B' : '#e0e0e0'} />)}
-              </div>
-              <span style={{ fontSize: 13, color: '#E8B84B', fontWeight: 700 }}>4.8</span>
-              <span style={{ fontSize: 13, color: '#aaa' }}>(127 omdömen)</span>
-            </div>
 
             <p style={{ fontSize: 12, color: '#aaa', marginBottom: 16 }}>Exkl. moms · Exkl. frakt</p>
 
@@ -167,7 +158,6 @@ function ProductDetailContent() {
             <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
               {[
                 { icon: Truck, text: 'Fri frakt över 2 000 kr' },
-                { icon: RotateCcw, text: '30 dgr öppet köp' },
                 { icon: ShieldCheck, text: 'Betala mot faktura' },
               ].map(({ icon: Icon, text }) => (
                 <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666' }}>
@@ -181,7 +171,7 @@ function ProductDetailContent() {
 
         {/* Tabs */}
         <div style={{ marginTop: 56, borderBottom: '1px solid #e8e8e8', display: 'flex', gap: 32 }}>
-          {([['beskrivning', 'Beskrivning'], ['specifikationer', 'Specifikationer'], ['omdomen', 'Omdömen (127)']] as const).map(([key, label]) => (
+          {([['beskrivning', 'Beskrivning'], ['specifikationer', 'Specifikationer']] as const).map(([key, label]) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
@@ -226,25 +216,6 @@ function ProductDetailContent() {
               ))}
             </div>
           )}
-          {activeTab === 'omdomen' && (
-            <div>
-              {[
-                { name: 'Erik S.', rating: 5, text: 'Fantastisk produkt! Löste upp inbränd bromsdamm på minuten.' },
-                { name: 'Maria L.', rating: 5, text: 'Använder detta på alla mina bilar nu. Ger perfekt resultat varje gång.' },
-                { name: 'Jonas K.', rating: 4, text: 'Mycket bra produkt för professionellt bruk. Rekommenderas.' },
-              ].map((r, i) => (
-                <div key={i} style={{ borderBottom: '1px solid #f0f0f0', padding: '20px 0' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                    <span style={{ fontWeight: 700, fontSize: 14, color: '#111' }}>{r.name}</span>
-                    <div style={{ display: 'flex', gap: 2 }}>
-                      {[...Array(5)].map((_, j) => <Star key={j} size={12} fill={j < r.rating ? '#E8B84B' : '#e0e0e0'} color={j < r.rating ? '#E8B84B' : '#e0e0e0'} />)}
-                    </div>
-                  </div>
-                  <p style={{ fontSize: 14, color: '#555', lineHeight: 1.6, margin: 0 }}>{r.text}</p>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Related products */}
@@ -265,7 +236,7 @@ function ProductDetailContent() {
                       <div style={{ background: '#f4f4f4', aspectRatio: '1/1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
                         {p.image_url ? (
                           <img src={p.image_url} alt={p.name} style={{ maxWidth: '80%', maxHeight: '80%', objectFit: 'contain' }} />
-                        ) : <span style={{ fontSize: 40 }}>📦</span>}
+                        ) : <Package size={40} strokeWidth={1} color="#bbb" />}
                       </div>
                     </Link>
                     <div style={{ padding: '12px 16px' }}>
