@@ -1,7 +1,7 @@
-import { ShieldCheck, FlaskConical, Zap, Trophy, Droplets, Leaf, Sparkles, Truck, Award, Car, Armchair, Wrench, Gem, type LucideIcon } from 'lucide-react'
+import { ShieldCheck, FlaskConical, Zap, Trophy, Droplets, Leaf, Sparkles, Truck, Award, Car, Armchair, Wrench, Gem, Phone, Star, Package, type LucideIcon } from 'lucide-react'
 
-// Icons for content edited in admin: the "Varför välja ProLux Shine?" cards
-// and the guides. Stored as the key (e.g. 'shield').
+// Icons for content edited in admin: the trust strip, the "Varför välja
+// ProLux Shine?" cards and the guides. Stored as the key (e.g. 'shield').
 export const FEATURE_ICONS: Record<string, { label: string; Icon: LucideIcon }> = {
   shield:   { label: 'Sköld',       Icon: ShieldCheck },
   flask:    { label: 'Kolv',        Icon: FlaskConical },
@@ -16,6 +16,9 @@ export const FEATURE_ICONS: Record<string, { label: string; Icon: LucideIcon }> 
   armchair: { label: 'Interiör',    Icon: Armchair },
   wrench:   { label: 'Verktyg',     Icon: Wrench },
   gem:      { label: 'Ädelsten',    Icon: Gem },
+  package:  { label: 'Paket',       Icon: Package },
+  star:     { label: 'Stjärna',     Icon: Star },
+  phone:    { label: 'Telefon',     Icon: Phone },
 }
 
 // Content saved before icons replaced emojis still maps to an icon.

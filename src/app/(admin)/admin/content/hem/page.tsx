@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { ChevronLeft, Save, Upload, Loader, Plus, Trash2 } from 'lucide-react'
 import { FEATURE_ICONS, featureIconKey } from '@/lib/feature-icons'
-import { getSiteContent, saveSiteContent, DEFAULT_HOME, HomeContent } from '@/lib/site-content'
+import { getSiteContent, saveSiteContent, DEFAULT_HOME, DEFAULT_TRUST, HomeContent, TrustItem } from '@/lib/site-content'
 
 function label(s: string) {
   return <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase' as const, letterSpacing: '.06em', marginBottom: 6 }}>{s}</label>
@@ -77,7 +77,7 @@ export default function AdminContentHem() {
   const [toast, setToast] = useState('')
 
   useEffect(() => {
-    getSiteContent('home', DEFAULT_HOME).then(c => { setForm(c); setLoading(false) })
+    getSiteContent('home', DEFAULT_HOME).then(c => { setForm({ ...c, trust: c.trust ?? DEFAULT_TRUST }); setLoading(false) })
   }, [])
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 3000) }
@@ -101,6 +101,10 @@ export default function AdminContentHem() {
   function removeCategory(i: number) {
     setForm(f => ({ ...f, categories: f.categories.filter((_, idx) => idx !== i) }))
   }
+  function updateTrust(i: number, field: keyof TrustItem, value: string) {
+    setForm(f => ({ ...f, trust: (f.trust ?? DEFAULT_TRUST).map((t, idx) => idx === i ? { ...t, [field]: value } : t) }))
+  }
+
   function updateFeature(i: number, field: 'icon' | 'title' | 'desc', value: string) {
     setForm(f => ({ ...f, why: { ...f.why, features: f.why.features.map((ft, idx) => idx === i ? { ...ft, [field]: value } : ft) } }))
   }
@@ -115,7 +119,7 @@ export default function AdminContentHem() {
       <div style={{ marginBottom: 28, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Startsidan</h1>
-          <p style={{ color: 'var(--text2)', fontSize: 13, margin: '4px 0 0' }}>Hero-slider och kategorikort på www.proluxshine.com</p>
+          <p style={{ color: 'var(--text2)', fontSize: 13, margin: '4px 0 0' }}>Bildspel, löften, kategorier och övrigt innehåll på www.proluxshine.com</p>
         </div>
         <button onClick={save} disabled={saving || loading} style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '11px 20px', background: 'var(--gold)', border: 'none',
@@ -230,6 +234,23 @@ export default function AdminContentHem() {
                   <input style={inputStyle} value={form.brandStory.brand2} onChange={e => setForm(f => ({ ...f, brandStory: { ...f.brandStory, brand2: e.target.value } }))} />
                 </div>
               </div>
+            </div>
+          </div>
+
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Löften — remsan under menyn och under bildspelet</h2>
+          <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 12px' }}>Rubriken visas i båda remsorna, undertexten bara under bildspelet. Töm rubriken för att ta bort en punkt.</p>
+          <div style={sectionCard}>
+            <div className="grid-2" style={{ gap: 16 }}>
+              {(form.trust ?? DEFAULT_TRUST).map((t, i) => (
+                <div key={i} style={{ display: 'grid', gap: 8, padding: 14, background: 'var(--bg4)', borderRadius: 8 }}>
+                  <select style={inputStyle} value={featureIconKey(t.icon) || ''} onChange={e => updateTrust(i, 'icon', e.target.value)}>
+                    {!featureIconKey(t.icon) && <option value="">Välj ikon…</option>}
+                    {Object.entries(FEATURE_ICONS).map(([key, { label }]) => <option key={key} value={key}>{label}</option>)}
+                  </select>
+                  <input style={inputStyle} value={t.title} onChange={e => updateTrust(i, 'title', e.target.value)} placeholder="Rubrik, t.ex. Fri frakt över 2 000 kr" />
+                  <input style={inputStyle} value={t.sub} onChange={e => updateTrust(i, 'sub', e.target.value)} placeholder="Undertext" />
+                </div>
+              ))}
             </div>
           </div>
 

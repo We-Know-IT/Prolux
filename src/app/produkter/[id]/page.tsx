@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PublicShell, usePublicCart } from '@/components/layout/PublicShell'
 import { fmt } from '@/lib/utils'
+import { stockStatus } from '@/lib/stock'
 import { ShoppingCart, Truck, ShieldCheck, ChevronRight, Minus, Plus, Package } from 'lucide-react'
 import Link from 'next/link'
 
@@ -17,6 +18,7 @@ function ProductDetailContent() {
 
   const [product, setProduct]   = useState<any>(null)
   const [related, setRelated]   = useState<any[]>([])
+  const [categoryName, setCategoryName] = useState('')
   const [authUser, setAuthUser] = useState<any>(null)
   const [customer, setCustomer] = useState<any>(null)
   const [loading, setLoading]   = useState(true)
@@ -33,19 +35,29 @@ function ProductDetailContent() {
           .then(({ data }) => setCustomer(data))
       }
     })
-    Promise.all([
-      sb.from('products').select('*').eq('id', id).single(),
-      sb.from('products').select('*').neq('id', id).limit(4),
-    ]).then(([{ data: p }, { data: r }]) => {
+    sb.from('products').select('*').eq('id', id).eq('active', true).maybeSingle().then(async ({ data: p }) => {
       setProduct(p)
-      setRelated(r || [])
       setLoading(false)
+      if (!p) return
+      // Related: same category first, topped up with other active products.
+      const [{ data: cat }, { data: same }, { data: other }] = await Promise.all([
+        p.category_id ? sb.from('categories').select('name').eq('id', p.category_id).maybeSingle() : Promise.resolve({ data: null }),
+        p.category_id ? sb.from('products').select('*').eq('active', true).eq('category_id', p.category_id).neq('id', id).order('sort_order').limit(4) : Promise.resolve({ data: [] }),
+        sb.from('products').select('*').eq('active', true).neq('id', id).order('sort_order').limit(8),
+      ])
+      setCategoryName(cat?.name || '')
+      const picked = [...(same || [])]
+      for (const o of other || []) if (picked.length < 4 && !picked.some(x => x.id === o.id)) picked.push(o)
+      setRelated(picked)
     })
   }, [id])
 
   const priceList = customer?.price_list_id || 'Standard'
   const discount  = DISCOUNT[priceList] ?? 0
   const custPrice = product ? Math.round(product.list_price * (1 - discount)) : 0
+  const stock     = stockStatus(product?.stock_qty)
+  // Short intro next to the price: the description's first paragraph.
+  const intro     = (product?.description || '').split(/\n\s*\n/)[0].trim()
 
   function addToCart() {
     for (let i = 0; i < qty; i++) {
@@ -94,20 +106,12 @@ function ProductDetailContent() {
 
           {/* Left — Image */}
           <div>
-            <div style={{ background: '#f4f4f4', borderRadius: 8, aspectRatio: '1/1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, marginBottom: 16, overflow: 'hidden' }}>
+            <div style={{ background: '#f4f4f4', borderRadius: 8, aspectRatio: '1/1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, overflow: 'hidden' }}>
               {product.image_url ? (
                 <img src={product.image_url} alt={product.name} style={{ maxWidth: '85%', maxHeight: '85%', objectFit: 'contain' }} />
               ) : (
                 <Package size={72} strokeWidth={1} color="#bbb" />
               )}
-            </div>
-            {/* Thumbnails */}
-            <div style={{ display: 'flex', gap: 10 }}>
-              {[product.image_url, product.image_url].filter(Boolean).map((img: string, i: number) => (
-                <div key={i} style={{ width: 80, height: 80, borderRadius: 6, border: i === 0 ? '2px solid #E8B84B' : '1px solid #e0e0e0', background: '#f4f4f4', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', padding: 8 }}>
-                  <img src={img} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-                </div>
-              ))}
             </div>
           </div>
 
@@ -122,16 +126,17 @@ function ProductDetailContent() {
 
             <p style={{ fontSize: 12, color: '#aaa', marginBottom: 16 }}>Exkl. moms · Exkl. frakt</p>
 
-            <p style={{ fontSize: 14, color: '#444', lineHeight: 1.7, marginBottom: 28, maxWidth: 440 }}>
-              {product.description || `${product.name} är ett professionellt rengöringsmedel för bilvård. Formulerat för att ge optimalt resultat med minimal ansträngning.`}
-            </p>
+            {intro && (
+              <p style={{ fontSize: 14, color: '#444', lineHeight: 1.7, marginBottom: 28, maxWidth: 440 }}>{intro}</p>
+            )}
 
-            {/* Price */}
-            <div style={{ marginBottom: 24 }}>
+            {/* Price + stock */}
+            <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 32, fontWeight: 800, color: '#111' }}>{fmt(custPrice)} kr</span>
               {discount > 0 && (
-                <span style={{ fontSize: 16, color: '#aaa', textDecoration: 'line-through', marginLeft: 12 }}>{fmt(product.list_price)} kr</span>
+                <span style={{ fontSize: 16, color: '#aaa', textDecoration: 'line-through' }}>{fmt(product.list_price)} kr</span>
               )}
+              <span style={{ fontSize: 12, fontWeight: 700, color: stock.color, background: stock.bg, padding: '4px 10px', borderRadius: 20 }}>{stock.label}</span>
             </div>
 
             {/* Qty + Add to cart */}
@@ -184,31 +189,23 @@ function ProductDetailContent() {
 
         <div style={{ padding: '32px 0 48px', maxWidth: 600 }}>
           {activeTab === 'beskrivning' && (
-            <div>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#111', marginBottom: 12 }}>
-                Professionell bilvårdskvalitet
-              </h3>
-              <p style={{ fontSize: 14, color: '#444', lineHeight: 1.8, marginBottom: 20 }}>
-                {product.name} är ett av ProLuxShines mest populära produkter. Det är speciellt framtaget för att hantera de tuffaste utmaningarna inom bilvård. Produkten arbetar snabbt och effektivt utan att skada lacken eller andra känsliga ytor. Perfekt för verkstäder, bilvårdsföretag och entusiaster som vill ha ett professionellt resultat.
+            product.description ? (
+              <div style={{ fontSize: 14, color: '#444', lineHeight: 1.8, whiteSpace: 'pre-line' }}>{product.description}</div>
+            ) : (
+              <p style={{ fontSize: 14, color: '#666', lineHeight: 1.8, margin: 0 }}>
+                Produktbeskrivning kommer snart. Kontakta oss om du har frågor om produkten.
               </p>
-              <h4 style={{ fontSize: 14, fontWeight: 700, color: '#111', marginBottom: 10 }}>Användningsområden:</h4>
-              <ol style={{ paddingLeft: 20, color: '#444', fontSize: 14, lineHeight: 2 }}>
-                <li>Appliceras på den smutsiga ytan.</li>
-                <li>Låt verka i 2–5 minuter beroende på smutsnivå.</li>
-                <li>Skölj av med högtryckstvättat eller vatten.</li>
-                <li>Vid behov, upprepa behandlingen på extra svåra fläckar.</li>
-              </ol>
-            </div>
+            )
           )}
           {activeTab === 'specifikationer' && (
             <div>
               {[
-                ['Varumärke', product.brand || 'ProLuxShine'],
-                ['Enhet', product.unit || '1 st'],
-                ['Kategori', 'Bilvård'],
-                ['Förpackning', 'Flaska / Dunk'],
-                ['pH-värde', '6–8 (neutralt)'],
-              ].map(([k, v]) => (
+                ['Artikelnummer', product.sku],
+                ['Varumärke', product.brand],
+                ['Kategori', categoryName],
+                ['Enhet', product.unit],
+                ['Lagerstatus', stock.label],
+              ].filter(([, v]) => v).map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', gap: 24, padding: '12px 0', borderBottom: '1px solid #f0f0f0', fontSize: 14 }}>
                   <span style={{ color: '#888', minWidth: 140 }}>{k}</span>
                   <span style={{ color: '#111', fontWeight: 500 }}>{v}</span>
@@ -242,7 +239,7 @@ function ProductDetailContent() {
                     <div style={{ padding: '12px 16px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                         <p style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '.08em', margin: 0 }}>{p.brand || 'ProLuxShine'}</p>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: '#4CAF7D', background: '#e8f5ee', padding: '2px 8px', borderRadius: 20 }}>I lager</span>
+                        {(() => { const st = stockStatus(p.stock_qty); return <span style={{ fontSize: 10, fontWeight: 700, color: st.color, background: st.bg, padding: '2px 8px', borderRadius: 20 }}>{st.label}</span> })()}
                       </div>
                       <Link href={`/produkter/${p.id}`} style={{ textDecoration: 'none' }}>
                         <p style={{ fontSize: 13, fontWeight: 600, color: '#111', margin: '4px 0 12px', lineHeight: 1.3 }}>{p.name}</p>

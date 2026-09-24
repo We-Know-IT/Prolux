@@ -47,7 +47,18 @@ export interface HomeContent {
   proCenter: ProCenterContent
   brandStory: BrandStoryContent
   why: WhyContent
+  trust?: TrustItem[]   // missing in content saved before the strip was editable
 }
+
+// The promises shown in the bar under the menu and the strip under the hero.
+export interface TrustItem { icon: string; title: string; sub: string }
+
+export const DEFAULT_TRUST: TrustItem[] = [
+  { icon: 'truck',   title: '1–2 dagars leverans',     sub: 'Snabb och säker frakt' },
+  { icon: 'package', title: 'Fri frakt över 2 000 kr', sub: 'Till valfritt ombud' },
+  { icon: 'star',    title: 'Professionell kvalitet',  sub: 'Virtus & Frescura' },
+  { icon: 'phone',   title: 'Personlig säljare',       sub: 'Telefon & mail mån–fre' },
+]
 
 export const DEFAULT_HOME: HomeContent = {
   hero: [

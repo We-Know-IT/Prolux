@@ -42,7 +42,7 @@ function PortalContent({ user }: { user: SupaUser }) {
         .select('*,order_items(product_id,product_name,qty,unit_price,list_price)')
         .or(`customer_id.eq.${user.user_metadata?.customer_id ?? 'none'}`)
         .order('created_at', { ascending: false }).limit(20),
-      sb.from('products').select('id,name,list_price,image_url,unit,brand').limit(12),
+      sb.from('products').select('id,name,list_price,image_url,unit,brand').eq('active', true).order('sort_order').limit(12),
     ]).then(([{ data: c }, { data: o }, { data: p }]) => {
       if (c) {
         setCustomer(c)

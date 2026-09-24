@@ -36,7 +36,7 @@ function ProductsContent() {
       }
     })
     Promise.all([
-      sb.from('products').select('*').order('name'),
+      sb.from('products').select('*').eq('active', true).order('name'),
       sb.from('categories').select('*').order('name'),
     ]).then(([{ data: p }, { data: c }]) => {
       setProducts(p || [])

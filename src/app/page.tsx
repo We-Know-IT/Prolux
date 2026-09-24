@@ -6,10 +6,10 @@ import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { PublicShell, useLoginModal, usePublicCart } from '@/components/layout/PublicShell'
 import { fmt, formatDate } from '@/lib/utils'
-import { getSiteContent, DEFAULT_HOME, HomeContent as SiteHomeContent } from '@/lib/site-content'
+import { getSiteContent, DEFAULT_HOME, DEFAULT_TRUST, HomeContent as SiteHomeContent } from '@/lib/site-content'
 import {
-  ArrowRight, ChevronRight, Package, Truck, Shield, Phone,
-  ShoppingCart, ShoppingBag, ExternalLink, Star, User, Lock, Save, Check, ClipboardList, RefreshCw, Sparkles
+  ArrowRight, ChevronRight, Package,
+  ShoppingCart, ShoppingBag, ExternalLink, User, Lock, Save, Check, ClipboardList, RefreshCw, Sparkles
 } from 'lucide-react'
 import type { User as SupaUser } from '@supabase/supabase-js'
 import OrderTracking from '@/components/portal/OrderTracking'
@@ -17,13 +17,6 @@ import { userRole } from '@/lib/roles'
 import { featureIcon } from '@/lib/feature-icons'
 
 const DISCOUNT: Record<string, number> = { A: 0.40, B: 0.30, C: 0.20, Standard: 0 }
-
-const TRUST = [
-  { icon: Truck,  title: '1–2 dagars leverans', sub: 'Snabb och säker frakt' },
-  { icon: Shield, title: 'Fri frakt över 2 000 kr', sub: 'Till valfritt ombud' },
-  { icon: Star,   title: 'Professionell kvalitet', sub: 'Virtus & Frescura' },
-  { icon: Phone,  title: 'Personlig säljare', sub: 'Telefon & mail mån–fre' },
-]
 
 /* ─── Scroll-reveal ───────────────────────────────────── */
 function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
@@ -474,14 +467,14 @@ function CustomerPortalSection({ customer, authUser, openLogin }: { customer: an
       Promise.all([
         sb.from('orders').select('*,order_items(product_id,product_name,qty,unit_price,list_price)')
           .eq('customer_id', customer.id).order('created_at', { ascending: false }).limit(20),
-        sb.from('products').select('id,name,list_price,image_url,unit,brand').limit(12),
+        sb.from('products').select('id,name,list_price,image_url,unit,brand').eq('active', true).order('sort_order').limit(12),
       ]).then(([{ data: o }, { data: p }]) => {
         if (o) setOrders(o)
         if (p) setProducts(p)
         setOrdersLoaded(true)
       })
     } else {
-      sb.from('products').select('id,name,list_price,image_url,unit,brand').limit(6)
+      sb.from('products').select('id,name,list_price,image_url,unit,brand').eq('active', true).order('sort_order').limit(6)
         .then(({ data }) => { if (data) setProducts(data); setOrdersLoaded(true) })
     }
   }, [customer?.id, ordersLoaded])
@@ -848,6 +841,7 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
   const priceList = customer?.price_list_id || 'Standard'
   const heroImg = products.find(p => p.image_url)?.image_url || null
   const [siteHome, setSiteHome] = useState<SiteHomeContent>(DEFAULT_HOME)
+  const trust = (siteHome.trust ?? DEFAULT_TRUST).filter(t => t.title.trim())
 
   useEffect(() => {
     getSiteContent('home', DEFAULT_HOME).then(setSiteHome)
@@ -858,17 +852,12 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
       {/* ── ANNOUNCEMENT BAR ── */}
       <div style={{ background: '#111', padding: '8px 24px', marginTop: 0 }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', justifyContent: 'center', gap: 'clamp(16px,4vw,48px)', flexWrap: 'wrap' }}>
-          {[
-            { icon: Truck,  text: '1–2 dagars leverans' },
-            { icon: Shield, text: 'Fri frakt över 2 000 kr' },
-            { icon: Star,   text: 'Professionell kvalitet' },
-            { icon: Phone,  text: 'Personlig säljare' },
-          ].map(({ icon: Icon, text }) => (
-            <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'rgba(255,255,255,.72)', whiteSpace: 'nowrap' }}>
+          {trust.map(({ icon, title }) => { const Icon = featureIcon(icon); return (
+            <div key={title} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'rgba(255,255,255,.8)', whiteSpace: 'nowrap' }}>
               <Icon size={13} color="#C9971A" strokeWidth={2} />
-              {text}
+              {title}
             </div>
-          ))}
+          ) })}
         </div>
       </div>
 
@@ -878,16 +867,16 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
       {/* ── TRUST STRIP ── */}
       <section style={{ background: 'transparent', borderBottom: '1px solid rgba(0,0,0,.07)' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px' }}>
-          <div className="trust-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)' }}>
-            {TRUST.map(({ icon: Icon, title, sub }, i) => (
-              <div key={title} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 16px', borderRight: i < 3 ? '1px solid rgba(0,0,0,.07)' : 'none' }}>
+          <div className="trust-grid" style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(trust.length, 1)},1fr)` }}>
+            {trust.map(({ icon, title, sub }, i) => { const Icon = featureIcon(icon); return (
+              <div key={title} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 16px', borderRight: i < trust.length - 1 ? '1px solid rgba(0,0,0,.07)' : 'none' }}>
                 <Icon size={20} color="#C9971A" strokeWidth={1.5} />
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '.06em' }}>{title}</div>
-                  <div style={{ fontSize: 12, color: '#888', marginTop: 1 }}>{sub}</div>
+                  {sub && <div style={{ fontSize: 12, color: '#555', marginTop: 1 }}>{sub}</div>}
                 </div>
               </div>
-            ))}
+            ) })}
           </div>
         </div>
       </section>
