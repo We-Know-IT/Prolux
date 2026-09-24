@@ -88,12 +88,12 @@ export default function CrmDashboardPage() {
   useLiveRefresh(['deals', 'customers', 'reminders', 'sales_budgets', 'orders'], loadData)
 
   function loadData() {
-    // Separate query: fails quietly until migration 0009 adds contact_birthday.
-    supabase.from('customers').select('id,company,contact_name,contact_birthday,account_manager').not('contact_birthday', 'is', null)
+    // Separate query: fails quietly until migration 0009 adds birthday.
+    supabase.from('customers').select('id,company,contact_name,birthday,account_manager').not('birthday', 'is', null)
       .then(({ data }) => {
         if (!data) return
         setBirthdays(data
-          .map((c: any) => ({ ...c, ...nextBirthday(c.contact_birthday) }))
+          .map((c: any) => ({ ...c, ...nextBirthday(c.birthday) }))
           .filter(c => c.daysUntil <= 30)
           .sort((a, b) => a.daysUntil - b.daysUntil))
       })
@@ -303,7 +303,7 @@ export default function CrmDashboardPage() {
             <Link key={c.id} href={`/crm/customers/${c.id}`}
               style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderTop: i > 0 ? '1px solid rgba(255,255,255,.05)' : 'none', textDecoration: 'none' }}>
               <div style={{ width: 44, textAlign: 'center', fontSize: 12, fontWeight: 700, color: c.daysUntil === 0 ? 'var(--green)' : 'var(--text)' }}>
-                {c.daysUntil === 0 ? 'Idag' : formatBirthday(c.contact_birthday)}
+                {c.daysUntil === 0 ? 'Idag' : formatBirthday(c.birthday)}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{c.contact_name || c.company}{c.turns ? ` fyller ${c.turns}` : ''}</div>

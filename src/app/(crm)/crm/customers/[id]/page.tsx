@@ -151,14 +151,14 @@ export default function CustomerDetailPage() {
 
   function startEdit() {
     if (!customer) return
-    setEditForm({ company: customer.company, contact_name: customer.contact_name, email: customer.email, phone: customer.phone || '', city: customer.city || '', org_nr: customer.org_nr || '', price_list_id: customer.price_list_id, status: customer.status, account_manager: customer.account_manager || '', contact_birthday: customer.contact_birthday || '' })
+    setEditForm({ company: customer.company, contact_name: customer.contact_name, email: customer.email, phone: customer.phone || '', city: customer.city || '', org_nr: customer.org_nr || '', price_list_id: customer.price_list_id, status: customer.status, account_manager: customer.account_manager || '', birthday: customer.birthday || '' })
     setEditMode(true)
   }
 
   async function saveEdit() {
     if (!customer) return
     setEditSaving(true)
-    const { data, error } = await supabase.from('customers').update({ ...editForm, account_manager: editForm.account_manager || null, contact_birthday: editForm.contact_birthday || null }).eq('id', customer.id).select().single()
+    const { data, error } = await supabase.from('customers').update({ ...editForm, account_manager: editForm.account_manager || null, birthday: editForm.birthday || null }).eq('id', customer.id).select().single()
     if (!error && data) { setCustomer(data as Customer); showToast('Kunduppgifter sparade'); setEditMode(false) }
     else showToast('Fel: ' + (error?.message || 'Kunde inte spara'))
     setEditSaving(false)
@@ -327,10 +327,10 @@ export default function CustomerDetailPage() {
               ['E-post', customer.email], ['Telefon', customer.phone || '—'], ['Stad', customer.city || '—'],
               ['Org.nr', customer.org_nr || '—'], ['Status', ({ active: 'Aktiv', inactive: 'Inaktiv', prospect: 'Prospekt' } as Record<string, string>)[customer.status] || customer.status], ['Prislista', customer.price_list_id],
               ['Kontaktperson', customer.contact_name || '—'],
-              ['Födelsedag', customer.contact_birthday ? (() => {
-                const nb = nextBirthday(customer.contact_birthday)
+              ['Födelsedag', customer.birthday ? (() => {
+                const nb = nextBirthday(customer.birthday)
                 const when = nb.daysUntil === 0 ? 'idag 🎉' : nb.daysUntil === 1 ? 'imorgon' : `om ${nb.daysUntil} dagar`
-                return `${formatBirthday(customer.contact_birthday)}${nb.turns ? ` · fyller ${nb.turns}` : ''} (${when})`
+                return `${formatBirthday(customer.birthday)}${nb.turns ? ` · fyller ${nb.turns}` : ''} (${when})`
               })() : '—'],
             ].map(([label, value]) => (
               <div key={label}>
@@ -621,7 +621,7 @@ export default function CustomerDetailPage() {
               { label: 'Telefon', key: 'phone', type: 'tel' },
               { label: 'Stad', key: 'city', type: 'text' },
               { label: 'Org.nr', key: 'org_nr', type: 'text' },
-              { label: 'Kontaktpersonens födelsedag', key: 'contact_birthday', type: 'date' },
+              { label: 'Kontaktpersonens födelsedag', key: 'birthday', type: 'date' },
             ].map(({ label, key, type }) => (
               <div key={key} style={{ marginBottom: 14 }}>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</label>
