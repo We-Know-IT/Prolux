@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatDate } from '@/lib/utils'
 import { ChevronLeft, ChevronRight, Plus, X, Calendar } from 'lucide-react'
+import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 
 const supabase = createClient()
 
@@ -45,7 +46,7 @@ export default function CrmCalendarPage() {
   const [saving, setSaving]         = useState(false)
   const [filter, setFilter]         = useState<'all' | 'upcoming' | 'done'>('upcoming')
 
-  useEffect(() => {
+  function loadData() {
     Promise.all([
       supabase.from('reminders').select('id,customer_id,title,due_date,priority,status,customers(company)').order('due_date'),
       supabase.from('customers').select('id,company').eq('status','active').order('company'),
@@ -53,7 +54,10 @@ export default function CrmCalendarPage() {
       if (r) setReminders(r as any)
       if (c) setCustomers(c as any)
     })
-  }, [])
+  }
+
+  useEffect(() => { loadData() }, [])
+  useLiveRefresh(['reminders', 'customers'], loadData)
 
   const todayStr = now.toISOString().slice(0, 10)
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate()

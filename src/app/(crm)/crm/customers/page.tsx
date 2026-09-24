@@ -6,6 +6,7 @@ import { Customer } from '@/types'
 import { formatDate } from '@/lib/utils'
 import { Plus, Search, Bell, Mail, ChevronRight, Phone } from 'lucide-react'
 import Link from 'next/link'
+import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 
 const supabase = createClient()
 
@@ -22,7 +23,7 @@ export default function CrmCustomersPage() {
 
   const today = new Date().toISOString().slice(0, 10)
 
-  useEffect(() => {
+  function loadData() {
     Promise.all([
       supabase.from('customers').select('id,company,contact_name,email,phone,city,org_nr,price_list_id,status,last_order_at,created_at').order('company'),
       supabase.from('reminders').select('customer_id,due_date').eq('status', 'upcoming'),
@@ -31,7 +32,10 @@ export default function CrmCustomersPage() {
       if (r) setAllReminders(r as any[])
       setLoading(false)
     })
-  }, [])
+  }
+
+  useEffect(() => { loadData() }, [])
+  useLiveRefresh(['customers', 'reminders'], loadData)
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 3000) }
 

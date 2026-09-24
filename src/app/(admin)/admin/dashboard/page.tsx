@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { fmt } from '@/lib/utils'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, Trophy, ArrowRight, Calendar, ChevronLeft, ChevronRight, Activity } from 'lucide-react'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -63,7 +64,7 @@ export default function AdminDashboard() {
   const monthEnd   = `${year}-${String(month + 1).padStart(2,'0')}-${new Date(year, month + 1, 0).getDate()}`
   const monthNames = ['Januari','Februari','Mars','April','Maj','Juni','Juli','Augusti','September','Oktober','November','December']
 
-  useEffect(() => {
+  function loadData() {
     const sb = createClient()
     Promise.all([
       sb.from('orders').select('*,customers(company,contact_name)').order('created_at', { ascending: false }),
@@ -84,12 +85,21 @@ export default function AdminDashboard() {
         const map: Record<string, number> = {}
         for (const row of b as any[]) map[row.salesperson] = row.budget
         setBudgets(map)
-        setBudgetInput(Object.fromEntries(SALESPEOPLE.map(sp => [sp, map[sp] ? String(map[sp]) : ''])))
       }
       if (r) setReminders(r)
       if (a) setActivities(a)
     })
-  }, [])
+  }
+
+  useEffect(() => { loadData() }, [])
+  useLiveRefresh(['orders', 'products', 'customers', 'deals', 'sales_budgets', 'reminders', 'customer_activities'], loadData)
+
+  // Seed the form from the latest saved budgets when opening it, so a background
+  // refresh never overwrites what the user is typing.
+  function openBudgetEditor() {
+    setBudgetInput(Object.fromEntries(SALESPEOPLE.map(sp => [sp, budgets[sp] ? String(budgets[sp]) : ''])))
+    setEditBudget(true)
+  }
 
   useEffect(() => { drawChart() }, [orders, chartPeriod])
 
@@ -342,7 +352,7 @@ export default function AdminDashboard() {
               <Target size={14} color="var(--gold)" />
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.09em' }}>Budget — {monthNames[month]}</span>
             </div>
-            <button onClick={() => setEditBudget(e => !e)}
+            <button onClick={() => editBudget ? setEditBudget(false) : openBudgetEditor()}
               style={{ fontSize: 11, padding: '4px 10px', background: 'rgba(232,184,75,.1)', border: '1px solid rgba(232,184,75,.2)', borderRadius: 6, color: 'var(--gold)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 600 }}>
               {editBudget ? 'Avbryt' : 'Sätt budget'}
             </button>
@@ -408,7 +418,7 @@ export default function AdminDashboard() {
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
               <Target size={28} color="rgba(232,184,75,.25)" />
               <div style={{ fontSize: 13, color: 'var(--text3)', textAlign: 'center' }}>Ingen budget satt</div>
-              <button onClick={() => setEditBudget(true)}
+              <button onClick={openBudgetEditor}
                 style={{ fontSize: 12, color: 'var(--gold)', background: 'rgba(232,184,75,.08)', border: '1px solid rgba(232,184,75,.2)', borderRadius: 7, padding: '6px 14px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
                 Sätt budget →
               </button>

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt } from '@/lib/utils'
 import { X, Check } from 'lucide-react'
+import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 
 function TrackingField({ orderId, initial, onSave }: { orderId: string; initial: string; onSave: (val: string) => void }) {
   const [val, setVal] = useState(initial)
@@ -50,19 +51,29 @@ export default function AdminOrders() {
   const [orderItems, setOrderItems]   = useState<any[]>([])
   const [toast, setToast]             = useState('')
 
-  useEffect(() => {
+  function loadOrders() {
     const sb = createClient()
-    sb.from('orders')
+    return sb.from('orders')
       .select('*,customers(company,contact_name,email)')
       .order('created_at', { ascending: false })
       .then(({ data }) => {
-        setOrders(data || [])
-        setFiltered(data || [])
-        const wantedId = new URLSearchParams(window.location.search).get('order')
-        const wanted = wantedId && data?.find(o => o.id === wantedId)
-        if (wanted) openOrder(wanted)
+        const list = data || []
+        setOrders(list)
+        // Keep an open detail panel in step with changes made on other devices.
+        setSelectedOrder((prev: any) => prev ? (list.find(o => o.id === prev.id) ?? prev) : prev)
+        return list
       })
+  }
+
+  useEffect(() => {
+    loadOrders().then(list => {
+      const wantedId = new URLSearchParams(window.location.search).get('order')
+      const wanted = wantedId && list.find(o => o.id === wantedId)
+      if (wanted) openOrder(wanted)
+    })
   }, [])
+
+  useLiveRefresh(['orders'], loadOrders)
 
   useEffect(() => {
     let list = orders

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Product, Customer, Category, CartItem, Order, OrderItem, OrderStatus, ORDER_STATUS_LABEL } from '@/types'
 import { custPrice, fmt, formatDate } from '@/lib/utils'
 import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star } from 'lucide-react'
+import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 
 const supabase = createClient()
 type View = 'new' | 'confirm' | 'history'
@@ -105,6 +106,13 @@ export default function CrmOrdersPage() {
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
+
+  function loadOrders() {
+    supabase.from('orders').select('id,order_nr,status,total,created_at,customers(id,company)').order('created_at', { ascending: false }).limit(50)
+      .then(({ data }) => { if (data) setOrders(data as any) })
+  }
+
+  useLiveRefresh(['orders'], loadOrders)
 
   useEffect(() => {
     Promise.all([

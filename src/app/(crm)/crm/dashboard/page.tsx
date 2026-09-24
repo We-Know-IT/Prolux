@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { fmt, formatDate } from '@/lib/utils'
 import { Plus, Users, ShoppingBag, Package, ChevronRight, FileText, GitBranch, Target, Calendar, ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
+import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 
 const supabase = createClient()
 
@@ -82,6 +83,12 @@ export default function CrmDashboardPage() {
       setFirstName(name)
       setIsAdmin(user?.user_metadata?.role === 'admin')
     })
+    loadData()
+  }, [])
+
+  useLiveRefresh(['deals', 'customers', 'reminders', 'sales_budgets'], loadData)
+
+  function loadData() {
     Promise.all([
       supabase.from('deals').select('id,title,value,created_at,customers(company)').eq('stage', 'Offert').order('created_at', { ascending: false }).limit(4),
       supabase.from('customers').select('id,company,price_list_id').eq('status', 'active').order('created_at', { ascending: false }).limit(5),
@@ -98,7 +105,6 @@ export default function CrmDashboardPage() {
         const loaded: Record<string, number> = {}
         for (const row of b as any[]) loaded[row.salesperson] = row.budget
         setBudgets(loaded)
-        setBudgetInput(Object.fromEntries(SALESPEOPLE.map(sp => [sp, loaded[sp] ? String(loaded[sp]) : ''])))
       }
       if (won) {
         const acc: Record<string, number> = {}
@@ -108,7 +114,14 @@ export default function CrmDashboardPage() {
         setAchieved(acc)
       }
     })
-  }, [])
+  }
+
+  // Seed the form from the latest saved budgets when opening it, so a background
+  // refresh never overwrites what the user is typing.
+  function openBudgetEditor() {
+    setBudgetInput(Object.fromEntries(SALESPEOPLE.map(sp => [sp, budgets[sp] ? String(budgets[sp]) : ''])))
+    setEditBudget(true)
+  }
 
   async function saveBudgets() {
     setSavingBudget(true)
@@ -237,7 +250,7 @@ export default function CrmDashboardPage() {
             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Månadsbudget — {monthNames[month]} {year}</span>
           </div>
           {isAdmin && (
-            <button onClick={() => setEditBudget(e => !e)}
+            <button onClick={() => editBudget ? setEditBudget(false) : openBudgetEditor()}
               style={{ fontSize: 11, padding: '4px 10px', background: 'rgba(232,184,75,.1)', border: '1px solid rgba(232,184,75,.2)', borderRadius: 6, color: 'var(--gold)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
               {editBudget ? 'Avbryt' : 'Sätt budget'}
             </button>

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Deal, Customer, DEAL_STAGES, DealStage } from '@/types'
 import { fmt, formatDate } from '@/lib/utils'
 import { Plus, X, User, ChevronDown } from 'lucide-react'
+import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 
 const supabase = createClient()
 
@@ -31,13 +32,20 @@ export default function CrmPipelinePage() {
   const [toast, setToast] = useState('')
   const [highlightDeal, setHighlightDeal] = useState<string | null>(null)
 
-  useEffect(() => {
-    Promise.all([
+  function loadData() {
+    return Promise.all([
       supabase.from('deals').select('*,customers(id,company)').order('created_at', { ascending: false }),
       supabase.from('customers').select('id,company').eq('status', 'active').order('company')
     ]).then(([d, c]) => {
       if (d.data) setDeals(d.data)
       if (c.data) setCustomers(c.data as Customer[])
+    })
+  }
+
+  useLiveRefresh(['deals', 'customers'], loadData)
+
+  useEffect(() => {
+    loadData().then(() => {
       setLoading(false)
       const wantedId = new URLSearchParams(window.location.search).get('deal')
       if (wantedId) {

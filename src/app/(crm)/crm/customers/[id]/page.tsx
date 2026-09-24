@@ -10,6 +10,7 @@ import {
   BarChart2, X, Trash2, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import Link from 'next/link'
+import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 
 const supabase = createClient()
 
@@ -75,7 +76,10 @@ export default function CustomerDetailPage() {
   const [editForm, setEditForm]           = useState<Partial<Customer>>({})
   const [editSaving, setEditSaving]       = useState(false)
 
-  useEffect(() => {
+  useEffect(() => { loadData() }, [id])
+  useLiveRefresh(['customers', 'orders', 'order_items', 'activities', 'reminders'], loadData)
+
+  function loadData() {
     if (!id) return
     Promise.all([
       supabase.from('customers').select('*').eq('id', id).single(),
@@ -91,7 +95,7 @@ export default function CustomerDetailPage() {
       if (p) setAllProductNames(p.map((x: any) => x.name))
       setLoading(false)
     })
-  }, [id])
+  }
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
