@@ -20,6 +20,7 @@ export default function CrmPipelinePage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [dragging, setDragging] = useState<string | null>(null)
   const [form, setForm] = useState({
     title: '', customer_id: '', value: '', stage: 'Prospekt' as DealStage,
@@ -77,9 +78,30 @@ export default function CrmPipelinePage() {
     setSavingCust(false)
   }
 
+  const EMPTY_FORM = { title: '', customer_id: '', value: '', stage: 'Prospekt' as DealStage, expected_close: '', notes: '', assigned_to: 'Bashar' }
+
+  function openNew() {
+    setEditingId(null)
+    setForm(EMPTY_FORM)
+    setShowModal(true)
+  }
+
+  function openEdit(d: any) {
+    setEditingId(d.id)
+    setForm({
+      title: d.title || '', customer_id: d.customer_id || '', value: d.value != null ? String(d.value) : '',
+      stage: d.stage, expected_close: d.expected_close || '', notes: d.notes || '', assigned_to: d.assigned_to || '',
+    })
+    setShowModal(true)
+  }
+
+  function closeModal() {
+    setShowModal(false); setShowNewCust(false); setEditingId(null)
+  }
+
   async function saveDeal() {
     if (!form.title.trim()) return showToast('Titel krävs')
-    const { data, error } = await supabase.from('deals').insert({
+    const fields = {
       title: form.title.trim(),
       customer_id: form.customer_id || null,
       value: parseFloat(form.value) || 0,
@@ -87,25 +109,33 @@ export default function CrmPipelinePage() {
       expected_close: form.expected_close || null,
       notes: form.notes || null,
       assigned_to: form.assigned_to || null,
-    }).select('*,customers(id,company)').single()
+    }
+    // Only a stage change moves updated_at: it dates a win for the budget, so
+    // fixing a typo on a won deal must not move it to this month.
+    const stageChanged = editingId && deals.find(d => d.id === editingId)?.stage !== form.stage
+    const { data, error } = editingId
+      ? await supabase.from('deals').update(stageChanged ? { ...fields, updated_at: new Date().toISOString() } : fields).eq('id', editingId).select('*,customers(id,company)').single()
+      : await supabase.from('deals').insert(fields).select('*,customers(id,company)').single()
     if (error) { showToast('Fel: ' + error.message); return }
     if (data) {
-      setDeals(ds => [data, ...ds])
-      showToast('Deal skapad!')
-      setShowModal(false)
-      setForm({ title: '', customer_id: '', value: '', stage: 'Prospekt', expected_close: '', notes: '', assigned_to: 'Bashar' })
-      setShowNewCust(false)
+      setDeals(ds => editingId ? ds.map(d => d.id === editingId ? data : d) : [data, ...ds])
+      showToast(editingId ? 'Deal uppdaterad' : 'Deal skapad!')
+      closeModal()
+      setForm(EMPTY_FORM)
     }
   }
 
   async function moveToStage(dealId: string, stage: DealStage) {
-    await supabase.from('deals').update({ stage }).eq('id', dealId)
+    // updated_at marks when a deal was won, which decides its budget month.
+    await supabase.from('deals').update({ stage, updated_at: new Date().toISOString() }).eq('id', dealId)
     setDeals(ds => ds.map(d => d.id === dealId ? { ...d, stage } : d))
   }
 
-  async function deleteDeal(id: string) {
+  async function deleteDeal(id: string, title: string) {
+    if (!confirm(`Radera "${title}"? Det går inte att ångra.`)) return
     await supabase.from('deals').delete().eq('id', id)
     setDeals(ds => ds.filter(d => d.id !== id))
+    if (editingId === id) closeModal()
     showToast('Deal raderad')
   }
 
@@ -123,7 +153,7 @@ export default function CrmPipelinePage() {
             {deals.filter(d => d.stage !== 'Vunnen' && d.stage !== 'Förlorad').length} aktiva deals · {fmt(deals.filter(d => d.stage !== 'Vunnen' && d.stage !== 'Förlorad').reduce((s,d) => s+d.value,0))} kr i pipeline
           </p>
         </div>
-        <button onClick={() => setShowModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px', background: 'var(--gold)', border: 'none', borderRadius: 8, color: '#111', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+        <button onClick={openNew} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px', background: 'var(--gold)', border: 'none', borderRadius: 8, color: '#111', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
           <Plus size={16} /> Ny deal
         </button>
       </div>
@@ -152,16 +182,18 @@ export default function CrmPipelinePage() {
                     draggable
                     onDragStart={() => setDragging(d.id)}
                     onDragEnd={() => setDragging(null)}
+                    onClick={() => openEdit(d)}
+                    title="Klicka för att redigera"
                     style={{
                       background: highlightDeal === d.id ? 'rgba(232,184,75,.1)' : 'var(--bg4)',
                       border: `1px solid ${highlightDeal === d.id ? 'var(--gold)' : dragging === d.id ? color : 'var(--line)'}`,
-                      borderRadius: 10, padding: 14, cursor: 'grab', transition: 'all .15s',
+                      borderRadius: 10, padding: 14, cursor: 'pointer', transition: 'all .15s',
                       boxShadow: highlightDeal === d.id ? '0 0 0 3px rgba(232,184,75,.2)' : 'none',
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4 }}>{d.title}</span>
-                      <button onClick={() => deleteDeal(d.id)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 2, flexShrink: 0 }}><X size={12} /></button>
+                      <button onClick={e => { e.stopPropagation(); deleteDeal(d.id, d.title) }} aria-label="Radera deal" style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 2, flexShrink: 0 }}><X size={12} /></button>
                     </div>
                     {(d as any).customers && <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 3 }}>{(d as any).customers.company}</div>}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
@@ -181,7 +213,7 @@ export default function CrmPipelinePage() {
                     {/* Move buttons */}
                     <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
                       {DEAL_STAGES.filter(s => s !== stage).slice(0, 3).map(s => (
-                        <button key={s} onClick={() => moveToStage(d.id, s)} style={{ fontSize: 9, padding: '2px 6px', background: `${STAGE_COLORS[s]}15`, border: `1px solid ${STAGE_COLORS[s]}30`, borderRadius: 4, color: STAGE_COLORS[s], cursor: 'pointer', fontWeight: 600 }}>→ {s}</button>
+                        <button key={s} onClick={e => { e.stopPropagation(); moveToStage(d.id, s) }} style={{ fontSize: 9, padding: '2px 6px', background: `${STAGE_COLORS[s]}15`, border: `1px solid ${STAGE_COLORS[s]}30`, borderRadius: 4, color: STAGE_COLORS[s], cursor: 'pointer', fontWeight: 600 }}>→ {s}</button>
                       ))}
                     </div>
                   </div>
@@ -197,8 +229,8 @@ export default function CrmPipelinePage() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 16, width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: 'var(--bg2)', zIndex: 1 }}>
-              <h2 style={{ margin: 0, fontFamily: 'var(--font-serif)', fontSize: 18, fontWeight: 400, color: 'var(--text)' }}>Ny deal</h2>
-              <button onClick={() => { setShowModal(false); setShowNewCust(false) }} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
+              <h2 style={{ margin: 0, fontFamily: 'var(--font-serif)', fontSize: 18, fontWeight: 400, color: 'var(--text)' }}>{editingId ? 'Redigera deal' : 'Ny deal'}</h2>
+              <button onClick={closeModal} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
             </div>
 
             <div style={{ padding: 24, display: 'grid', gap: 14 }}>
@@ -280,6 +312,7 @@ export default function CrmPipelinePage() {
                 <label style={{ display: 'block', fontSize: 11, color: 'var(--text3)', marginBottom: 5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Säljare</label>
                 <select value={form.assigned_to} onChange={e => setForm(f => ({ ...f, assigned_to: e.target.value }))}
                   style={{ width: '100%', padding: '9px 12px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none' }}>
+                  <option value="">— Ingen —</option>
                   {SALESPEOPLE.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
@@ -300,8 +333,11 @@ export default function CrmPipelinePage() {
             </div>
 
             <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', display: 'flex', gap: 10, justifyContent: 'flex-end', position: 'sticky', bottom: 0, background: 'var(--bg2)' }}>
-              <button onClick={() => { setShowModal(false); setShowNewCust(false) }} style={{ padding: '9px 18px', background: 'transparent', border: '1px solid var(--line)', borderRadius: 6, color: 'var(--text2)', fontSize: 13, cursor: 'pointer' }}>Avbryt</button>
-              <button onClick={saveDeal} style={{ padding: '9px 22px', background: 'var(--gold)', border: 'none', borderRadius: 6, color: '#111', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Skapa deal</button>
+              <button onClick={closeModal} style={{ padding: '9px 18px', background: 'transparent', border: '1px solid var(--line)', borderRadius: 6, color: 'var(--text2)', fontSize: 13, cursor: 'pointer' }}>Avbryt</button>
+              {editingId && (
+                <button onClick={() => deleteDeal(editingId, form.title)} style={{ marginRight: 'auto', padding: '9px 14px', background: 'transparent', border: '1px solid rgba(224,82,82,.3)', borderRadius: 6, color: 'var(--red)', fontSize: 13, cursor: 'pointer' }}>Radera</button>
+              )}
+              <button onClick={saveDeal} style={{ padding: '9px 22px', background: 'var(--gold)', border: 'none', borderRadius: 6, color: '#111', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{editingId ? 'Spara ändringar' : 'Skapa deal'}</button>
             </div>
           </div>
         </div>
