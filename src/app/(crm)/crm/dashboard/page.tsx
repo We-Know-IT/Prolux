@@ -6,6 +6,8 @@ import { Plus, Users, ShoppingBag, Package, ChevronRight, FileText, GitBranch, T
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { SALESPEOPLE, salespersonName, monthRange, budgetAchieved, canConfirmOrder } from '@/lib/team'
+import { useBudgetHistory } from '@/hooks/useBudgetHistory'
+import BudgetHistoryChart from '@/components/BudgetHistoryChart'
 
 const supabase = createClient()
 
@@ -55,6 +57,7 @@ export default function CrmDashboardPage() {
   const [reminders, setReminders]         = useState<any[]>([])
   const [budgets, setBudgets]             = useState<Record<string, number>>({})
   const [achieved, setAchieved]           = useState<Record<string, number>>({})
+  const { months: budgetHistory }         = useBudgetHistory(6)
   const [editBudget, setEditBudget]       = useState(false)
   const [budgetInput, setBudgetInput]     = useState<Record<string, string>>({})
   const [savingBudget, setSavingBudget]   = useState(false)
@@ -386,6 +389,17 @@ export default function CrmDashboardPage() {
           </div>
         )}
       </div>
+
+      {/* Budget history: own for salespeople, whole team for admins */}
+      {meLoaded && (() => {
+        const people = isAdmin ? SALESPEOPLE.filter(sp => budgetHistory.some(m => m.sold[sp] || m.budget[sp])) : [firstName]
+        if (people.length === 0 || budgetHistory.length === 0) return null
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 12, marginBottom: 24 }}>
+            {people.map(sp => <BudgetHistoryChart key={sp} salesperson={sp} months={budgetHistory} />)}
+          </div>
+        )
+      })()}
 
       {/* Calendar + Offerter */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 24 }}>

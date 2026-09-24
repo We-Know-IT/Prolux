@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { SALESPEOPLE, monthRange, budgetAchieved } from '@/lib/team'
+import { useBudgetHistory } from '@/hooks/useBudgetHistory'
+import BudgetHistoryChart from '@/components/BudgetHistoryChart'
 import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, Trophy, ArrowRight, Calendar, ChevronLeft, ChevronRight, Activity } from 'lucide-react'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -40,6 +42,7 @@ export default function AdminDashboard() {
   const [customers, setCustomers] = useState<any[]>([])
   const [deals, setDeals]           = useState<any[]>([])
   const [wonDeals, setWonDeals]     = useState<any[]>([])
+  const { months: budgetHistory }   = useBudgetHistory(6)
   const [budgets, setBudgets]       = useState<Record<string, number>>({})
   const [reminders, setReminders]   = useState<any[]>([])
   const [activities, setActivities] = useState<any[]>([])
@@ -427,6 +430,21 @@ export default function AdminDashboard() {
           )}
         </div>
       </div>
+
+      {/* Budget history — last 6 months per salesperson */}
+      {(() => {
+        const active = SALESPEOPLE.filter(sp => budgetHistory.some(m => m.sold[sp] || m.budget[sp]))
+        if (active.length === 0) return null
+        return (
+          <div style={{ ...card, padding: '22px 24px', marginBottom: 20 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Budget senaste 6 månaderna</div>
+            <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>Sålt exkl. moms per säljare, jämfört med månadens budget</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 12 }}>
+              {active.map(sp => <BudgetHistoryChart key={sp} salesperson={sp} months={budgetHistory} />)}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Bottom grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 16 }}>
