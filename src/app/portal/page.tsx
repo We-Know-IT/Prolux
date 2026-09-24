@@ -8,6 +8,7 @@ import {
   Package, ShoppingCart, User, Save, Check, ClipboardList, RefreshCw, ArrowRight, ExternalLink
 } from 'lucide-react'
 import type { User as SupaUser } from '@supabase/supabase-js'
+import OrderTracking from '@/components/portal/OrderTracking'
 
 const DISCOUNT: Record<string, number> = { A: 0.40, B: 0.30, C: 0.20, Standard: 0 }
 const STATUS_LABEL: Record<string, string> = { pending: 'Mottagen', confirmed: 'Bekräftad', packed: 'Packad', shipped: 'Skickad', delivered: 'Levererad', cancelled: 'Avbruten' }
@@ -37,7 +38,7 @@ function PortalContent({ user }: { user: SupaUser }) {
     Promise.all([
       sb.from('customers').select('*').eq('auth_user_id', user.id).maybeSingle(),
       sb.from('orders')
-        .select('id,order_nr,status,subtotal,total,created_at,order_items(product_id,product_name,qty,unit_price,list_price)')
+        .select('*,order_items(product_id,product_name,qty,unit_price,list_price)')
         .or(`customer_id.eq.${user.user_metadata?.customer_id ?? 'none'}`)
         .order('created_at', { ascending: false }).limit(20),
       sb.from('products').select('id,name,list_price,image_url,unit,brand').limit(12),
@@ -47,7 +48,7 @@ function PortalContent({ user }: { user: SupaUser }) {
         setForm({ contact_name: c.contact_name || '', phone: c.phone || '', address: c.address || '' })
         // Re-fetch orders by customer id if we have one
         sb.from('orders')
-          .select('id,order_nr,status,subtotal,total,created_at,order_items(product_id,product_name,qty,unit_price,list_price)')
+          .select('*,order_items(product_id,product_name,qty,unit_price,list_price)')
           .eq('customer_id', c.id)
           .order('created_at', { ascending: false }).limit(20)
           .then(({ data: orders2 }) => { if (orders2) setOrders(orders2) })
@@ -207,6 +208,7 @@ function PortalContent({ user }: { user: SupaUser }) {
                       </div>
                     )
                   })()}
+                  <OrderTracking order={latestOrder} />
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
                     {latestOrder.order_items?.slice(0, 3).map((item: any, i: number) => (
                       <span key={i} style={{ fontSize: 11, padding: '3px 8px', background: '#F5F3EE', borderRadius: 4, color: '#666' }}>
@@ -307,6 +309,7 @@ function PortalContent({ user }: { user: SupaUser }) {
                         </span>
                       </div>
                     </div>
+                    <OrderTracking order={o} />
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
                       {o.order_items?.map((item: any, i: number) => (
                         <span key={i} style={{ fontSize: 11, padding: '3px 8px', background: '#F5F3EE', borderRadius: 4, color: '#555' }}>

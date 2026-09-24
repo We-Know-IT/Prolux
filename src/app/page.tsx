@@ -12,6 +12,7 @@ import {
   ShoppingCart, ShoppingBag, ExternalLink, Star, User, Lock, Save, Check, ClipboardList, RefreshCw
 } from 'lucide-react'
 import type { User as SupaUser } from '@supabase/supabase-js'
+import OrderTracking from '@/components/portal/OrderTracking'
 
 const DISCOUNT: Record<string, number> = { A: 0.40, B: 0.30, C: 0.20, Standard: 0 }
 
@@ -76,7 +77,7 @@ function PortalHome({ user, products }: { user: SupaUser; products: any[] }) {
     Promise.all([
       supabase.from('customers').select('*').eq('email', user.email!).maybeSingle(),
       supabase.from('orders')
-        .select('id,order_nr,status,total,created_at,order_items(product_name,qty,unit_price)')
+        .select('*,order_items(product_name,qty,unit_price)')
         .eq('customer_id', user.user_metadata?.customer_id ?? '')
         .order('created_at', { ascending: false }),
     ]).then(([{ data: c }, { data: o }]) => {
@@ -284,6 +285,7 @@ function PortalHome({ user, products }: { user: SupaUser; products: any[] }) {
                           <div style={{ fontSize: 11, color: '#bbb' }}>inkl. moms</div>
                         </div>
                       </div>
+                      <OrderTracking order={o} />
                       {o.order_items?.length > 0 && (
                         <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(0,0,0,.06)', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                           {o.order_items.map((item: any, i: number) => (
@@ -479,7 +481,7 @@ function CustomerPortalSection({ customer, authUser, openLogin }: { customer: an
     const sb = createClient()
     if (customer?.id) {
       Promise.all([
-        sb.from('orders').select('id,order_nr,status,subtotal,total,created_at,order_items(product_id,product_name,qty,unit_price,list_price)')
+        sb.from('orders').select('*,order_items(product_id,product_name,qty,unit_price,list_price)')
           .eq('customer_id', customer.id).order('created_at', { ascending: false }).limit(20),
         sb.from('products').select('id,name,list_price,image_url,unit,brand').limit(12),
       ]).then(([{ data: o }, { data: p }]) => {
@@ -643,6 +645,7 @@ function CustomerPortalSection({ customer, authUser, openLogin }: { customer: an
                       </div>
                     </div>
                   )}
+                  <OrderTracking order={latestOrder} />
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
                     {latestOrder.order_items?.slice(0, 3).map((item: any, i: number) => (
                       <span key={i} style={{ fontSize: 11, padding: '3px 8px', background: '#F5F3EE', borderRadius: 4, color: '#666' }}>{item.product_name} ×{item.qty}</span>
@@ -770,6 +773,7 @@ function CustomerPortalSection({ customer, authUser, openLogin }: { customer: an
                         </button>
                       </div>
                     </div>
+                    <OrderTracking order={o} />
                     {o.order_items?.length > 0 && (
                       <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {o.order_items.slice(0, 4).map((item: any, i: number) => (

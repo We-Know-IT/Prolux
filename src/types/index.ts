@@ -54,6 +54,8 @@ export interface Order {
   total: number
   visma_invoice_id: string | null
   transport_order_id: string | null
+  carrier?: string | null
+  shipped_at?: string | null
   notes: string | null
   assigned_to?: string | null
   created_by?: string | null

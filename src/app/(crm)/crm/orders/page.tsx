@@ -7,6 +7,7 @@ import { custPrice, fmt, formatDateTime } from '@/lib/utils'
 import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star } from 'lucide-react'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { SALESPEOPLE, salespersonName, canConfirmOrder } from '@/lib/team'
+import ShipOrderForm from '@/components/orders/ShipOrderForm'
 
 const supabase = createClient()
 type View = 'new' | 'confirm' | 'history'
@@ -116,7 +117,7 @@ export default function CrmOrdersPage() {
   }, [])
 
   function loadOrders() {
-    supabase.from('orders').select('id,order_nr,status,total,created_at,assigned_to,created_by,customers(id,company)').order('created_at', { ascending: false }).limit(50)
+    supabase.from('orders').select('*,customers(id,company)').order('created_at', { ascending: false }).limit(50)
       .then(({ data }) => { if (data) setOrders(data as any) })
   }
 
@@ -124,7 +125,7 @@ export default function CrmOrdersPage() {
 
   useEffect(() => {
     Promise.all([
-      supabase.from('orders').select('id,order_nr,status,total,created_at,assigned_to,created_by,customers(id,company)').order('created_at', { ascending: false }).limit(50),
+      supabase.from('orders').select('*,customers(id,company)').order('created_at', { ascending: false }).limit(50),
       supabase.from('customers').select('id,company,contact_name,price_list_id,city,org_nr,phone,email,account_manager').eq('status', 'active').order('company'),
       supabase.from('products').select('id,sku,name,brand,unit,list_price,stock_qty,active,image_url,category_id').eq('active', true).order('sort_order'),
       supabase.from('categories').select('id,name,sort_order').order('sort_order'),
@@ -374,6 +375,17 @@ export default function CrmOrdersPage() {
                                 {item.product_name} ×{item.qty}
                               </span>
                             ))}
+                          </div>
+                        )}
+                        {o.status !== 'pending' && (canConfirmOrder(o, myName, isAdmin) || o.transport_order_id) && (
+                          <div style={{ marginTop: 14 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Frakt & spårning</div>
+                            {canConfirmOrder(o, myName, isAdmin)
+                              ? <ShipOrderForm order={o} onShipped={patch => {
+                                  setOrders(os => os.map(x => x.id === o.id ? { ...x, ...patch } : x))
+                                  showToast(`Order #${o.order_nr} markerad som skickad`)
+                                }} />
+                              : <ShipOrderForm order={o} readOnly onShipped={() => {}} />}
                           </div>
                         )}
                       </td>

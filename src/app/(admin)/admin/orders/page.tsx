@@ -2,32 +2,11 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt, formatDateTime } from '@/lib/utils'
-import { X, Check } from 'lucide-react'
+import { X } from 'lucide-react'
+import ShipOrderForm from '@/components/orders/ShipOrderForm'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { SALESPEOPLE } from '@/lib/team'
 
-function TrackingField({ orderId, initial, onSave }: { orderId: string; initial: string; onSave: (val: string) => void }) {
-  const [val, setVal] = useState(initial)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  async function save() {
-    setSaving(true)
-    const sb = createClient()
-    await sb.from('orders').update({ transport_order_id: val }).eq('id', orderId)
-    onSave(val); setSaved(true); setSaving(false)
-    setTimeout(() => setSaved(false), 2000)
-  }
-  return (
-    <div style={{ display: 'flex', gap: 8 }}>
-      <input value={val} onChange={e => { setVal(e.target.value); setSaved(false) }} placeholder="ex. 123456789"
-        style={{ flex: 1, padding: '8px 12px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontFamily: 'var(--font-sans)', fontSize: 13, outline: 'none' }} />
-      <button onClick={save} disabled={saving}
-        style={{ padding: '8px 14px', background: saved ? 'rgba(76,175,125,.15)' : 'var(--bg3)', border: `1px solid ${saved ? 'var(--green)' : 'var(--border)'}`, borderRadius: 6, color: saved ? 'var(--green)' : 'var(--text2)', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-        {saved ? <><Check size={12} /> Sparat</> : saving ? '…' : 'Spara'}
-      </button>
-    </div>
-  )
-}
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Utkast', pending: 'Väntande', confirmed: 'Bekräftad',
@@ -299,10 +278,14 @@ export default function AdminOrders() {
                 </div>
               </div>
 
-              {/* Tracking number */}
+              {/* Shipping */}
               <div>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8, display: 'block' }}>Spårningsnummer</span>
-                <TrackingField orderId={selectedOrder.id} initial={selectedOrder.transport_order_id || ''} onSave={(val) => setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, transport_order_id: val } : o))} />
+                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8, display: 'block' }}>Frakt & spårning</span>
+                <ShipOrderForm key={selectedOrder.id} order={selectedOrder} onShipped={patch => {
+                  setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, ...patch } : o))
+                  setSelectedOrder((prev: any) => ({ ...prev, ...patch }))
+                  showToast(`Order #${selectedOrder.order_nr} markerad som skickad`)
+                }} />
               </div>
             </div>
           </>

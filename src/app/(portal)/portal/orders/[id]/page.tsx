@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ArrowLeft, Clock, CheckCircle, Package, Truck, Home } from 'lucide-react'
 import { ElementType } from 'react'
 import { portalCustomer } from '@/lib/portal-customer'
+import OrderTracking from '@/components/portal/OrderTracking'
 
 interface Step {
   status: string
@@ -172,6 +173,8 @@ export default async function OrderDetailPage({
       )}
 
       {/* Timeline */}
+      <OrderTracking order={order} />
+
       {!isCancelled && (
         <div style={{ marginBottom: 40 }}>
           {STEPS.map((step, i) => {
