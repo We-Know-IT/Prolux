@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
+import { SALESPEOPLE } from '@/lib/team'
 
 const supabase = createClient()
 
@@ -149,14 +150,14 @@ export default function CustomerDetailPage() {
 
   function startEdit() {
     if (!customer) return
-    setEditForm({ company: customer.company, contact_name: customer.contact_name, email: customer.email, phone: customer.phone || '', city: customer.city || '', org_nr: customer.org_nr || '', price_list_id: customer.price_list_id, status: customer.status })
+    setEditForm({ company: customer.company, contact_name: customer.contact_name, email: customer.email, phone: customer.phone || '', city: customer.city || '', org_nr: customer.org_nr || '', price_list_id: customer.price_list_id, status: customer.status, account_manager: customer.account_manager || '' })
     setEditMode(true)
   }
 
   async function saveEdit() {
     if (!customer) return
     setEditSaving(true)
-    const { data, error } = await supabase.from('customers').update(editForm).eq('id', customer.id).select().single()
+    const { data, error } = await supabase.from('customers').update({ ...editForm, account_manager: editForm.account_manager || null }).eq('id', customer.id).select().single()
     if (!error && data) { setCustomer(data as Customer); showToast('Kunduppgifter sparade'); setEditMode(false) }
     else showToast('Fel: ' + (error?.message || 'Kunde inte spara'))
     setEditSaving(false)
@@ -258,6 +259,9 @@ export default function CustomerDetailPage() {
                 <p style={{ margin: '2px 0 0', color: 'var(--text2)', fontSize: 13 }}>
                   {customer.contact_name}
                   {customer.city ? ` · ${customer.city}` : ''}
+                </p>
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: customer.account_manager ? 'var(--text3)' : 'var(--red)' }}>
+                  {customer.account_manager ? `Kundansvarig: ${customer.account_manager}` : 'Ingen kundansvarig — ordrar får ingen mottagare'}
                 </p>
               </div>
               <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 5, background: PL_BADGE_COLOR[customer.price_list_id], color: PL_TEXT_COLOR[customer.price_list_id], fontWeight: 700, marginLeft: 4 }}>
@@ -628,6 +632,16 @@ export default function CustomerDetailPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.06em' }}>Kundansvarig</label>
+              <select value={editForm.account_manager || ''} onChange={e => setEditForm(f => ({ ...f, account_manager: e.target.value }))}
+                style={{ width: '100%', padding: '9px 12px', background: 'var(--bg3)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none' }}>
+                <option value="">— Ingen —</option>
+                {SALESPEOPLE.map(sp => <option key={sp} value={sp}>{sp}</option>)}
+              </select>
+              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Nya ordrar från kunden går till och räknas på den här säljaren.</div>
             </div>
 
             <div style={{ marginBottom: 20 }}>

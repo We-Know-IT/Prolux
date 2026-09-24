@@ -6,6 +6,7 @@ import { Product, Customer, Category, CartItem, Order, OrderItem, OrderStatus, O
 import { custPrice, fmt, formatDate } from '@/lib/utils'
 import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star } from 'lucide-react'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
+import { SALESPEOPLE, salespersonName } from '@/lib/team'
 
 const supabase = createClient()
 type View = 'new' | 'confirm' | 'history'
@@ -98,6 +99,9 @@ export default function CrmOrdersPage() {
   const [isMobile, setIsMobile]           = useState(false)
   const [showMobileCart, setShowMobileCart] = useState(false)
   const [delivery, setDelivery]           = useState('Direkt')
+  const [assignee, setAssignee]           = useState('')
+  const [myName, setMyName]               = useState('')
+  const [onlyMine, setOnlyMine]           = useState(false)
   const [placing, setPlacing]             = useState(false)
 
   useEffect(() => {
@@ -108,7 +112,7 @@ export default function CrmOrdersPage() {
   }, [])
 
   function loadOrders() {
-    supabase.from('orders').select('id,order_nr,status,total,created_at,customers(id,company)').order('created_at', { ascending: false }).limit(50)
+    supabase.from('orders').select('id,order_nr,status,total,created_at,assigned_to,customers(id,company)').order('created_at', { ascending: false }).limit(50)
       .then(({ data }) => { if (data) setOrders(data as any) })
   }
 
@@ -116,8 +120,8 @@ export default function CrmOrdersPage() {
 
   useEffect(() => {
     Promise.all([
-      supabase.from('orders').select('id,order_nr,status,total,created_at,customers(id,company)').order('created_at', { ascending: false }).limit(50),
-      supabase.from('customers').select('id,company,contact_name,price_list_id,city,org_nr,phone,email').eq('status', 'active').order('company'),
+      supabase.from('orders').select('id,order_nr,status,total,created_at,assigned_to,customers(id,company)').order('created_at', { ascending: false }).limit(50),
+      supabase.from('customers').select('id,company,contact_name,price_list_id,city,org_nr,phone,email,account_manager').eq('status', 'active').order('company'),
       supabase.from('products').select('id,sku,name,brand,unit,list_price,stock_qty,active,image_url,category_id').eq('active', true).order('sort_order'),
       supabase.from('categories').select('id,name,sort_order').order('sort_order'),
     ]).then(([o, c, p, cat]) => {
@@ -137,6 +141,7 @@ export default function CrmOrdersPage() {
     if (!customer) return
     autoSelectedRef.current = true
     setSelectedCustomer(customer)
+    setAssignee(customer.account_manager || '')
     setCart([])
     loadLastBought(customer)
     const productName = searchParams.get('product')
@@ -178,8 +183,13 @@ export default function CrmOrdersPage() {
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setMyName(salespersonName(user)))
+  }, [])
+
   function selectCustomerAndLoad(c: Customer) {
     setSelectedCustomer(c)
+    setAssignee(c.account_manager || myName)
     setCart([])
     loadLastBought(c)
   }
@@ -218,6 +228,9 @@ export default function CrmOrdersPage() {
       delivery_name: selectedCustomer.company,
       delivery_city: selectedCustomer.city,
       subtotal: afterDiscount, vat_amount: vat, total,
+      // Empty lets the database default it to the customer's account manager.
+      // No manager on the customer: the salesperson placing it receives it.
+      assigned_to: assignee || (selectedCustomer.account_manager ? null : myName || null),
       notes: `Leverans: ${delivery}${discountAmt ? ` | Rabatt: ${discountAmt} kr` : ''}`
     }).select().single()
     if (error || !order) { showToast('Fel vid orderläggning'); setPlacing(false); return }
@@ -263,7 +276,10 @@ export default function CrmOrdersPage() {
   if (view === 'history') return (
     <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Alla ordrar</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: 0 }}>{onlyMine ? 'Mina ordrar' : 'Alla ordrar'}</h1>
+        <button onClick={() => setOnlyMine(m => !m)} style={{ marginLeft: 'auto', marginRight: 10, padding: '8px 14px', background: onlyMine ? 'rgba(232,184,75,.12)' : 'transparent', border: `1px solid ${onlyMine ? 'rgba(232,184,75,.35)' : 'var(--line)'}`, borderRadius: 8, color: onlyMine ? 'var(--gold)' : 'var(--text2)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          {onlyMine ? 'Visa alla' : 'Bara mina'}
+        </button>
         <button onClick={() => setView('new')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', background: 'var(--gold)', border: 'none', borderRadius: 8, color: '#111', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
           <Plus size={15} /> Ny order
         </button>
@@ -272,15 +288,15 @@ export default function CrmOrdersPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 480 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)' }}>
-              {['Order', 'Datum', 'Kund', 'Summa inkl. moms', 'Status'].map(h => (
+              {['Order', 'Datum', 'Kund', 'Mottagare', 'Summa inkl. moms', 'Status'].map(h => (
                 <th key={h} style={{ padding: '12px 16px', textAlign: 'left', color: 'var(--text3)', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: 'var(--text3)' }}>Laddar...</td></tr>
-            ) : orders.map(o => {
+              <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'var(--text3)' }}>Laddar...</td></tr>
+            ) : orders.filter(o => !onlyMine || o.assigned_to === myName).map(o => {
               const expanded = expandedOrderId === o.id
               const items = orderItemsById[o.id]
               return (
@@ -289,6 +305,7 @@ export default function CrmOrdersPage() {
                     <td style={{ padding: '12px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text3)' }}>#{o.order_nr}</td>
                     <td style={{ padding: '12px 16px', color: 'var(--text2)' }}>{formatDate(o.created_at)}</td>
                     <td style={{ padding: '12px 16px', color: 'var(--text)', fontWeight: 500 }}>{(o as any).customers?.company || '—'}</td>
+                    <td style={{ padding: '12px 16px', color: o.assigned_to ? 'var(--text2)' : 'var(--red)' }}>{o.assigned_to || 'Saknas'}</td>
                     <td style={{ padding: '12px 16px', color: 'var(--gold)', fontWeight: 700 }}>{fmt(o.total)} kr</td>
                     <td style={{ padding: '12px 16px' }}>
                       <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: 'rgba(76,175,125,.12)', color: 'var(--green)', fontWeight: 700 }}>
@@ -298,7 +315,7 @@ export default function CrmOrdersPage() {
                   </tr>
                   {expanded && (
                     <tr style={{ borderBottom: '1px solid var(--border2)' }}>
-                      <td colSpan={5} style={{ padding: '4px 16px 16px', background: 'rgba(232,184,75,.02)' }}>
+                      <td colSpan={6} style={{ padding: '4px 16px 16px', background: 'rgba(232,184,75,.02)' }}>
                         {!items ? (
                           <div style={{ fontSize: 12, color: 'var(--text3)', padding: '8px 0' }}>Laddar produkter...</div>
                         ) : items.length === 0 ? (
@@ -319,7 +336,7 @@ export default function CrmOrdersPage() {
               )
             })}
             {!loading && orders.length === 0 && (
-              <tr><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: 'var(--text3)' }}>Inga ordrar</td></tr>
+              <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'var(--text3)' }}>Inga ordrar</td></tr>
             )}
           </tbody>
         </table>
@@ -368,6 +385,18 @@ export default function CrmOrdersPage() {
             </div>
           </div>
         )}
+      </div>
+      <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: '0 0 4px' }}>Mottagare</h3>
+        <p style={{ fontSize: 12, color: 'var(--text3)', margin: '0 0 12px' }}>Säljaren som hanterar ordern och får den på sin budget.</p>
+        <div style={{ position: 'relative' }}>
+          <select value={assignee} onChange={e => setAssignee(e.target.value)}
+            style={{ width: '100%', padding: '11px 36px 11px 14px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 14, outline: 'none', appearance: 'none', cursor: 'pointer' }}>
+            <option value="">{selectedCustomer.account_manager ? `Kundansvarig (${selectedCustomer.account_manager})` : '— Ingen mottagare —'}</option>
+            {SALESPEOPLE.map(sp => <option key={sp} value={sp}>{sp}{sp === selectedCustomer.account_manager ? ' (kundansvarig)' : ''}</option>)}
+          </select>
+          <ChevronDown size={15} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', pointerEvents: 'none' }} />
+        </div>
       </div>
       <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
         <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>

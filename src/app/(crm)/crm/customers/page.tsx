@@ -7,6 +7,7 @@ import { formatDate } from '@/lib/utils'
 import { Plus, Search, Bell, Mail, ChevronRight, Phone } from 'lucide-react'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
+import { SALESPEOPLE, salespersonName } from '@/lib/team'
 
 const supabase = createClient()
 
@@ -17,7 +18,8 @@ export default function CrmCustomersPage() {
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
   const [showNewCustomer, setShowNewCustomer] = useState(false)
-  const [newCustomerForm, setNewCustomerForm] = useState({ company: '', contact_name: '', email: '', phone: '', city: '', org_nr: '', price_list_id: 'Standard' })
+  const [myName, setMyName] = useState('')
+  const [newCustomerForm, setNewCustomerForm] = useState({ company: '', contact_name: '', email: '', phone: '', city: '', org_nr: '', price_list_id: 'Standard', account_manager: '' })
   const [savingCustomer, setSavingCustomer] = useState(false)
   const [toast, setToast]             = useState('')
 
@@ -25,7 +27,7 @@ export default function CrmCustomersPage() {
 
   function loadData() {
     Promise.all([
-      supabase.from('customers').select('id,company,contact_name,email,phone,city,org_nr,price_list_id,status,last_order_at,created_at').order('company'),
+      supabase.from('customers').select('id,company,contact_name,email,phone,city,org_nr,price_list_id,status,last_order_at,account_manager,created_at').order('company'),
       supabase.from('reminders').select('customer_id,due_date').eq('status', 'upcoming'),
     ]).then(([{ data: c }, { data: r }]) => {
       if (c) setCustomers(c as Customer[])
@@ -34,7 +36,15 @@ export default function CrmCustomersPage() {
     })
   }
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    loadData()
+    // New customers default to the salesperson creating them.
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      const me = salespersonName(user)
+      setMyName(me)
+      setNewCustomerForm(f => ({ ...f, account_manager: f.account_manager || me }))
+    })
+  }, [])
   useLiveRefresh(['customers', 'reminders'], loadData)
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 3000) }
@@ -44,12 +54,13 @@ export default function CrmCustomersPage() {
     setSavingCustomer(true)
     const { data, error } = await supabase.from('customers').insert({
       ...newCustomerForm,
+      account_manager: newCustomerForm.account_manager || null,
       status: 'active',
     }).select().single()
     if (!error && data) {
       setCustomers(cs => [...cs, data].sort((a, b) => a.company.localeCompare(b.company)))
       setShowNewCustomer(false)
-      setNewCustomerForm({ company: '', contact_name: '', email: '', phone: '', city: '', org_nr: '', price_list_id: 'Standard' })
+      setNewCustomerForm({ company: '', contact_name: '', email: '', phone: '', city: '', org_nr: '', price_list_id: 'Standard', account_manager: myName })
       showToast('Kund skapad!')
     } else {
       showToast('Fel: ' + (error?.message || 'Kunde inte spara'))
@@ -142,6 +153,7 @@ export default function CrmCustomersPage() {
                 <div style={{ fontSize: 12, color: 'var(--text3)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                   <span>{c.contact_name}</span>
                   {c.city && <span>📍 {c.city}</span>}
+                  <span style={{ color: c.account_manager ? undefined : 'var(--red)' }}>👤 {c.account_manager || 'Ingen kundansvarig'}</span>
                   {c.last_order_at && <span>Senast: {formatDate(c.last_order_at)}</span>}
                 </div>
               </div>
@@ -211,6 +223,15 @@ export default function CrmCustomersPage() {
               <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>
                 {newCustomerForm.price_list_id === 'A' ? 'Platinum — 40% rabatt' : newCustomerForm.price_list_id === 'B' ? 'Gold — 30% rabatt' : newCustomerForm.price_list_id === 'C' ? 'Silver — 20% rabatt' : 'Utan rabatt (listavis)'}
               </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.06em' }}>Kundansvarig</label>
+              <select value={newCustomerForm.account_manager} onChange={e => setNewCustomerForm(f => ({ ...f, account_manager: e.target.value }))}
+                style={{ width: '100%', padding: '9px 12px', background: 'var(--bg3)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none' }}>
+                <option value="">— Ingen —</option>
+                {SALESPEOPLE.map(sp => <option key={sp} value={sp}>{sp}</option>)}
+              </select>
             </div>
 
             <div style={{ display: 'flex', gap: 10 }}>

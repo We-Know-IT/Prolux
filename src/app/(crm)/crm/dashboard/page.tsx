@@ -5,6 +5,7 @@ import { fmt, formatDate } from '@/lib/utils'
 import { Plus, Users, ShoppingBag, Package, ChevronRight, FileText, GitBranch, Target, Calendar, ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
+import { SALESPEOPLE, salespersonName, monthRange, salesBySalesperson } from '@/lib/team'
 
 const supabase = createClient()
 
@@ -16,8 +17,6 @@ const glass: React.CSSProperties = {
   borderRadius: 12,
   boxShadow: '0 1px 0 rgba(255,255,255,.04) inset, 0 4px 24px rgba(0,0,0,.3)',
 }
-
-const SALESPEOPLE = ['Bashar', 'Stefan', 'Anna', 'Erik']
 
 function workingDaysInMonth(year: number, month: number): number {
   let count = 0
@@ -67,30 +66,32 @@ export default function CrmDashboardPage() {
   const [remCustomer, setRemCustomer]     = useState('')
   const [remPriority, setRemPriority]     = useState<'low' | 'normal' | 'high'>('normal')
   const [savingReminder, setSavingReminder] = useState(false)
-
-  const monthStart = `${year}-${String(month + 1).padStart(2,'0')}-01`
-  const monthEnd   = `${year}-${String(month + 1).padStart(2,'0')}-${new Date(year, month + 1, 0).getDate()}`
+  const [meLoaded, setMeLoaded]           = useState(false)
+  const [pendingOrders, setPendingOrders] = useState<any[]>([])
+  const [confirmingId, setConfirmingId]   = useState<string | null>(null)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      const name = (user?.user_metadata?.full_name || user?.user_metadata?.name || 'Bashar').split(' ')[0]
-      setFirstName(name)
+      setFirstName(salespersonName(user))
       setIsAdmin(user?.user_metadata?.role === 'admin')
+      setMeLoaded(true)
     })
     loadData()
   }, [])
 
-  useLiveRefresh(['deals', 'customers', 'reminders', 'sales_budgets'], loadData)
+  useLiveRefresh(['deals', 'customers', 'reminders', 'sales_budgets', 'orders'], loadData)
 
   function loadData() {
+    const { start, end } = monthRange()
     Promise.all([
       supabase.from('deals').select('id,title,value,created_at,customers(company)').eq('stage', 'Offert').order('created_at', { ascending: false }).limit(4),
       supabase.from('customers').select('id,company,price_list_id').eq('status', 'active').order('created_at', { ascending: false }).limit(5),
       supabase.from('reminders').select('id,customer_id,title,due_date,priority,status,customers(company)').eq('status', 'upcoming').order('due_date'),
       supabase.from('sales_budgets').select('salesperson,budget').eq('year', year).eq('month', month),
-      supabase.from('deals').select('assigned_to,value').eq('stage', 'Vunnen').gte('updated_at', monthStart).lte('updated_at', monthEnd + 'T23:59:59'),
+      supabase.from('orders').select('assigned_to,subtotal,status').gte('created_at', start).lte('created_at', end),
       supabase.from('customers').select('id,company').eq('status', 'active').order('company'),
-    ]).then(([{ data: d }, { data: c }, { data: r }, { data: b }, { data: won }, { data: ac }]) => {
+      supabase.from('orders').select('id,order_nr,total,created_at,assigned_to,customers(id,company)').eq('status', 'pending').order('created_at', { ascending: false }),
+    ]).then(([{ data: d }, { data: c }, { data: r }, { data: b }, { data: sold }, { data: ac }, { data: po }]) => {
       if (d) setDeals(d)
       if (c) setRecentCustomers(c)
       if (r) setReminders(r)
@@ -100,14 +101,16 @@ export default function CrmDashboardPage() {
         for (const row of b as any[]) loaded[row.salesperson] = row.budget
         setBudgets(loaded)
       }
-      if (won) {
-        const acc: Record<string, number> = {}
-        for (const deal of won as any[]) {
-          if (deal.assigned_to) acc[deal.assigned_to] = (acc[deal.assigned_to] || 0) + (deal.value || 0)
-        }
-        setAchieved(acc)
-      }
+      if (sold) setAchieved(salesBySalesperson(sold))
+      if (po) setPendingOrders(po)
     })
+  }
+
+  async function confirmOrder(id: string) {
+    setConfirmingId(id)
+    const { error } = await supabase.from('orders').update({ status: 'confirmed' }).eq('id', id)
+    setConfirmingId(null)
+    if (!error) setPendingOrders(os => os.filter(o => o.id !== id))
   }
 
   // Seed the form from the latest saved budgets when opening it, so a background
@@ -236,6 +239,41 @@ export default function CrmDashboardPage() {
         ))}
       </div>
 
+      {/* Orders waiting on this user (admins also see unassigned ones) */}
+      {(() => {
+        const mine = meLoaded ? pendingOrders.filter(o => o.assigned_to === firstName || (isAdmin && !o.assigned_to)) : []
+        if (mine.length === 0) return null
+        return (
+          <div style={{ ...glass, padding: '18px 22px', marginBottom: 24, border: '1px solid rgba(232,184,75,.25)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <ShoppingBag size={15} color="var(--gold)" />
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Ordrar att hantera</span>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '1px 8px', borderRadius: 10, background: 'rgba(232,184,75,.15)', color: 'var(--gold)' }}>{mine.length}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {mine.map((o, i) => (
+                <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderTop: i > 0 ? '1px solid rgba(255,255,255,.05)' : 'none', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: 160 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                      #{o.order_nr} · {o.customers?.id
+                        ? <Link href={`/crm/customers/${o.customers.id}`} style={{ color: 'var(--text)', textDecoration: 'underline', textUnderlineOffset: 3 }}>{o.customers.company}</Link>
+                        : 'Gästorder'}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
+                      {formatDate(o.created_at)} · {fmt(o.total)} kr{!o.assigned_to ? ' · saknar mottagare' : ''}
+                    </div>
+                  </div>
+                  <button onClick={() => confirmOrder(o.id)} disabled={confirmingId === o.id}
+                    style={{ padding: '7px 14px', background: 'var(--gold)', border: 'none', borderRadius: 7, color: '#111', fontSize: 12, fontWeight: 700, cursor: 'pointer', opacity: confirmingId === o.id ? .6 : 1 }}>
+                    {confirmingId === o.id ? 'Bekräftar…' : 'Bekräfta order'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Budget Widget */}
       <div style={{ ...glass, padding: '20px 24px', marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -284,7 +322,7 @@ export default function CrmDashboardPage() {
                 <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 12 }}>
                   {[
                     { label: 'Månadsbudget', value: `${fmt(budgets[firstName])} kr`, color: 'var(--text)' },
-                    { label: 'Stängda affärer', value: `${fmt(achieved[firstName] || 0)} kr`, color: (achieved[firstName] || 0) > 0 ? 'var(--green)' : 'var(--text3)' },
+                    { label: 'Sålt', value: `${fmt(achieved[firstName] || 0)} kr`, color: (achieved[firstName] || 0) > 0 ? 'var(--green)' : 'var(--text3)' },
                     { label: 'Kvar', value: `${fmt(Math.max(0, budgets[firstName] - (achieved[firstName] || 0)))} kr`, color: 'var(--text)' },
                     { label: 'Dagsmål', value: `${fmt(Math.round(budgets[firstName] / workDays))} kr`, color: 'var(--gold)' },
                   ].map(({ label, value, color }) => (
@@ -327,7 +365,7 @@ export default function CrmDashboardPage() {
                 <div style={{ display: 'flex', gap: 24, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,.06)' }}>
                   {[
                     { label: 'Total månadsbudget', value: `${fmt(totalBudget)} kr` },
-                    { label: 'Teamets stängda affärer', value: `${fmt(Object.values(achieved).reduce((a,b) => a+b, 0))} kr` },
+                    { label: 'Teamets försäljning', value: `${fmt(Object.values(achieved).reduce((a,b) => a+b, 0))} kr` },
                     { label: 'Arbetsdagar kvar', value: `${workDays - daysPassed} av ${workDays}` },
                   ].map(({ label, value }) => (
                     <div key={label}>

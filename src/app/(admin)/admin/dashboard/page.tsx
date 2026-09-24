@@ -5,6 +5,7 @@ import { fmt } from '@/lib/utils'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
+import { SALESPEOPLE, monthRange, salesBySalesperson } from '@/lib/team'
 import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, Trophy, ArrowRight, Calendar, ChevronLeft, ChevronRight, Activity } from 'lucide-react'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -20,7 +21,6 @@ const STATUS_CSS: Record<string, { bg: string; color: string }> = {
   cancelled: { bg: 'rgba(224,82,82,.12)',   color: '#E05252' },
   draft:     { bg: 'rgba(78,85,102,.12)',   color: '#4E5566' },
 }
-const SALESPEOPLE = ['Bashar', 'Stefan', 'Anna', 'Erik']
 
 function workingDaysInMonth(year: number, month: number) {
   let count = 0
@@ -247,11 +247,12 @@ export default function AdminDashboard() {
   const totalBudget     = Object.values(budgets).reduce((a, b) => a + b, 0)
   const workDays        = workingDaysInMonth(year, month)
 
-  // Won per salesperson this month
-  const wonBySP: Record<string, number> = {}
-  for (const d of wonDeals) {
-    if (d.assigned_to) wonBySP[d.assigned_to] = (wonBySP[d.assigned_to] || 0) + (d.value || 0)
-  }
+  // Budget credit: this month's orders per assignee.
+  const { start: salesStart, end: salesEnd } = monthRange(now)
+  const ordersThisMonth = orders.filter(o => o.created_at >= salesStart && o.created_at <= salesEnd)
+  const soldBySP        = salesBySalesperson(ordersThisMonth)
+  const soldThisMonth   = Object.values(soldBySP).reduce((a, b) => a + b, 0)
+  const unassignedCount = orders.filter(o => !o.assigned_to && o.status === 'pending').length
 
   const card: React.CSSProperties = {
     background: 'rgba(13,16,23,.7)',
@@ -264,7 +265,7 @@ export default function AdminDashboard() {
 
   const kpis = [
     { label: 'Total omsättning',  value: `${fmt(revenue)} kr`,         sub: 'alla ordrar exkl. moms',     icon: TrendingUp, gold: true },
-    { label: 'Aktiva ordrar',     value: pendingCount.toString(),       sub: 'väntande behandling',         icon: Clock,      alert: pendingCount > 0 },
+    { label: 'Aktiva ordrar',     value: pendingCount.toString(),       sub: unassignedCount > 0 ? `${unassignedCount} saknar mottagare` : 'väntande behandling',         icon: Clock,      alert: pendingCount > 0 },
     { label: 'Ordrar idag',       value: todayOrders.toString(),        sub: 'nya ordrar',                  icon: ShoppingBag },
     { label: 'Aktiva kunder',     value: activeCustomers.toString(),    sub: `av ${customers.length} totalt`, icon: Users },
     { label: 'Pipeline-värde',    value: `${fmt(pipelineValue)} kr`,   sub: `${deals.length} aktiva deals`, icon: GitBranch, blue: true },
@@ -382,7 +383,7 @@ export default function AdminDashboard() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
                 {SALESPEOPLE.filter(sp => budgets[sp]).map(sp => {
                   const budget   = budgets[sp]
-                  const achieved = wonBySP[sp] || 0
+                  const achieved = soldBySP[sp] || 0
                   const pct      = Math.min((achieved / budget) * 100, 100)
                   const isGreen  = achieved >= budget
                   return (
@@ -409,8 +410,8 @@ export default function AdminDashboard() {
                   <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{fmt(totalBudget)} kr</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 2 }}>Stängt</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: wonThisMonth > 0 ? 'var(--green)' : 'var(--text3)' }}>{fmt(wonThisMonth)} kr</div>
+                  <div style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 2 }}>Sålt</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: soldThisMonth > 0 ? 'var(--green)' : 'var(--text3)' }}>{fmt(soldThisMonth)} kr</div>
                 </div>
               </div>
             </>

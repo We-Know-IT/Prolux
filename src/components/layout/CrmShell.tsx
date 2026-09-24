@@ -1,10 +1,11 @@
 'use client'
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister'
-import { ReactNode, useState } from 'react'
+import { ReactNode, useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
+import { salespersonName } from '@/lib/team'
 import { LayoutDashboard, GitBranch, Users, ShoppingCart, LogOut, Menu, X, CalendarDays, StickyNote } from 'lucide-react'
 
 const NAV = [
@@ -19,7 +20,27 @@ const NAV = [
 export default function CrmShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [orderToast, setOrderToast] = useState<{ id: string; nr: number; name: string } | null>(null)
   const supabase = createClient()
+
+  // Tell the salesperson when a new order is assigned to them, wherever they are in the app.
+  useEffect(() => {
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    let timer: ReturnType<typeof setTimeout> | undefined
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      const me = salespersonName(user)
+      channel = supabase
+        .channel(`orders-for-${me}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders', filter: `assigned_to=eq.${me}` }, payload => {
+          const o = payload.new as any
+          setOrderToast({ id: o.id, nr: o.order_nr, name: o.delivery_name || 'Ny kund' })
+          clearTimeout(timer)
+          timer = setTimeout(() => setOrderToast(null), 8000)
+        })
+        .subscribe()
+    })
+    return () => { clearTimeout(timer); if (channel) supabase.removeChannel(channel) }
+  }, [])
 
   async function logout() {
     await supabase.auth.signOut()
@@ -139,6 +160,12 @@ export default function CrmShell({ children }: { children: ReactNode }) {
       )}
 
       <ServiceWorkerRegister />
+      {orderToast && (
+        <Link href="/crm/dashboard" onClick={() => setOrderToast(null)} style={{ position: 'fixed', top: 72, right: 16, left: 'auto', zIndex: 999, maxWidth: 'calc(100vw - 32px)', background: 'var(--bg2)', border: '1px solid var(--gold)', borderRadius: 12, padding: '14px 18px', boxShadow: '0 8px 32px rgba(0,0,0,.4)', textDecoration: 'none', display: 'block' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Ny order till dig: #{orderToast.nr}</div>
+          <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{orderToast.name} · tryck för att hantera</div>
+        </Link>
+      )}
       <main style={{ flex: 1 }}>
         {children}
       </main>

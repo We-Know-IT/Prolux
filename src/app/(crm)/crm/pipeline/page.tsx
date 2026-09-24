@@ -5,6 +5,7 @@ import { Deal, Customer, DEAL_STAGES, DealStage } from '@/types'
 import { fmt, formatDate } from '@/lib/utils'
 import { Plus, X, User, ChevronDown } from 'lucide-react'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
+import { SALESPEOPLE } from '@/lib/team'
 
 const supabase = createClient()
 
@@ -13,7 +14,6 @@ const STAGE_COLORS: Record<DealStage, string> = {
   Förhandling: '#9B6EE8', Vunnen: '#4CAF7D', Förlorad: '#E05252'
 }
 
-const SALESPEOPLE = ['Bashar', 'Stefan', 'Anna', 'Erik']
 
 export default function CrmPipelinePage() {
   const [deals, setDeals] = useState<(Deal & { customers?: Customer })[]>([])
