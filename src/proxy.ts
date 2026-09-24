@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { cookieDomainForHost } from '@/lib/supabase/cookie-domain'
+import { userRole } from '@/lib/roles'
 
 // Same codebase, same deployment — split crm/admin from the webshop by hostname.
 const CRM_HOSTS = ['crm.proluxshine.com']
@@ -55,7 +56,7 @@ export async function proxy(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  const role: string | undefined = user?.user_metadata?.role
+  const role: string | undefined = userRole(user)
 
   // Redirect logged-in users away from login
   if (pathname === '/login' && user) {

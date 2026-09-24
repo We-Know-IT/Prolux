@@ -86,10 +86,10 @@ export const DEFAULT_HOME: HomeContent = {
   why: {
     heading: 'Varför välja ProLux Shine?',
     features: [
-      { icon: '🛡️', title: 'Säker för alla ytor',   desc: 'Sammansättningarna ger extremt effektiva formuleringar utformade för att ge utmärkt skydd mot känsliga material.' },
-      { icon: '⚗️', title: 'pH-balanserat',          desc: 'Perfekt komponerat pH-värden som inte skadar lackytan, även vid hög koncentration.' },
-      { icon: '⚡', title: 'Effektiv avfettning',     desc: 'Våra lättlösliga enskilda och kalklettnings löser på föroreningsrester med överväldigande kraft.' },
-      { icon: '🏆', title: 'Högsta kvalitet',         desc: 'Formulerat och tillverkat i Italien av ledande kemister med högsta certifieringar.' },
+      { icon: 'shield', title: 'Säker för alla ytor',   desc: 'Sammansättningarna ger extremt effektiva formuleringar utformade för att ge utmärkt skydd mot känsliga material.' },
+      { icon: 'flask', title: 'pH-balanserat',          desc: 'Perfekt komponerat pH-värden som inte skadar lackytan, även vid hög koncentration.' },
+      { icon: 'zap', title: 'Effektiv avfettning',     desc: 'Våra lättlösliga enskilda och kalklettnings löser på föroreningsrester med överväldigande kraft.' },
+      { icon: 'trophy', title: 'Högsta kvalitet',         desc: 'Formulerat och tillverkat i Italien av ledande kemister med högsta certifieringar.' },
     ],
   },
 }

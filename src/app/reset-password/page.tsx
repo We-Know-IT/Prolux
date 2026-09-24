@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
+import { userRole } from '@/lib/roles'
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
@@ -22,7 +23,7 @@ export default function ResetPasswordPage() {
     setLoading(false)
     if (updateErr) { setError('Kunde inte spara: ' + updateErr.message); return }
     setDone(true)
-    const role = data.user?.user_metadata?.role
+    const role = userRole(data.user)
     const path = role === 'admin' ? '/admin/dashboard' : role === 'crm' ? '/crm/dashboard' : '/portal/dashboard'
     const targetHost = role === 'admin' || role === 'crm' ? 'crm.proluxshine.com' : 'www.proluxshine.com'
     const currentHost = window.location.hostname

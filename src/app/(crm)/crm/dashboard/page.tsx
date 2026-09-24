@@ -9,6 +9,7 @@ import { SALESPEOPLE, salespersonName, monthRange, budgetAchieved, canConfirmOrd
 import { useBudgetHistory } from '@/hooks/useBudgetHistory'
 import BudgetHistoryChart from '@/components/BudgetHistoryChart'
 import { nextBirthday, formatBirthday } from '@/lib/birthdays'
+import { userRole } from '@/lib/roles'
 
 const supabase = createClient()
 
@@ -78,7 +79,7 @@ export default function CrmDashboardPage() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setFirstName(salespersonName(user))
-      setIsAdmin(user?.user_metadata?.role === 'admin')
+      setIsAdmin(userRole(user) === 'admin')
       setMeLoaded(true)
     })
     loadData()

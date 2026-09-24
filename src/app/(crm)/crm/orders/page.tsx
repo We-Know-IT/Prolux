@@ -8,6 +8,7 @@ import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { SALESPEOPLE, salespersonName, canConfirmOrder } from '@/lib/team'
 import ShipOrderForm from '@/components/orders/ShipOrderForm'
+import { userRole } from '@/lib/roles'
 
 const supabase = createClient()
 type View = 'new' | 'confirm' | 'history'
@@ -190,7 +191,7 @@ export default function CrmOrdersPage() {
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => { setMyName(salespersonName(user)); setIsAdmin(user?.user_metadata?.role === 'admin') })
+    supabase.auth.getUser().then(({ data: { user } }) => { setMyName(salespersonName(user)); setIsAdmin(userRole(user) === 'admin') })
   }, [])
 
   function selectCustomerAndLoad(c: Customer) {

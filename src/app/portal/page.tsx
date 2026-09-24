@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import type { User as SupaUser } from '@supabase/supabase-js'
 import OrderTracking from '@/components/portal/OrderTracking'
+import { userRole } from '@/lib/roles'
 
 const DISCOUNT: Record<string, number> = { A: 0.40, B: 0.30, C: 0.20, Standard: 0 }
 const STATUS_LABEL: Record<string, string> = { pending: 'Mottagen', confirmed: 'Bekräftad', packed: 'Packad', shipped: 'Skickad', delivered: 'Levererad', cancelled: 'Avbruten' }
@@ -29,7 +30,7 @@ function PortalContent({ user }: { user: SupaUser }) {
   const [pwNew, setPwNew]           = useState('')
   const [pwMsg, setPwMsg]           = useState('')
 
-  const role = user.user_metadata?.role
+  const role = userRole(user)
   useEffect(() => {
     if (role === 'admin') { router.replace('/admin/dashboard'); return }
     if (role === 'crm')   { router.replace('/crm/dashboard');   return }

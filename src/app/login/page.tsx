@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
+import { userRole } from '@/lib/roles'
 
 export default function LoginPage() {
   const [email, setEmail]       = useState('')
@@ -34,7 +35,7 @@ export default function LoginPage() {
     const supabase = createClient()
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) { setError('Fel lösenord eller e-post. Försök igen.'); setLoading(false); return }
-    const role = data.user?.user_metadata?.role
+    const role = userRole(data.user)
     const path = role === 'admin' ? '/admin/dashboard' : role === 'crm' ? '/crm/dashboard' : '/portal/dashboard'
     const targetHost = role === 'admin' || role === 'crm' ? 'crm.proluxshine.com' : 'www.proluxshine.com'
     const currentHost = window.location.hostname

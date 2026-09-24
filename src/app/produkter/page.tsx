@@ -240,21 +240,15 @@ function ProductsContent() {
                   </Link>
                   <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
-                      {authUser ? (
-                        <>
-                          <div style={{ fontSize: 18, fontWeight: 700, color: '#111' }}>{fmt(price)} kr</div>
-                          {discount > 0 && (
-                            <div style={{ fontSize: 12, color: '#bbb', textDecoration: 'line-through' }}>{fmt(p.list_price)} kr</div>
-                          )}
-                        </>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: '#111' }}>{fmt(price)} kr</div>
+                      {discount > 0 ? (
+                        <div style={{ fontSize: 12, color: '#bbb', textDecoration: 'line-through' }}>{fmt(p.list_price)} kr</div>
                       ) : (
-                        <button onClick={openLogin} style={{ fontSize: 13, color: '#C9971A', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                          Logga in för pris
-                        </button>
+                        <div style={{ fontSize: 11, color: '#999' }}>exkl. moms</div>
                       )}
                     </div>
                     <button
-                      onClick={() => authUser ? addToCart(p) : openLogin()}
+                      onClick={() => addToCart(p)}
                       style={{ width: 40, height: 40, borderRadius: '50%', background: added ? '#4CAF7D' : '#E8B84B', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .2s', flexShrink: 0 }}
                     >
                       <ShoppingCart size={16} color="#111" strokeWidth={2.5} />

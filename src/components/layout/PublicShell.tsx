@@ -1,13 +1,14 @@
 'use client'
-import { ReactNode, useState, useEffect, createContext, useContext, useCallback } from 'react'
+import { ReactNode, useState, useEffect, createContext, useContext, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { Menu, X, ChevronRight, ShoppingCart, User, LogOut, Package, ChevronDown, Minus, Plus, Trash2 } from 'lucide-react'
+import { Menu, X, ChevronRight, ShoppingCart, User, LogOut, Package, ChevronDown, Minus, Plus, Trash2, FileText } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt } from '@/lib/utils'
 import { getSiteContent, DEFAULT_CONTACT, ContactContent } from '@/lib/site-content'
 import type { User as SupaUser } from '@supabase/supabase-js'
+import { userRole } from '@/lib/roles'
 
 export const LoginModalContext = createContext<() => void>(() => {})
 export function useLoginModal() { return useContext(LoginModalContext) }
@@ -23,14 +24,20 @@ interface CartCtx {
   count: number
   subtotal: number
   openCart: () => void
+  authUser: SupaUser | null
+  authLoading: boolean
+  customer: any
+  priceList: string
 }
 export const CartContext = createContext<CartCtx>({
   items: [], addItem: () => {}, removeItem: () => {}, updateQty: () => {}, clearCart: () => {},
   count: 0, subtotal: 0, openCart: () => {},
+  authUser: null, authLoading: true, customer: null, priceList: 'Standard',
 })
 export function usePublicCart() { return useContext(CartContext) }
 
 const DISCOUNT: Record<string, number> = { A: 0.40, B: 0.30, C: 0.20, Standard: 0 }
+const CART_KEY = 'prolux-cart'
 
 const NAV_PUBLIC = [
   { href: '/',             label: 'Hem' },
@@ -68,10 +75,6 @@ export function PublicShell({ children }: { children: ReactNode }) {
   const [authUser, setAuthUser]   = useState<SupaUser | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [customer, setCustomer]   = useState<any>(null)
-  const [orderPlacing, setOrderPlacing] = useState(false)
-  const [orderDone, setOrderDone] = useState<number | null>(null)
-  const [guestForm, setGuestForm] = useState({ name: '', company: '', email: '', address: '', city: '', phone: '' })
-  const [guestStep, setGuestStep] = useState(false)
   const [regMode, setRegMode] = useState(false)
   const [regForm, setRegForm] = useState({ email: '', password: '', company: '', contact_name: '', phone: '' })
   const [regLoading, setRegLoading] = useState(false)
@@ -79,8 +82,25 @@ export function PublicShell({ children }: { children: ReactNode }) {
   const [regDone, setRegDone] = useState(false)
   const [contact, setContact] = useState<ContactContent>(DEFAULT_CONTACT)
 
-  // Cart state
+  // Cart state. Kept in localStorage so it survives moving between pages
+  // (every page mounts its own PublicShell) and reaching the checkout.
   const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const cartLoaded = useRef(false)
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(CART_KEY) || '[]')
+      // localStorage is only readable after mount, so the cart is restored here.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (Array.isArray(saved) && saved.length) setCartItems(saved)
+    } catch { /* storage unavailable: start empty */ }
+    cartLoaded.current = true
+  }, [])
+
+  useEffect(() => {
+    if (!cartLoaded.current) return
+    try { localStorage.setItem(CART_KEY, JSON.stringify(cartItems)) } catch { /* ignore */ }
+  }, [cartItems])
 
   useEffect(() => {
     getSiteContent('contact', DEFAULT_CONTACT).then(setContact)
@@ -93,10 +113,12 @@ export function PublicShell({ children }: { children: ReactNode }) {
       setAuthLoading(false)
       if (session?.user) fetchCustomer(sb, session.user.id)
     })
-    const { data: { subscription } } = sb.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
       setAuthUser(session?.user ?? null)
       if (session?.user) fetchCustomer(sb, session.user.id)
-      else { setCustomer(null); setCartItems([]) }
+      else setCustomer(null)
+      // Guests keep their cart; only an explicit sign-out empties it.
+      if (event === 'SIGNED_OUT') setCartItems([])
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -124,7 +146,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
     setAuthUser(data.user)
     closeLogin()
     setLoading(false)
-    const role = data.user?.user_metadata?.role
+    const role = userRole(data.user)
     if (role === 'admin') { window.location.href = '/admin/dashboard'; return }
     if (role === 'crm')   { window.location.href = '/crm/dashboard';   return }
     // Signal HomeContent to scroll to portal once auth state propagates
@@ -177,7 +199,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
   }
 
   function goToPortal() {
-    const role = authUser?.user_metadata?.role
+    const role = userRole(authUser)
     if (role === 'admin') { window.location.href = '/admin/dashboard' }
     else if (role === 'crm') { window.location.href = '/crm/dashboard' }
     else { sessionStorage.setItem('scrollToPortal', '1'); window.location.pathname === '/' ? (() => { const el = document.getElementById('min-portal'); el ? el.scrollIntoView({ behavior: 'smooth' }) : null })() : (window.location.href = '/') }
@@ -185,7 +207,15 @@ export function PublicShell({ children }: { children: ReactNode }) {
   }
 
   // Cart helpers
-  const priceList = customer?.price_list_id || authUser?.user_metadata?.price_list_id || 'Standard'
+  // Same source the database prices orders from (place_order): the customer card.
+  const priceList = customer?.price_list_id || 'Standard'
+
+  // Prices follow the current price list, so items added as a guest show
+  // the customer's price after logging in.
+  const pricedItems = useMemo(() => {
+    const disc = DISCOUNT[priceList] ?? 0
+    return cartItems.map(i => ({ ...i, unit_price: Math.round(i.list_price * (1 - disc)) }))
+  }, [cartItems, priceList])
 
   const addItem = useCallback((p: { id: string; name: string; brand: string; list_price: number; image_url: string | null; unit: string }, pl: string) => {
     const disc = DISCOUNT[pl] ?? 0
@@ -205,52 +235,15 @@ export function PublicShell({ children }: { children: ReactNode }) {
   }, [removeItem])
   const clearCart  = useCallback(() => setCartItems([]), [])
   const count      = cartItems.reduce((s, i) => s + i.qty, 0)
-  const subtotal   = cartItems.reduce((s, i) => s + i.unit_price * i.qty, 0)
+  const subtotal   = pricedItems.reduce((s, i) => s + i.unit_price * i.qty, 0)
 
-  async function placeOrder(deliveryOverride?: typeof guestForm) {
-    if (cartItems.length === 0) return
-    setOrderPlacing(true)
-    const sb = createClient()
-    const delivery = deliveryOverride || guestForm
-    const { data: orderData, error: orderErr } = await sb.from('orders').insert({
-      customer_id: customer?.id || null,
-      price_list_id: priceList,
-      status: 'pending',
-      delivery_name: customer ? (customer.contact_name || customer.company) : delivery.name,
-      delivery_address: delivery.address || customer?.address || '',
-      delivery_city: customer?.city || delivery.city || '',
-      notes: delivery.company ? `Företag: ${delivery.company}` : null,
-      subtotal,
-      vat_amount: Math.round(subtotal * 0.25),
-      total: subtotal + Math.round(subtotal * 0.25),
-    }).select().single()
-
-    if (!orderErr && orderData) {
-      const items = cartItems.map(i => ({
-        order_id: orderData.id,
-        product_id: i.id,
-        product_name: i.name,
-        product_sku: '',
-        qty: i.qty,
-        unit_price: i.unit_price,
-        list_price: i.list_price,
-        total_price: i.unit_price * i.qty,
-      }))
-      await sb.from('order_items').insert(items)
-      setOrderDone(orderData.order_nr)
-      setGuestStep(false)
-      clearCart()
-    }
-    setOrderPlacing(false)
-  }
-
-  const role = authUser?.user_metadata?.role
+  const role = userRole(authUser)
   const displayName = customer?.contact_name || authUser?.user_metadata?.full_name || authUser?.email?.split('@')[0] || 'Kund'
   const isCustomer = authUser && role !== 'admin' && role !== 'crm'
 
   const navBg = scrolled ? 'rgba(13,15,20,.97)' : 'rgba(13,15,20,.92)'
 
-  const cartCtx: CartCtx = { items: cartItems, addItem, removeItem, updateQty, clearCart, count, subtotal, openCart: () => setCartOpen(true) }
+  const cartCtx: CartCtx = { items: pricedItems, addItem, removeItem, updateQty, clearCart, count, subtotal, openCart: () => setCartOpen(true), authUser, authLoading, customer, priceList }
 
   return (
     <CartContext.Provider value={cartCtx}>
@@ -466,17 +459,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
           </button>
         </div>
 
-        {orderDone ? (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, textAlign: 'center' }}>
-            <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#F0FDF4', border: '2px solid #4CAF7D', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20, fontSize: 28 }}>✓</div>
-            <div style={{ fontFamily: 'var(--font-serif)', fontSize: 24, fontWeight: 400, color: '#111', marginBottom: 8 }}>Order lagd!</div>
-            <div style={{ fontSize: 14, color: '#666', marginBottom: 4 }}>Order #{orderDone} har mottagits.</div>
-            <div style={{ fontSize: 13, color: '#999', marginBottom: 28 }}>Vi behandlar din beställning och hör av oss.</div>
-            <button onClick={() => { setOrderDone(null); setCartOpen(false) }} style={{ padding: '12px 28px', borderRadius: 9, background: '#111', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
-              Stäng
-            </button>
-          </div>
-        ) : cartItems.length === 0 ? (
+        {cartItems.length === 0 ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, textAlign: 'center' }}>
             <ShoppingCart size={48} color="#ddd" strokeWidth={1} style={{ marginBottom: 16 }} />
             <div style={{ fontSize: 15, fontWeight: 600, color: '#333', marginBottom: 6 }}>Varukorgen är tom</div>
@@ -488,7 +471,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
         ) : (
           <>
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
-              {cartItems.map(item => (
+              {pricedItems.map(item => (
                 <div key={item.id} style={{ display: 'flex', gap: 14, paddingBlock: 14, borderBottom: '1px solid rgba(0,0,0,.06)' }}>
                   <div style={{ width: 64, height: 64, borderRadius: 8, background: '#F9F7F3', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {item.image_url ? <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Package size={24} color="#ccc" strokeWidth={1} />}
@@ -531,41 +514,10 @@ export function PublicShell({ children }: { children: ReactNode }) {
                 <span>Totalt inkl. moms</span>
                 <span style={{ color: '#C9971A' }}>{fmt(subtotal + Math.round(subtotal * 0.25))} kr</span>
               </div>
-              {!authUser ? (
-                <button onClick={() => { setCartOpen(false); openLogin() }} style={{ width: '100%', padding: '14px', borderRadius: 9, background: '#111', color: '#fff', fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
-                  Logga in för att beställa
-                </button>
-              ) : customer ? (
-                <button onClick={() => placeOrder()} disabled={orderPlacing} style={{ width: '100%', padding: '14px', borderRadius: 9, background: orderPlacing ? '#ddd' : '#111', color: orderPlacing ? '#999' : '#fff', fontSize: 15, fontWeight: 700, border: 'none', cursor: orderPlacing ? 'default' : 'pointer' }}>
-                  {orderPlacing ? 'Lägger order…' : 'Lägg order'}
-                </button>
-              ) : guestStep ? (
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111', marginBottom: 12 }}>Leveransuppgifter</div>
-                  {[
-                    { key: 'name', label: 'Namn *', placeholder: 'Anna Svensson' },
-                    { key: 'company', label: 'Företag', placeholder: 'AB Bilservice (valfritt)' },
-                    { key: 'address', label: 'Adress *', placeholder: 'Storgatan 1' },
-                    { key: 'city', label: 'Stad *', placeholder: 'Stockholm' },
-                    { key: 'phone', label: 'Telefon', placeholder: '070-123 45 67' },
-                  ].map(({ key, label, placeholder }) => (
-                    <div key={key} style={{ marginBottom: 10 }}>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#666', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</label>
-                      <input value={(guestForm as any)[key]} onChange={e => setGuestForm(f => ({ ...f, [key]: e.target.value }))} placeholder={placeholder}
-                        style={{ width: '100%', padding: '9px 12px', border: '1px solid rgba(0,0,0,.12)', borderRadius: 7, fontSize: 13, color: '#111', outline: 'none', boxSizing: 'border-box' }} />
-                    </div>
-                  ))}
-                  <button onClick={() => placeOrder(guestForm)} disabled={orderPlacing || !guestForm.name || !guestForm.address || !guestForm.city}
-                    style={{ width: '100%', padding: '13px', borderRadius: 9, background: '#111', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', marginTop: 8, opacity: (!guestForm.name || !guestForm.address || !guestForm.city) ? 0.5 : 1 }}>
-                    {orderPlacing ? 'Lägger order…' : 'Bekräfta order'}
-                  </button>
-                  <button onClick={() => setGuestStep(false)} style={{ width: '100%', padding: '10px', borderRadius: 9, background: 'transparent', color: '#888', fontSize: 13, border: 'none', cursor: 'pointer', marginTop: 4 }}>Tillbaka</button>
-                </div>
-              ) : (
-                <button onClick={() => setGuestStep(true)} style={{ width: '100%', padding: '14px', borderRadius: 9, background: '#111', color: '#fff', fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
-                  Gå till kassa
-                </button>
-              )}
+              <Link href="/kassa" onClick={() => setCartOpen(false)}
+                style={{ display: 'block', width: '100%', padding: '14px', borderRadius: 9, background: '#111', color: '#fff', fontSize: 15, fontWeight: 700, textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}>
+                Till kassan
+              </Link>
               <button onClick={() => setCartOpen(false)} style={{ width: '100%', padding: '11px', borderRadius: 9, background: 'transparent', color: '#666', fontSize: 13, fontWeight: 500, border: 'none', cursor: 'pointer', marginTop: 8 }}>
                 Fortsätt handla
               </button>
@@ -620,13 +572,12 @@ export function PublicShell({ children }: { children: ReactNode }) {
 
             {/* Col 4 — Betalning */}
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.35)', textTransform: 'uppercase', letterSpacing: '.12em', marginBottom: 18 }}>Säkra betalningar</div>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,.45)', lineHeight: 1.7, marginBottom: 20 }}>
-                Vi samarbetar med Klarna och Swish för smidiga och säkra transaktioner.
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.35)', textTransform: 'uppercase', letterSpacing: '.12em', marginBottom: 18 }}>Betalning</div>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,.65)', lineHeight: 1.7, marginBottom: 20 }}>
+                Företag handlar mot faktura. Fakturan skickas när vi har bekräftat ordern.
               </p>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <div style={{ background: '#fff', borderRadius: 6, padding: '6px 14px', fontSize: 12, fontWeight: 700, color: '#1B1F2E' }}>Klarna</div>
-                <div style={{ background: '#0A9960', borderRadius: 6, padding: '6px 14px', fontSize: 12, fontWeight: 700, color: '#fff' }}>Swish</div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: '1px solid rgba(255,255,255,.2)', borderRadius: 6, padding: '6px 14px', fontSize: 12, fontWeight: 700, color: '#fff' }}>
+                <FileText size={14} /> Faktura
               </div>
             </div>
           </div>

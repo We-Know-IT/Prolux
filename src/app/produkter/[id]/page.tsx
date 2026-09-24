@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { PublicShell, useLoginModal, usePublicCart } from '@/components/layout/PublicShell'
+import { PublicShell, usePublicCart } from '@/components/layout/PublicShell'
 import { fmt } from '@/lib/utils'
 import { ShoppingCart, Truck, RotateCcw, ShieldCheck, Star, ChevronRight, Minus, Plus } from 'lucide-react'
 import Link from 'next/link'
@@ -12,7 +12,6 @@ const DISCOUNT: Record<string, number> = { A: 0.40, B: 0.30, C: 0.20, Standard: 
 
 function ProductDetailContent() {
   const { id } = useParams<{ id: string }>()
-  const openLogin = useLoginModal()
   const cart = usePublicCart()
   const router = useRouter()
 
@@ -49,7 +48,6 @@ function ProductDetailContent() {
   const custPrice = product ? Math.round(product.list_price * (1 - discount)) : 0
 
   function addToCart() {
-    if (!authUser) { openLogin(); return }
     for (let i = 0; i < qty; i++) {
       cart.addItem({ id: product.id, name: product.name, brand: product.brand, list_price: product.list_price, image_url: product.image_url, unit: product.unit }, priceList)
     }
@@ -131,7 +129,7 @@ function ProductDetailContent() {
               <span style={{ fontSize: 13, color: '#aaa' }}>(127 omdömen)</span>
             </div>
 
-            <p style={{ fontSize: 12, color: '#aaa', marginBottom: 16 }}>Inkl. moms · Exkl. frakt</p>
+            <p style={{ fontSize: 12, color: '#aaa', marginBottom: 16 }}>Exkl. moms · Exkl. frakt</p>
 
             <p style={{ fontSize: 14, color: '#444', lineHeight: 1.7, marginBottom: 28, maxWidth: 440 }}>
               {product.description || `${product.name} är ett professionellt rengöringsmedel för bilvård. Formulerat för att ge optimalt resultat med minimal ansträngning.`}
@@ -146,7 +144,7 @@ function ProductDetailContent() {
             </div>
 
             {/* Qty + Add to cart */}
-            <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #e0e0e0', borderRadius: 8, overflow: 'hidden' }}>
                 <button onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 42, height: 52, border: 'none', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555' }}>
                   <Minus size={16} />
@@ -165,17 +163,12 @@ function ProductDetailContent() {
               </button>
             </div>
 
-            {/* Klarna */}
-            <button style={{ width: '100%', height: 48, background: '#fff', border: '1px solid #e0e0e0', borderRadius: 8, fontWeight: 500, fontSize: 14, color: '#555', cursor: 'pointer', marginBottom: 20 }}>
-              Köp med Klarna · Betala sen.
-            </button>
-
             {/* Trust badges */}
             <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
               {[
-                { icon: Truck, text: 'Fri frakt >999 kr' },
+                { icon: Truck, text: 'Fri frakt över 2 000 kr' },
                 { icon: RotateCcw, text: '30 dgr öppet köp' },
-                { icon: ShieldCheck, text: 'Säker betalning' },
+                { icon: ShieldCheck, text: 'Betala mot faktura' },
               ].map(({ icon: Icon, text }) => (
                 <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666' }}>
                   <Icon size={14} color="#888" />
@@ -284,7 +277,7 @@ function ProductDetailContent() {
                         <p style={{ fontSize: 13, fontWeight: 600, color: '#111', margin: '4px 0 12px', lineHeight: 1.3 }}>{p.name}</p>
                       </Link>
                       <button
-                        onClick={() => { cart.addItem({ id: p.id, name: p.name, brand: p.brand, list_price: p.list_price, image_url: p.image_url, unit: p.unit }, priceList); if (!authUser) openLogin() }}
+                        onClick={() => { cart.addItem({ id: p.id, name: p.name, brand: p.brand, list_price: p.list_price, image_url: p.image_url, unit: p.unit }, priceList) }}
                         style={{ width: '100%', padding: '8px 0', background: '#E8B84B', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: 'pointer', color: '#0F1115', letterSpacing: '.04em', textTransform: 'uppercase' }}
                       >
                         KÖP NU

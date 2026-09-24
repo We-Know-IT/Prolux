@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt } from '@/lib/utils'
 import { X, Pencil, Trash2, Plus, Package, Search, Upload, Loader } from 'lucide-react'
+import { userRole } from '@/lib/roles'
 
 const EMPTY_FORM = {
   name: '', sku: '', category_id: '', brand: 'Frescura', description: '',
@@ -44,7 +45,7 @@ export default function AdminProducts() {
   async function checkUser() {
     const sb = createClient()
     const { data: { user } } = await sb.auth.getUser()
-    setCanEdit(user?.user_metadata?.role === 'admin')
+    setCanEdit(userRole(user) === 'admin')
   }
 
   async function load() {

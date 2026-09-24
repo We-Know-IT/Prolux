@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'
 import type { User as SupaUser } from '@supabase/supabase-js'
 import OrderTracking from '@/components/portal/OrderTracking'
+import { userRole } from '@/lib/roles'
+import { featureIcon } from '@/lib/feature-icons'
 
 const DISCOUNT: Record<string, number> = { A: 0.40, B: 0.30, C: 0.20, Standard: 0 }
 
@@ -67,20 +69,18 @@ function PortalHome({ user, products }: { user: SupaUser; products: any[] }) {
   const [pwMsg, setPwMsg]           = useState('')
   const [pwSaving, setPwSaving]     = useState(false)
 
-  const role      = user.user_metadata?.role
+  const role      = userRole(user)
   const name      = user.user_metadata?.full_name || user.email?.split('@')[0] || 'kund'
-  const priceList = user.user_metadata?.price_list_id || 'Standard'
+  const priceList = customer?.price_list_id || 'Standard'
   const disc      = DISCOUNT[priceList] ?? 0
 
   useEffect(() => {
     const supabase = createClient()
-    Promise.all([
-      supabase.from('customers').select('*').eq('email', user.email!).maybeSingle(),
-      supabase.from('orders')
-        .select('*,order_items(product_name,qty,unit_price)')
-        .eq('customer_id', user.user_metadata?.customer_id ?? '')
-        .order('created_at', { ascending: false }),
-    ]).then(([{ data: c }, { data: o }]) => {
+    // Orders are readable only for the customer's own card (see migration 0010).
+    supabase.from('customers').select('*').eq('auth_user_id', user.id).maybeSingle().then(async ({ data: c }) => {
+      const { data: o } = c
+        ? await supabase.from('orders').select('*,order_items(product_name,qty,unit_price)').eq('customer_id', c.id).order('created_at', { ascending: false })
+        : { data: null }
       if (c) {
         setCustomer(c)
         setAcctName(c.contact_name || '')
@@ -941,39 +941,23 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
                         {BADGES[i]}
                       </div>
                     )}
-                    <div style={{ height: 200, background: '#F5F2ED', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 12 }}>
+                    <Link href={`/produkter/${p.id}`} aria-label={p.name} style={{ height: 200, background: '#F5F2ED', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 12 }}>
                       {p.image_url ? <img src={p.image_url} alt={p.name} style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} /> : <Package size={48} color="#ccc" strokeWidth={1} />}
-                    </div>
+                    </Link>
                     <div style={{ padding: '12px 14px 14px', flex: 1, display: 'flex', flexDirection: 'column' }}>
                       <div style={{ fontSize: 10, color: '#bbb', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3 }}>{p.brand}</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#111', flex: 1, lineHeight: 1.35, marginBottom: 12 }}>{p.name}</div>
+                      <Link href={`/produkter/${p.id}`} style={{ fontSize: 13, fontWeight: 600, color: '#111', flex: 1, lineHeight: 1.35, marginBottom: 12, textDecoration: 'none' }}>{p.name}</Link>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                         <div>
-                          {authUser && customer ? (
-                            <>
-                              <div style={{ fontSize: 16, fontWeight: 800, color: '#111' }}>{fmt(Math.round(p.list_price * (1 - (DISCOUNT[priceList] ?? 0))))} kr</div>
-                              <div style={{ fontSize: 10, color: '#aaa' }}>{p.unit}</div>
-                            </>
-                          ) : (
-                            <>
-                              <div style={{ fontSize: 16, fontWeight: 800, color: '#111' }}>{fmt(Math.round(p.list_price * 0.6))} kr</div>
-                              <div style={{ fontSize: 10, color: '#aaa' }}>exkl. moms</div>
-                            </>
-                          )}
+                          <div style={{ fontSize: 16, fontWeight: 800, color: '#111' }}>{fmt(Math.round(p.list_price * (1 - (DISCOUNT[priceList] ?? 0))))} kr</div>
+                          <div style={{ fontSize: 10, color: '#aaa' }}>exkl. moms</div>
                         </div>
-                        {authUser ? (
-                          <button onClick={() => cart.addItem(p, priceList)}
-                            style={{ width: 36, height: 36, borderRadius: '50%', background: '#C9971A', color: '#111', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background .15s' }}
-                            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#111'; (e.currentTarget as HTMLButtonElement).style.color = '#fff' }}
-                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#C9971A'; (e.currentTarget as HTMLButtonElement).style.color = '#111' }}>
-                            <ShoppingCart size={14} />
-                          </button>
-                        ) : (
-                          <button onClick={openLogin}
-                            style={{ width: 36, height: 36, borderRadius: '50%', background: '#C9971A', color: '#111', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <ShoppingCart size={14} />
-                          </button>
-                        )}
+                        <button onClick={() => cart.addItem(p, priceList)} aria-label={`Lägg ${p.name} i varukorgen`}
+                          style={{ width: 36, height: 36, borderRadius: '50%', background: '#C9971A', color: '#111', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background .15s' }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#111'; (e.currentTarget as HTMLButtonElement).style.color = '#fff' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#C9971A'; (e.currentTarget as HTMLButtonElement).style.color = '#111' }}>
+                          <ShoppingCart size={14} />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1082,7 +1066,11 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
             {siteHome.why.features.map(f => (
               <Reveal key={f.title}>
                 <div style={{ background: '#fff', borderRadius: 12, padding: '28px 24px', border: '1px solid #e8e8e8' }}>
-                  <div style={{ fontSize: 32, marginBottom: 14 }}>{f.icon}</div>
+                  {(() => { const Icon = featureIcon(f.icon); return (
+                    <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(201,151,26,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                      <Icon size={22} color="#A67C12" strokeWidth={1.75} />
+                    </div>
+                  ) })()}
                   <div style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 8 }}>{f.title}</div>
                   <div style={{ fontSize: 13, color: '#666', lineHeight: 1.7 }}>{f.desc}</div>
                 </div>
@@ -1111,7 +1099,7 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
       </section>
 
       {/* ── CUSTOMER PORTAL SECTION (logged in only) ── */}
-      {authUser && authUser.user_metadata?.role !== 'admin' && authUser.user_metadata?.role !== 'crm' && (
+      {authUser && userRole(authUser) === 'portal' && (
         <CustomerPortalSection customer={customer} authUser={authUser} openLogin={openLogin} />
       )}
 
@@ -1210,7 +1198,7 @@ function HomeContent() {
   // Scroll to portal when user just logged in (sessionStorage flag set by login handler)
   useEffect(() => {
     if (!authChecked || !authUser) return
-    const role = authUser.user_metadata?.role
+    const role = userRole(authUser)
     if (role === 'admin' || role === 'crm') return
     if (sessionStorage.getItem('scrollToPortal') !== '1') return
     sessionStorage.removeItem('scrollToPortal')

@@ -4,9 +4,7 @@ import { useCart } from '@/hooks/useCart'
 import { createClient } from '@/lib/supabase/client'
 import { fmt } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
-import { Campaign } from '@/types'
 import { Tag, X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
-import { portalCustomer } from '@/lib/portal-customer'
 
 interface FormState {
   // Delivery
@@ -76,59 +74,26 @@ export default function CheckoutPage() {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
+  // Campaign codes are checked by the database (place_order dry run); the
+  // campaigns table is not readable by customers.
   async function handleCampaign() {
     if (!campaignInput.trim()) return
     setCampaignLoading(true)
     setCampaignError('')
     setCampaignSuccess('')
-
-    const supabase = createClient()
-    const { data: camp } = await supabase
-      .from('campaigns')
-      .select('*')
-      .eq('code', campaignInput.trim().toUpperCase())
-      .eq('active', true)
-      .single()
-
+    const code = campaignInput.trim().toUpperCase()
+    const { data, error } = await createClient().rpc('place_order', {
+      p_items: items.map(i => ({ product_id: i.product.id, qty: i.qty })),
+      p_campaign_code: code,
+      p_dry_run: true,
+    })
     setCampaignLoading(false)
-
-    if (!camp) {
-      setCampaignError('Ogiltig eller utgången kampanjkod.')
+    if (error || !data) {
+      setCampaignError(error?.message || 'Ogiltig eller utgången kampanjkod.')
       return
     }
-
-    const c = camp as Campaign
-    const now = new Date()
-    if (c.valid_to && new Date(c.valid_to) < now) {
-      setCampaignError('Kampanjkoden har gått ut.')
-      return
-    }
-    if (new Date(c.valid_from) > now) {
-      setCampaignError('Kampanjkoden är inte aktiv ännu.')
-      return
-    }
-    if (c.max_uses !== null && c.used_count >= c.max_uses) {
-      setCampaignError('Kampanjkoden är fullt utnyttjad.')
-      return
-    }
-    if (c.min_order_amount > 0 && subtotal < c.min_order_amount) {
-      setCampaignError(
-        `Minsta ordervärde för denna kod är ${fmt(c.min_order_amount)} kr.`
-      )
-      return
-    }
-
-    const discountAmount =
-      c.discount_type === 'percent'
-        ? Math.round(subtotal * (c.discount_value / 100))
-        : c.discount_value
-
-    applyCampaign(discountAmount, c.code)
-    setCampaignSuccess(
-      c.discount_type === 'percent'
-        ? `${c.name} — ${c.discount_value}% rabatt tillagd!`
-        : `${c.name} — ${fmt(c.discount_value)} kr rabatt tillagd!`
-    )
+    applyCampaign((data as { discount: number }).discount, code)
+    setCampaignSuccess(`${code} — ${fmt((data as { discount: number }).discount)} kr rabatt tillagd!`)
     setCampaignInput('')
   }
 
@@ -152,70 +117,31 @@ export default function CheckoutPage() {
       return
     }
 
-    // Orders belong to customers.id, like webshop and CRM orders.
-    const { customerId } = await portalCustomer(supabase, user.id)
+    // Priced and saved by the database, like the webshop checkout.
+    const { data: placed, error: placeError } = await supabase.rpc('place_order', {
+      p_items: items.map(item => ({ product_id: item.product.id, qty: item.qty })),
+      p_delivery: {
+        company: form.deliveryCompany || form.deliveryName,
+        contact_name: form.deliveryName,
+        email: form.email || user.email,
+        phone: form.phone,
+        address: form.deliveryAddress,
+        zip: form.deliveryZip,
+        city: form.deliveryCity,
+        reference: form.reference,
+        message: form.notes,
+      },
+      p_campaign_code: campaignCode || null,
+    })
 
-    // Build order
-    const orderPayload = {
-      customer_id: customerId ?? user.id,
-      status: 'pending' as const,
-      price_list_id: priceList,
-      delivery_name: [form.deliveryName, form.deliveryCompany].filter(Boolean).join(', ') || null,
-      delivery_city: form.deliveryCity || null,
-      subtotal: Math.round(subtotal - campaignDiscount),
-      vat_amount: vatAmount,
-      total,
-      notes: [
-        form.notes,
-        form.reference ? `Referens: ${form.reference}` : '',
-        form.deliveryAddress ? `Adress: ${form.deliveryAddress}, ${form.deliveryZip} ${form.deliveryCity}` : '',
-        form.email ? `E-post: ${form.email}` : '',
-        form.phone ? `Tel: ${form.phone}` : '',
-        campaignCode ? `Kampanjkod: ${campaignCode}` : '',
-      ].filter(Boolean).join('\n') || null,
-    }
-
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert(orderPayload)
-      .select()
-      .single()
-
-    if (orderError || !order) {
-      setSubmitError('Något gick fel vid orderläggning. Försök igen.')
+    if (placeError || !placed) {
+      setSubmitError(placeError?.message || 'Något gick fel vid orderläggning. Försök igen.')
       setSubmitting(false)
       return
-    }
-
-    // Insert order items
-    const orderItems = items.map(item => ({
-      order_id: order.id,
-      product_id: item.product.id,
-      product_name: item.product.name,
-      product_sku: item.product.sku,
-      qty: item.qty,
-      unit_price: item.unitPrice,
-      list_price: item.product.list_price,
-      total_price: item.unitPrice * item.qty,
-    }))
-
-    const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
-
-    if (itemsError) {
-      // Order created but items failed — try to clean up
-      await supabase.from('orders').delete().eq('id', order.id)
-      setSubmitError('Något gick fel vid orderläggning. Försök igen.')
-      setSubmitting(false)
-      return
-    }
-
-    // Increment campaign used_count
-    if (campaignCode) {
-      await supabase.rpc('increment_campaign_used', { code: campaignCode }).then(() => {})
     }
 
     clearCart()
-    router.push(`/portal/orders/${order.id}`)
+    router.push('/portal/orders')
   }
 
   if (items.length === 0 && !submitting) {

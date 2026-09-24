@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { ChevronLeft, Save, Upload, Loader, Plus, Trash2 } from 'lucide-react'
+import { FEATURE_ICONS, featureIconKey } from '@/lib/feature-icons'
 import { getSiteContent, saveSiteContent, DEFAULT_HOME, HomeContent } from '@/lib/site-content'
 
 function label(s: string) {
@@ -241,7 +242,10 @@ export default function AdminContentHem() {
             <div className="grid-2" style={{ gap: 16 }}>
               {form.why.features.map((ft, i) => (
                 <div key={i} style={{ display: 'grid', gap: 8, padding: 14, background: 'var(--bg4)', borderRadius: 8 }}>
-                  <input style={inputStyle} value={ft.icon} onChange={e => updateFeature(i, 'icon', e.target.value)} placeholder="Emoji, t.ex. 🛡️" />
+                  <select style={inputStyle} value={featureIconKey(ft.icon) || ''} onChange={e => updateFeature(i, 'icon', e.target.value)}>
+                    {!featureIconKey(ft.icon) && <option value="">Välj ikon…</option>}
+                    {Object.entries(FEATURE_ICONS).map(([key, { label }]) => <option key={key} value={key}>{label}</option>)}
+                  </select>
                   <input style={inputStyle} value={ft.title} onChange={e => updateFeature(i, 'title', e.target.value)} placeholder="Titel" />
                   <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={ft.desc} onChange={e => updateFeature(i, 'desc', e.target.value)} placeholder="Beskrivning" />
                 </div>

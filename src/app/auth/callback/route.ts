@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { userRole } from '@/lib/roles'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${origin}/reset-password`)
     }
 
-    const role = user?.user_metadata?.role
+    const role = userRole(user)
     const path = role === 'admin' ? '/admin/dashboard' : role === 'crm' ? '/crm/dashboard' : '/portal/dashboard'
     const targetHost = role === 'admin' || role === 'crm' ? 'crm.proluxshine.com' : 'www.proluxshine.com'
     const currentHost = new URL(origin).hostname
