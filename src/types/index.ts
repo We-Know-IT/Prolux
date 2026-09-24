@@ -57,6 +57,7 @@ export interface Order {
   notes: string | null
   assigned_to?: string | null
   created_by?: string | null
+  deal_id?: string | null
   created_at: string
   order_items?: OrderItem[]
   customers?: Customer

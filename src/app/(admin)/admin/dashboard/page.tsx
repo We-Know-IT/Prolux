@@ -71,7 +71,7 @@ export default function AdminDashboard() {
       sb.from('products').select('*').order('sort_order'),
       sb.from('customers').select('*').order('company'),
       sb.from('deals').select('id,title,value,stage,assigned_to,updated_at').neq('stage', 'Vunnen').neq('stage', 'Förlorad'),
-      sb.from('deals').select('assigned_to,value,updated_at').eq('stage', 'Vunnen').gte('updated_at', monthStart).lte('updated_at', monthEnd + 'T23:59:59'),
+      sb.from('deals').select('id,assigned_to,value,updated_at').eq('stage', 'Vunnen').gte('updated_at', monthStart).lte('updated_at', monthEnd + 'T23:59:59'),
       sb.from('sales_budgets').select('salesperson,budget').eq('year', year).eq('month', month),
       sb.from('reminders').select('id,title,due_date,priority,customers(company)').eq('status', 'upcoming').order('due_date').limit(20),
       sb.from('customer_activities').select('id,activity_type,notes,created_at,customers(company)').order('created_at', { ascending: false }).limit(12),
@@ -250,7 +250,7 @@ export default function AdminDashboard() {
   // Budget credit: this month's orders per assignee.
   const { start: salesStart, end: salesEnd } = monthRange(now)
   const ordersThisMonth = orders.filter(o => o.created_at >= salesStart && o.created_at <= salesEnd)
-  const soldBySP        = budgetAchieved(ordersThisMonth, wonDeals)
+  const soldBySP        = budgetAchieved(ordersThisMonth, wonDeals, orders.filter(o => o.status !== 'cancelled'))
   const soldThisMonth   = Object.values(soldBySP).reduce((a, b) => a + b, 0)
   const unassignedCount = orders.filter(o => !o.assigned_to && o.status === 'pending').length
 

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { fmt, formatDate } from '@/lib/utils'
 import { ORDER_STATUS_LABEL, OrderStatus } from '@/types'
 import Link from 'next/link'
+import { portalCustomer } from '@/lib/portal-customer'
 
 const STATUS_CSS: Record<string, { background: string; color: string }> = {
   pending:   { background: 'rgba(212,138,58,.12)',  color: '#D48A3A' },
@@ -19,11 +20,12 @@ export default async function OrdersPage() {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+  const { orderOwnerIds } = await portalCustomer(supabase, user.id)
 
   const { data: orders } = await supabase
     .from('orders')
     .select('*, order_items(*)')
-    .eq('customer_id', user.id)
+    .in('customer_id', orderOwnerIds)
     .order('created_at', { ascending: false })
 
   const orderList = orders || []

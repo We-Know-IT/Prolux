@@ -5,6 +5,7 @@ import { ORDER_STATUS_LABEL, OrderStatus, OrderItem } from '@/types'
 import Link from 'next/link'
 import { ArrowLeft, Clock, CheckCircle, Package, Truck, Home } from 'lucide-react'
 import { ElementType } from 'react'
+import { portalCustomer } from '@/lib/portal-customer'
 
 interface Step {
   status: string
@@ -68,12 +69,13 @@ export default async function OrderDetailPage({
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+  const { orderOwnerIds } = await portalCustomer(supabase, user.id)
 
   const { data: order } = await supabase
     .from('orders')
     .select('*, order_items(*)')
     .eq('id', id)
-    .eq('customer_id', user.id)
+    .in('customer_id', orderOwnerIds)
     .single()
 
   if (!order) notFound()

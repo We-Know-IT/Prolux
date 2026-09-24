@@ -6,6 +6,7 @@ import { fmt } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { Campaign } from '@/types'
 import { Tag, X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { portalCustomer } from '@/lib/portal-customer'
 
 interface FormState {
   // Delivery
@@ -151,9 +152,12 @@ export default function CheckoutPage() {
       return
     }
 
+    // Orders belong to customers.id, like webshop and CRM orders.
+    const { customerId } = await portalCustomer(supabase, user.id)
+
     // Build order
     const orderPayload = {
-      customer_id: user.id,
+      customer_id: customerId ?? user.id,
       status: 'pending' as const,
       price_list_id: priceList,
       delivery_name: [form.deliveryName, form.deliveryCompany].filter(Boolean).join(', ') || null,

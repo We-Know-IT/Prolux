@@ -19,7 +19,9 @@ export function monthRange(date = new Date()) {
 }
 
 // Budget credit: each salesperson's order value this month (excluding VAT and
-// cancelled orders) plus the value of deals they won this month.
+// cancelled orders) plus the value of deals they won this month. A won deal
+// that has an order linked to it (orders.deal_id) is already counted through
+// that order, so it is skipped.
 export function salesBySalesperson(orders: { assigned_to?: string | null; subtotal?: number | null; status?: string | null }[]) {
   const acc: Record<string, number> = {}
   for (const o of orders) {
@@ -31,11 +33,13 @@ export function salesBySalesperson(orders: { assigned_to?: string | null; subtot
 
 export function budgetAchieved(
   orders: Parameters<typeof salesBySalesperson>[0],
-  wonDeals: { assigned_to?: string | null; value?: number | null }[],
+  wonDeals: { id?: string; assigned_to?: string | null; value?: number | null }[],
+  dealsWithOrders: { deal_id?: string | null }[] = [],
 ) {
   const acc = salesBySalesperson(orders)
+  const linked = new Set(dealsWithOrders.map(o => o.deal_id).filter(Boolean))
   for (const d of wonDeals) {
-    if (!d.assigned_to) continue
+    if (!d.assigned_to || (d.id && linked.has(d.id))) continue
     acc[d.assigned_to] = (acc[d.assigned_to] || 0) + (d.value || 0)
   }
   return acc

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { fmt, custPrice, formatDate } from '@/lib/utils'
 import { DISCOUNT, ORDER_STATUS_LABEL, PriceList, OrderStatus } from '@/types'
 import Link from 'next/link'
+import { portalCustomer } from '@/lib/portal-customer'
 
 const STATUS_CSS: Record<string, { background: string; color: string }> = {
   pending:   { background: 'rgba(212,138,58,.12)',  color: '#D48A3A' },
@@ -24,6 +25,7 @@ export default async function PortalDashboard() {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+  const { orderOwnerIds } = await portalCustomer(supabase, user.id)
 
   const priceList = ((user.user_metadata?.price_list as string) || 'B') as PriceList
   const company = (user.user_metadata?.company as string) || 'Ditt företag'
@@ -32,7 +34,7 @@ export default async function PortalDashboard() {
     supabase
       .from('orders')
       .select('*, order_items(*)')
-      .eq('customer_id', user.id)
+      .in('customer_id', orderOwnerIds)
       .order('created_at', { ascending: false })
       .limit(10),
     supabase

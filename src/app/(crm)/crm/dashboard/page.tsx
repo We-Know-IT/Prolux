@@ -91,8 +91,9 @@ export default function CrmDashboardPage() {
       supabase.from('orders').select('assigned_to,subtotal,status').gte('created_at', start).lte('created_at', end),
       supabase.from('customers').select('id,company').eq('status', 'active').order('company'),
       supabase.from('orders').select('id,order_nr,total,created_at,assigned_to,created_by,customers(id,company)').eq('status', 'pending').order('created_at', { ascending: false }),
-      supabase.from('deals').select('assigned_to,value').eq('stage', 'Vunnen').gte('updated_at', start).lte('updated_at', end),
-    ]).then(([{ data: d }, { data: c }, { data: r }, { data: b }, { data: sold }, { data: ac }, { data: po }, { data: won }]) => {
+      supabase.from('deals').select('id,assigned_to,value').eq('stage', 'Vunnen').gte('updated_at', start).lte('updated_at', end),
+      supabase.from('orders').select('deal_id').not('deal_id', 'is', null).neq('status', 'cancelled'),
+    ]).then(([{ data: d }, { data: c }, { data: r }, { data: b }, { data: sold }, { data: ac }, { data: po }, { data: won }, { data: linked }]) => {
       if (d) setDeals(d)
       if (c) setRecentCustomers(c)
       if (r) setReminders(r)
@@ -102,7 +103,7 @@ export default function CrmDashboardPage() {
         for (const row of b as any[]) loaded[row.salesperson] = row.budget
         setBudgets(loaded)
       }
-      if (sold || won) setAchieved(budgetAchieved(sold || [], won || []))
+      if (sold || won) setAchieved(budgetAchieved(sold || [], won || [], linked || []))
       if (po) setPendingOrders(po)
     })
   }

@@ -100,6 +100,8 @@ export default function CrmOrdersPage() {
   const [showMobileCart, setShowMobileCart] = useState(false)
   const [delivery, setDelivery]           = useState('Direkt')
   const [assignee, setAssignee]           = useState('')
+  const [customerDeals, setCustomerDeals] = useState<{ id: string; title: string; value: number; stage: string }[]>([])
+  const [dealId, setDealId]               = useState('')
   const [myName, setMyName]               = useState('')
   const [isAdmin, setIsAdmin]             = useState(false)
   const [confirmingId, setConfirmingId]   = useState<string | null>(null)
@@ -146,6 +148,7 @@ export default function CrmOrdersPage() {
     setAssignee(customer.account_manager || '')
     setCart([])
     loadLastBought(customer)
+    loadCustomerDeals(customer)
     const productName = searchParams.get('product')
     if (productName) {
       const prod = products.find(p => p.name.toLowerCase() === productName.toLowerCase())
@@ -194,6 +197,24 @@ export default function CrmOrdersPage() {
     setAssignee(c.account_manager || myName)
     setCart([])
     loadLastBought(c)
+    loadCustomerDeals(c)
+  }
+
+  // Deals the order can be linked to, so a won deal and its order are only
+  // counted once in the budget. Pre-selects the most likely one: a won deal
+  // without an order, else the furthest-along open deal.
+  async function loadCustomerDeals(c: Customer) {
+    setCustomerDeals([]); setDealId('')
+    const [{ data: deals }, { data: linked, error }] = await Promise.all([
+      supabase.from('deals').select('id,title,value,stage').eq('customer_id', c.id).neq('stage', 'Förlorad').order('created_at', { ascending: false }),
+      supabase.from('orders').select('deal_id').eq('customer_id', c.id).not('deal_id', 'is', null).neq('status', 'cancelled'),
+    ])
+    if (error || !deals) return // orders.deal_id missing: migration 0006 not run yet
+    const taken = new Set((linked || []).map((o: any) => o.deal_id))
+    const open = deals.filter((d: any) => !taken.has(d.id))
+    setCustomerDeals(open as any)
+    const pick = ['Vunnen', 'Förhandling', 'Offert'].map(st => open.find((d: any) => d.stage === st)).find(Boolean)
+    setDealId((pick as any)?.id || '')
   }
 
   function addToCart(p: Product) {
@@ -235,9 +256,15 @@ export default function CrmOrdersPage() {
       // Empty lets the database default it to the customer's account manager.
       // No manager on the customer: the salesperson placing it receives it.
       assigned_to: assignee || (selectedCustomer.account_manager ? null : myName || null),
+      ...(dealId ? { deal_id: dealId } : {}),
       notes: `Leverans: ${delivery}${discountAmt ? ` | Rabatt: ${discountAmt} kr` : ''}`
     }).select().single()
     if (error || !order) { showToast('Fel vid orderläggning'); setPlacing(false); return }
+    // An order on a deal means the deal is won.
+    const linkedDeal = customerDeals.find(d => d.id === dealId)
+    if (linkedDeal && linkedDeal.stage !== 'Vunnen') {
+      await supabase.from('deals').update({ stage: 'Vunnen', updated_at: new Date().toISOString() }).eq('id', linkedDeal.id)
+    }
     await supabase.from('order_items').insert(cart.map(i => ({
       order_id: order.id, product_id: i.product.id,
       product_name: i.product.name, product_sku: i.product.sku,
@@ -247,7 +274,7 @@ export default function CrmOrdersPage() {
     setOrders(os => [{ ...order, customers: selectedCustomer }, ...os])
     setCart([]); setSelectedCustomer(null); setCustomerSearch(''); setProductSearch('')
     setDiscount(''); setDiscountEnabled(false); setDelivery('Direkt')
-    setLastBought([]); setSelectedCategory('all')
+    setLastBought([]); setSelectedCategory('all'); setCustomerDeals([]); setDealId('')
     setPlacing(false); setView('history')
     showToast(`Order #${order.order_nr} skapad — bekräfta den när den är klar`)
   }
@@ -418,6 +445,20 @@ export default function CrmOrdersPage() {
           <ChevronDown size={15} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', pointerEvents: 'none' }} />
         </div>
       </div>
+      {customerDeals.length > 0 && (
+        <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: '0 0 4px' }}>Koppla till affär</h3>
+          <p style={{ fontSize: 12, color: 'var(--text3)', margin: '0 0 12px' }}>Affären markeras som vunnen och räknas via ordern, så budgeten inte räknar samma försäljning två gånger.</p>
+          <div style={{ position: 'relative' }}>
+            <select value={dealId} onChange={e => setDealId(e.target.value)}
+              style={{ width: '100%', padding: '11px 36px 11px 14px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 14, outline: 'none', appearance: 'none', cursor: 'pointer' }}>
+              <option value="">— Ingen affär —</option>
+              {customerDeals.map(d => <option key={d.id} value={d.id}>{d.title} · {d.stage} · {fmt(d.value || 0)} kr</option>)}
+            </select>
+            <ChevronDown size={15} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', pointerEvents: 'none' }} />
+          </div>
+        </div>
+      )}
       <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
         <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
           <Truck size={15} color="var(--text3)" /> Leverans
@@ -510,7 +551,7 @@ export default function CrmOrdersPage() {
                 {selectedCustomer.contact_name && `${selectedCustomer.contact_name} · `}Prislista {selectedCustomer.price_list_id}
               </div>
             </div>
-            <button onClick={() => { setSelectedCustomer(null); setCart([]); setCustomerSearch(''); setLastBought([]); setRecommendations([]) }}
+            <button onClick={() => { setSelectedCustomer(null); setCart([]); setCustomerSearch(''); setLastBought([]); setRecommendations([]); setCustomerDeals([]); setDealId('') }}
               style={{ padding: '7px 14px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text2)', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
               Byt kund
             </button>
