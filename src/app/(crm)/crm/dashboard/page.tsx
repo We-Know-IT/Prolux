@@ -5,7 +5,7 @@ import { fmt, formatDate } from '@/lib/utils'
 import { Plus, Users, ShoppingBag, Package, ChevronRight, FileText, GitBranch, Target, Calendar, ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
-import { SALESPEOPLE, salespersonName, monthRange, salesBySalesperson } from '@/lib/team'
+import { SALESPEOPLE, salespersonName, monthRange, budgetAchieved, canConfirmOrder } from '@/lib/team'
 
 const supabase = createClient()
 
@@ -90,8 +90,9 @@ export default function CrmDashboardPage() {
       supabase.from('sales_budgets').select('salesperson,budget').eq('year', year).eq('month', month),
       supabase.from('orders').select('assigned_to,subtotal,status').gte('created_at', start).lte('created_at', end),
       supabase.from('customers').select('id,company').eq('status', 'active').order('company'),
-      supabase.from('orders').select('id,order_nr,total,created_at,assigned_to,customers(id,company)').eq('status', 'pending').order('created_at', { ascending: false }),
-    ]).then(([{ data: d }, { data: c }, { data: r }, { data: b }, { data: sold }, { data: ac }, { data: po }]) => {
+      supabase.from('orders').select('id,order_nr,total,created_at,assigned_to,created_by,customers(id,company)').eq('status', 'pending').order('created_at', { ascending: false }),
+      supabase.from('deals').select('assigned_to,value').eq('stage', 'Vunnen').gte('updated_at', start).lte('updated_at', end),
+    ]).then(([{ data: d }, { data: c }, { data: r }, { data: b }, { data: sold }, { data: ac }, { data: po }, { data: won }]) => {
       if (d) setDeals(d)
       if (c) setRecentCustomers(c)
       if (r) setReminders(r)
@@ -101,16 +102,17 @@ export default function CrmDashboardPage() {
         for (const row of b as any[]) loaded[row.salesperson] = row.budget
         setBudgets(loaded)
       }
-      if (sold) setAchieved(salesBySalesperson(sold))
+      if (sold || won) setAchieved(budgetAchieved(sold || [], won || []))
       if (po) setPendingOrders(po)
     })
   }
 
   async function confirmOrder(id: string) {
     setConfirmingId(id)
-    const { error } = await supabase.from('orders').update({ status: 'confirmed' }).eq('id', id)
+    const { data: ok, error } = await supabase.rpc('confirm_order', { p_order_id: id })
     setConfirmingId(null)
-    if (!error) setPendingOrders(os => os.filter(o => o.id !== id))
+    if (!error && ok) setPendingOrders(os => os.filter(o => o.id !== id))
+    else alert('Kunde inte bekräfta ordern. Har migration 0004 körts i Supabase?')
   }
 
   // Seed the form from the latest saved budgets when opening it, so a background
@@ -239,9 +241,9 @@ export default function CrmDashboardPage() {
         ))}
       </div>
 
-      {/* Orders waiting on this user (admins also see unassigned ones) */}
+      {/* Orders this user placed or received (admins also see unassigned ones) */}
       {(() => {
-        const mine = meLoaded ? pendingOrders.filter(o => o.assigned_to === firstName || (isAdmin && !o.assigned_to)) : []
+        const mine = meLoaded ? pendingOrders.filter(o => canConfirmOrder(o, firstName, isAdmin)) : []
         if (mine.length === 0) return null
         return (
           <div style={{ ...glass, padding: '18px 22px', marginBottom: 24, border: '1px solid rgba(232,184,75,.25)' }}>

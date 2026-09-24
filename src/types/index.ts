@@ -56,6 +56,7 @@ export interface Order {
   transport_order_id: string | null
   notes: string | null
   assigned_to?: string | null
+  created_by?: string | null
   created_at: string
   order_items?: OrderItem[]
   customers?: Customer

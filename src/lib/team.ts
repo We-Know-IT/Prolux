@@ -18,7 +18,8 @@ export function monthRange(date = new Date()) {
   }
 }
 
-// Budget credit: each salesperson's order value this month, excluding VAT and cancelled orders.
+// Budget credit: each salesperson's order value this month (excluding VAT and
+// cancelled orders) plus the value of deals they won this month.
 export function salesBySalesperson(orders: { assigned_to?: string | null; subtotal?: number | null; status?: string | null }[]) {
   const acc: Record<string, number> = {}
   for (const o of orders) {
@@ -26,4 +27,22 @@ export function salesBySalesperson(orders: { assigned_to?: string | null; subtot
     acc[o.assigned_to] = (acc[o.assigned_to] || 0) + (o.subtotal || 0)
   }
   return acc
+}
+
+export function budgetAchieved(
+  orders: Parameters<typeof salesBySalesperson>[0],
+  wonDeals: { assigned_to?: string | null; value?: number | null }[],
+) {
+  const acc = salesBySalesperson(orders)
+  for (const d of wonDeals) {
+    if (!d.assigned_to) continue
+    acc[d.assigned_to] = (acc[d.assigned_to] || 0) + (d.value || 0)
+  }
+  return acc
+}
+
+// Orders a CRM user can confirm: ones they placed or received. Admins also
+// handle orders nobody has been assigned.
+export function canConfirmOrder(o: { assigned_to?: string | null; created_by?: string | null }, me: string, isAdmin: boolean) {
+  return isAdmin ? (!o.assigned_to || o.assigned_to === me || o.created_by === me) : (o.assigned_to === me || o.created_by === me)
 }

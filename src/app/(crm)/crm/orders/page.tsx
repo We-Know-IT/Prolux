@@ -6,7 +6,7 @@ import { Product, Customer, Category, CartItem, Order, OrderItem, OrderStatus, O
 import { custPrice, fmt, formatDate } from '@/lib/utils'
 import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star } from 'lucide-react'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
-import { SALESPEOPLE, salespersonName } from '@/lib/team'
+import { SALESPEOPLE, salespersonName, canConfirmOrder } from '@/lib/team'
 
 const supabase = createClient()
 type View = 'new' | 'confirm' | 'history'
@@ -101,6 +101,8 @@ export default function CrmOrdersPage() {
   const [delivery, setDelivery]           = useState('Direkt')
   const [assignee, setAssignee]           = useState('')
   const [myName, setMyName]               = useState('')
+  const [isAdmin, setIsAdmin]             = useState(false)
+  const [confirmingId, setConfirmingId]   = useState<string | null>(null)
   const [onlyMine, setOnlyMine]           = useState(false)
   const [placing, setPlacing]             = useState(false)
 
@@ -112,7 +114,7 @@ export default function CrmOrdersPage() {
   }, [])
 
   function loadOrders() {
-    supabase.from('orders').select('id,order_nr,status,total,created_at,assigned_to,customers(id,company)').order('created_at', { ascending: false }).limit(50)
+    supabase.from('orders').select('id,order_nr,status,total,created_at,assigned_to,created_by,customers(id,company)').order('created_at', { ascending: false }).limit(50)
       .then(({ data }) => { if (data) setOrders(data as any) })
   }
 
@@ -120,7 +122,7 @@ export default function CrmOrdersPage() {
 
   useEffect(() => {
     Promise.all([
-      supabase.from('orders').select('id,order_nr,status,total,created_at,assigned_to,customers(id,company)').order('created_at', { ascending: false }).limit(50),
+      supabase.from('orders').select('id,order_nr,status,total,created_at,assigned_to,created_by,customers(id,company)').order('created_at', { ascending: false }).limit(50),
       supabase.from('customers').select('id,company,contact_name,price_list_id,city,org_nr,phone,email,account_manager').eq('status', 'active').order('company'),
       supabase.from('products').select('id,sku,name,brand,unit,list_price,stock_qty,active,image_url,category_id').eq('active', true).order('sort_order'),
       supabase.from('categories').select('id,name,sort_order').order('sort_order'),
@@ -184,7 +186,7 @@ export default function CrmOrdersPage() {
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setMyName(salespersonName(user)))
+    supabase.auth.getUser().then(({ data: { user } }) => { setMyName(salespersonName(user)); setIsAdmin(user?.user_metadata?.role === 'admin') })
   }, [])
 
   function selectCustomerAndLoad(c: Customer) {
@@ -223,7 +225,9 @@ export default function CrmOrdersPage() {
     setPlacing(true)
     const { data: order, error } = await supabase.from('orders').insert({
       customer_id: selectedCustomer.id,
-      status: 'confirmed' as OrderStatus,
+      // Placed as pending: the salesperson confirms it from the history or dashboard.
+      status: 'pending' as OrderStatus,
+      created_by: myName || null,
       price_list_id: selectedCustomer.price_list_id,
       delivery_name: selectedCustomer.company,
       delivery_city: selectedCustomer.city,
@@ -245,7 +249,16 @@ export default function CrmOrdersPage() {
     setDiscount(''); setDiscountEnabled(false); setDelivery('Direkt')
     setLastBought([]); setSelectedCategory('all')
     setPlacing(false); setView('history')
-    showToast(`Order #${order.order_nr} skapad!`)
+    showToast(`Order #${order.order_nr} skapad — bekräfta den när den är klar`)
+  }
+
+  async function confirmOrder(id: string) {
+    setConfirmingId(id)
+    const { data: ok, error } = await supabase.rpc('confirm_order', { p_order_id: id })
+    setConfirmingId(null)
+    if (error || !ok) { showToast('Kunde inte bekräfta ordern'); return }
+    setOrders(os => os.map(o => o.id === id ? { ...o, status: 'confirmed' as OrderStatus } : o))
+    showToast('Order bekräftad')
   }
 
   const filteredCustomers = customers.filter(c =>
@@ -296,7 +309,7 @@ export default function CrmOrdersPage() {
           <tbody>
             {loading ? (
               <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'var(--text3)' }}>Laddar...</td></tr>
-            ) : orders.filter(o => !onlyMine || o.assigned_to === myName).map(o => {
+            ) : orders.filter(o => !onlyMine || o.assigned_to === myName || o.created_by === myName).map(o => {
               const expanded = expandedOrderId === o.id
               const items = orderItemsById[o.id]
               return (
@@ -308,9 +321,16 @@ export default function CrmOrdersPage() {
                     <td style={{ padding: '12px 16px', color: o.assigned_to ? 'var(--text2)' : 'var(--red)' }}>{o.assigned_to || 'Saknas'}</td>
                     <td style={{ padding: '12px 16px', color: 'var(--gold)', fontWeight: 700 }}>{fmt(o.total)} kr</td>
                     <td style={{ padding: '12px 16px' }}>
-                      <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: 'rgba(76,175,125,.12)', color: 'var(--green)', fontWeight: 700 }}>
-                        {ORDER_STATUS_LABEL[o.status] || o.status}
-                      </span>
+                      {o.status === 'pending' && canConfirmOrder(o, myName, isAdmin) ? (
+                        <button onClick={e => { e.stopPropagation(); confirmOrder(o.id) }} disabled={confirmingId === o.id}
+                          style={{ fontSize: 11, padding: '4px 10px', borderRadius: 5, background: 'var(--gold)', border: 'none', color: '#111', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', opacity: confirmingId === o.id ? .6 : 1 }}>
+                          {confirmingId === o.id ? 'Bekräftar…' : 'Bekräfta'}
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: o.status === 'pending' ? 'rgba(232,184,75,.12)' : 'rgba(76,175,125,.12)', color: o.status === 'pending' ? 'var(--text2)' : 'var(--green)', fontWeight: 700 }}>
+                          {ORDER_STATUS_LABEL[o.status] || o.status}
+                        </span>
+                      )}
                     </td>
                   </tr>
                   {expanded && (

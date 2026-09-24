@@ -5,7 +5,7 @@ import { fmt } from '@/lib/utils'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
-import { SALESPEOPLE, monthRange, salesBySalesperson } from '@/lib/team'
+import { SALESPEOPLE, monthRange, budgetAchieved } from '@/lib/team'
 import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, Trophy, ArrowRight, Calendar, ChevronLeft, ChevronRight, Activity } from 'lucide-react'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -250,7 +250,7 @@ export default function AdminDashboard() {
   // Budget credit: this month's orders per assignee.
   const { start: salesStart, end: salesEnd } = monthRange(now)
   const ordersThisMonth = orders.filter(o => o.created_at >= salesStart && o.created_at <= salesEnd)
-  const soldBySP        = salesBySalesperson(ordersThisMonth)
+  const soldBySP        = budgetAchieved(ordersThisMonth, wonDeals)
   const soldThisMonth   = Object.values(soldBySP).reduce((a, b) => a + b, 0)
   const unassignedCount = orders.filter(o => !o.assigned_to && o.status === 'pending').length
 
