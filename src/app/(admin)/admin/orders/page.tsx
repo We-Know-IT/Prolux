@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { fmt } from '@/lib/utils'
+import { fmt, formatDateTime } from '@/lib/utils'
 import { X, Check } from 'lucide-react'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { SALESPEOPLE } from '@/lib/team'
@@ -101,7 +101,7 @@ export default function AdminOrders() {
     await sb.from('orders').update({ assigned_to }).eq('id', id)
     setOrders(prev => prev.map(o => o.id === id ? { ...o, assigned_to } : o))
     setSelectedOrder((prev: any) => prev?.id === id ? { ...prev, assigned_to } : prev)
-    showToast(assigned_to ? `Mottagare: ${assigned_to}` : 'Mottagare borttagen')
+    showToast(assigned_to ? `Säljare: ${assigned_to}` : 'Säljare borttagen')
   }
 
   async function updateStatus(id: string, status: string) {
@@ -121,7 +121,7 @@ export default function AdminOrders() {
     const csv = [
       'Order #,Kund,Datum,Belopp,Status',
       ...filtered.map(o =>
-        `${o.order_nr},${o.customers?.company || o.delivery_name || ''},${o.created_at?.slice(0, 10)},${o.subtotal},${STATUS_LABELS[o.status] || o.status}`
+        `${o.order_nr},${o.customers?.company || o.delivery_name || ''},${formatDateTime(o.created_at)},${o.subtotal},${STATUS_LABELS[o.status] || o.status}`
       ),
     ].join('\n')
     const a = document.createElement('a')
@@ -158,7 +158,7 @@ export default function AdminOrders() {
         >
           <option value="">Alla statusar</option>
           {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          <option value="unassigned">Saknar mottagare</option>
+          <option value="unassigned">Saknar säljare</option>
         </select>
         <span style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--text3)' }}>{filtered.length} ordrar</span>
       </div>
@@ -168,7 +168,7 @@ export default function AdminOrders() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {['#', 'Datum', 'Kund', 'Mottagare', 'Prislista', 'Belopp', 'Status', 'Ändra status'].map(h => (
+              {['#', 'Datum', 'Kund', 'Säljare', 'Prislista', 'Belopp', 'Status', 'Ändra status'].map(h => (
                 <th key={h} style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', padding: '14px 0', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>{h}</th>
               ))}
             </tr>
@@ -179,7 +179,7 @@ export default function AdminOrders() {
               return (
                 <tr key={o.id} onClick={() => openOrder(o)} style={{ cursor: 'pointer' }}>
                   <td style={{ padding: '16px 0', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--gold)', fontWeight: 500, borderBottom: '1px solid rgba(255,255,255,.04)' }}>#{o.order_nr}</td>
-                  <td style={{ padding: '16px 0', fontSize: '13px', color: 'var(--text)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>{o.created_at?.slice(0, 10)}</td>
+                  <td style={{ padding: '16px 0', fontSize: '13px', color: 'var(--text)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>{formatDateTime(o.created_at)}</td>
                   <td style={{ padding: '16px 0', fontSize: '13px', color: 'var(--text)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>{o.customers?.company || o.delivery_name || '—'}</td>
                   <td style={{ padding: '16px 0', fontSize: '13px', color: o.assigned_to ? 'var(--text2)' : 'var(--red)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>{o.assigned_to || 'Saknas'}</td>
                   <td style={{ padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
@@ -229,11 +229,11 @@ export default function AdminOrders() {
                       {STATUS_LABELS[selectedOrder.status] || selectedOrder.status}
                     </span>
                   )],
-                  ['Datum',     selectedOrder.created_at?.slice(0, 10)],
+                  ['Datum',     formatDateTime(selectedOrder.created_at)],
                   ['Prislista', selectedOrder.price_list_id || 'Standard'],
                   ['Kund',      selectedOrder.customers?.company || selectedOrder.delivery_name || '—'],
                   ['E-post',    selectedOrder.customers?.email || '—'],
-                  ['Mottagare', (
+                  ['Säljare', (
                     <select key="a" value={selectedOrder.assigned_to || ''} onChange={e => updateAssignee(selectedOrder.id, e.target.value)}
                       style={{ fontSize: 12, padding: '4px 8px', border: `1px solid ${selectedOrder.assigned_to ? 'var(--border)' : 'var(--red)'}`, borderRadius: 4, background: 'var(--bg3)', color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>
                       <option value="">— Ingen —</option>

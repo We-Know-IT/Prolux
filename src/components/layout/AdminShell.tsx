@@ -44,7 +44,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
         const order = payload.new as any
         setNewOrderCount(n => n + 1)
-        setRealtimeToast({ nr: order.order_nr, company: `${order.delivery_name || 'Ny kund'} · ${order.assigned_to ? `till ${order.assigned_to}` : 'saknar mottagare'}` })
+        setRealtimeToast({ nr: order.order_nr, company: `${order.delivery_name || 'Ny kund'} · ${order.assigned_to ? `till ${order.assigned_to}` : 'saknar säljare'}` })
         setTimeout(() => setRealtimeToast(null), 5000)
       })
       .subscribe()

@@ -265,7 +265,7 @@ export default function AdminDashboard() {
 
   const kpis = [
     { label: 'Total omsättning',  value: `${fmt(revenue)} kr`,         sub: 'alla ordrar exkl. moms',     icon: TrendingUp, gold: true },
-    { label: 'Aktiva ordrar',     value: pendingCount.toString(),       sub: unassignedCount > 0 ? `${unassignedCount} saknar mottagare` : 'väntande behandling',         icon: Clock,      alert: pendingCount > 0 },
+    { label: 'Aktiva ordrar',     value: pendingCount.toString(),       sub: unassignedCount > 0 ? `${unassignedCount} saknar säljare` : 'väntande behandling',         icon: Clock,      alert: pendingCount > 0 },
     { label: 'Ordrar idag',       value: todayOrders.toString(),        sub: 'nya ordrar',                  icon: ShoppingBag },
     { label: 'Aktiva kunder',     value: activeCustomers.toString(),    sub: `av ${customers.length} totalt`, icon: Users },
     { label: 'Pipeline-värde',    value: `${fmt(pipelineValue)} kr`,   sub: `${deals.length} aktiva deals`, icon: GitBranch, blue: true },

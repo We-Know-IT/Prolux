@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { fmt, formatDate } from '@/lib/utils'
+import { fmt, formatDate, formatDateTime } from '@/lib/utils'
 import { Plus, Users, ShoppingBag, Package, ChevronRight, FileText, GitBranch, Target, Calendar, ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
@@ -262,7 +262,7 @@ export default function CrmDashboardPage() {
                         : 'Gästorder'}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
-                      {formatDate(o.created_at)} · {fmt(o.total)} kr{!o.assigned_to ? ' · saknar mottagare' : ''}
+                      {formatDateTime(o.created_at)} · {fmt(o.total)} kr{!o.assigned_to ? ' · saknar säljare' : ''}
                     </div>
                   </div>
                   <button onClick={() => confirmOrder(o.id)} disabled={confirmingId === o.id}

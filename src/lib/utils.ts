@@ -19,3 +19,12 @@ export function formatDate(dateStr: string): string {
     year: 'numeric', month: 'short', day: 'numeric'
   })
 }
+
+// "2026-09-24 14:32" in Swedish time, for order lists where the time of day matters.
+export function formatDateTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return ''
+  return new Date(dateStr).toLocaleString('sv-SE', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm',
+  })
+}

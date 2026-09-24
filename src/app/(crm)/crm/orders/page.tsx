@@ -3,7 +3,7 @@ import { Fragment, useEffect, useState, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Product, Customer, Category, CartItem, Order, OrderItem, OrderStatus, ORDER_STATUS_LABEL } from '@/types'
-import { custPrice, fmt, formatDate } from '@/lib/utils'
+import { custPrice, fmt, formatDateTime } from '@/lib/utils'
 import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star } from 'lucide-react'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { SALESPEOPLE, salespersonName, canConfirmOrder } from '@/lib/team'
@@ -301,7 +301,7 @@ export default function CrmOrdersPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 480 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)' }}>
-              {['Order', 'Datum', 'Kund', 'Mottagare', 'Summa inkl. moms', 'Status'].map(h => (
+              {['Order', 'Datum', 'Kund', 'Säljare', 'Summa inkl. moms', 'Status'].map(h => (
                 <th key={h} style={{ padding: '12px 16px', textAlign: 'left', color: 'var(--text3)', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
               ))}
             </tr>
@@ -316,7 +316,7 @@ export default function CrmOrdersPage() {
                 <Fragment key={o.id}>
                   <tr onClick={() => toggleOrderExpand(o.id)} style={{ borderBottom: expanded ? 'none' : '1px solid var(--border2)', cursor: 'pointer', background: expanded ? 'rgba(232,184,75,.04)' : 'transparent' }}>
                     <td style={{ padding: '12px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text3)' }}>#{o.order_nr}</td>
-                    <td style={{ padding: '12px 16px', color: 'var(--text2)' }}>{formatDate(o.created_at)}</td>
+                    <td style={{ padding: '12px 16px', color: 'var(--text2)' }}>{formatDateTime(o.created_at)}</td>
                     <td style={{ padding: '12px 16px', color: 'var(--text)', fontWeight: 500 }}>{(o as any).customers?.company || '—'}</td>
                     <td style={{ padding: '12px 16px', color: o.assigned_to ? 'var(--text2)' : 'var(--red)' }}>{o.assigned_to || 'Saknas'}</td>
                     <td style={{ padding: '12px 16px', color: 'var(--gold)', fontWeight: 700 }}>{fmt(o.total)} kr</td>
@@ -407,12 +407,12 @@ export default function CrmOrdersPage() {
         )}
       </div>
       <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: '0 0 4px' }}>Mottagare</h3>
+        <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: '0 0 4px' }}>Säljare</h3>
         <p style={{ fontSize: 12, color: 'var(--text3)', margin: '0 0 12px' }}>Säljaren som hanterar ordern och får den på sin budget.</p>
         <div style={{ position: 'relative' }}>
           <select value={assignee} onChange={e => setAssignee(e.target.value)}
             style={{ width: '100%', padding: '11px 36px 11px 14px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 14, outline: 'none', appearance: 'none', cursor: 'pointer' }}>
-            <option value="">{selectedCustomer.account_manager ? `Kundansvarig (${selectedCustomer.account_manager})` : '— Ingen mottagare —'}</option>
+            <option value="">{selectedCustomer.account_manager ? `Kundansvarig (${selectedCustomer.account_manager})` : '— Ingen säljare —'}</option>
             {SALESPEOPLE.map(sp => <option key={sp} value={sp}>{sp}{sp === selectedCustomer.account_manager ? ' (kundansvarig)' : ''}</option>)}
           </select>
           <ChevronDown size={15} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', pointerEvents: 'none' }} />

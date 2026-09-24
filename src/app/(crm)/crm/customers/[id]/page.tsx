@@ -261,7 +261,7 @@ export default function CustomerDetailPage() {
                   {customer.city ? ` · ${customer.city}` : ''}
                 </p>
                 <p style={{ margin: '4px 0 0', fontSize: 12, color: customer.account_manager ? 'var(--text3)' : 'var(--red)' }}>
-                  {customer.account_manager ? `Kundansvarig: ${customer.account_manager}` : 'Ingen kundansvarig — ordrar får ingen mottagare'}
+                  {customer.account_manager ? `Kundansvarig: ${customer.account_manager}` : 'Ingen kundansvarig — ordrar får ingen säljare'}
                 </p>
               </div>
               <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 5, background: PL_BADGE_COLOR[customer.price_list_id], color: PL_TEXT_COLOR[customer.price_list_id], fontWeight: 700, marginLeft: 4 }}>
