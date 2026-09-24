@@ -2,12 +2,13 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt, formatDate, formatDateTime } from '@/lib/utils'
-import { Plus, Users, ShoppingBag, Package, ChevronRight, FileText, GitBranch, Target, Calendar, ChevronLeft } from 'lucide-react'
+import { Plus, Users, ShoppingBag, Package, ChevronRight, FileText, GitBranch, Target, Calendar, ChevronLeft, Cake } from 'lucide-react'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { SALESPEOPLE, salespersonName, monthRange, budgetAchieved, canConfirmOrder } from '@/lib/team'
 import { useBudgetHistory } from '@/hooks/useBudgetHistory'
 import BudgetHistoryChart from '@/components/BudgetHistoryChart'
+import { nextBirthday, formatBirthday } from '@/lib/birthdays'
 
 const supabase = createClient()
 
@@ -57,6 +58,7 @@ export default function CrmDashboardPage() {
   const [reminders, setReminders]         = useState<any[]>([])
   const [budgets, setBudgets]             = useState<Record<string, number>>({})
   const [achieved, setAchieved]           = useState<Record<string, number>>({})
+  const [birthdays, setBirthdays]         = useState<any[]>([])
   const { months: budgetHistory }         = useBudgetHistory(6)
   const [editBudget, setEditBudget]       = useState(false)
   const [budgetInput, setBudgetInput]     = useState<Record<string, string>>({})
@@ -85,6 +87,15 @@ export default function CrmDashboardPage() {
   useLiveRefresh(['deals', 'customers', 'reminders', 'sales_budgets', 'orders'], loadData)
 
   function loadData() {
+    // Separate query: fails quietly until migration 0009 adds contact_birthday.
+    supabase.from('customers').select('id,company,contact_name,contact_birthday,account_manager').not('contact_birthday', 'is', null)
+      .then(({ data }) => {
+        if (!data) return
+        setBirthdays(data
+          .map((c: any) => ({ ...c, ...nextBirthday(c.contact_birthday) }))
+          .filter(c => c.daysUntil <= 30)
+          .sort((a, b) => a.daysUntil - b.daysUntil))
+      })
     const { start, end } = monthRange()
     Promise.all([
       supabase.from('deals').select('id,title,value,created_at,customers(company)').eq('stage', 'Offert').order('created_at', { ascending: false }).limit(4),
@@ -279,6 +290,31 @@ export default function CrmDashboardPage() {
           </div>
         )
       })()}
+
+      {/* Upcoming birthdays — for greetings and offers */}
+      {birthdays.length > 0 && (
+        <div style={{ ...glass, padding: '18px 22px', marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <Cake size={15} color="var(--text2)" />
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Födelsedagar kommande 30 dagar</span>
+          </div>
+          {birthdays.map((c, i) => (
+            <Link key={c.id} href={`/crm/customers/${c.id}`}
+              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderTop: i > 0 ? '1px solid rgba(255,255,255,.05)' : 'none', textDecoration: 'none' }}>
+              <div style={{ width: 44, textAlign: 'center', fontSize: 12, fontWeight: 700, color: c.daysUntil === 0 ? 'var(--green)' : 'var(--text)' }}>
+                {c.daysUntil === 0 ? 'Idag' : formatBirthday(c.contact_birthday)}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{c.contact_name || c.company}{c.turns ? ` fyller ${c.turns}` : ''}</div>
+                <div style={{ fontSize: 11, color: 'var(--text2)' }}>{c.company}{c.account_manager ? ` · ${c.account_manager}` : ''}</div>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text2)', whiteSpace: 'nowrap' }}>
+                {c.daysUntil === 0 ? '🎉' : c.daysUntil === 1 ? 'imorgon' : `om ${c.daysUntil} d`}
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* Budget Widget */}
       <div style={{ ...glass, padding: '20px 24px', marginBottom: 24 }}>

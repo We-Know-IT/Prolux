@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Customer, Order, OrderItem, Activity, PRICE_LIST_LABEL } from '@/types'
+import { Customer, Order, OrderItem, Activity, PRICE_LIST_LABEL, ORDER_STATUS_LABEL, OrderStatus } from '@/types'
 import { fmt, formatDate, custPrice } from '@/lib/utils'
 import {
   Plus, Mail, FileText, Bell, Calendar,
@@ -12,6 +12,7 @@ import {
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { SALESPEOPLE } from '@/lib/team'
+import { nextBirthday, formatBirthday } from '@/lib/birthdays'
 
 const supabase = createClient()
 
@@ -150,14 +151,14 @@ export default function CustomerDetailPage() {
 
   function startEdit() {
     if (!customer) return
-    setEditForm({ company: customer.company, contact_name: customer.contact_name, email: customer.email, phone: customer.phone || '', city: customer.city || '', org_nr: customer.org_nr || '', price_list_id: customer.price_list_id, status: customer.status, account_manager: customer.account_manager || '' })
+    setEditForm({ company: customer.company, contact_name: customer.contact_name, email: customer.email, phone: customer.phone || '', city: customer.city || '', org_nr: customer.org_nr || '', price_list_id: customer.price_list_id, status: customer.status, account_manager: customer.account_manager || '', contact_birthday: customer.contact_birthday || '' })
     setEditMode(true)
   }
 
   async function saveEdit() {
     if (!customer) return
     setEditSaving(true)
-    const { data, error } = await supabase.from('customers').update({ ...editForm, account_manager: editForm.account_manager || null }).eq('id', customer.id).select().single()
+    const { data, error } = await supabase.from('customers').update({ ...editForm, account_manager: editForm.account_manager || null, contact_birthday: editForm.contact_birthday || null }).eq('id', customer.id).select().single()
     if (!error && data) { setCustomer(data as Customer); showToast('Kunduppgifter sparade'); setEditMode(false) }
     else showToast('Fel: ' + (error?.message || 'Kunde inte spara'))
     setEditSaving(false)
@@ -324,7 +325,13 @@ export default function CustomerDetailPage() {
           <div style={{ ...card, padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px 24px' }}>
             {[
               ['E-post', customer.email], ['Telefon', customer.phone || '—'], ['Stad', customer.city || '—'],
-              ['Org.nr', customer.org_nr || '—'], ['Status', customer.status], ['Prislista', customer.price_list_id],
+              ['Org.nr', customer.org_nr || '—'], ['Status', ({ active: 'Aktiv', inactive: 'Inaktiv', prospect: 'Prospekt' } as Record<string, string>)[customer.status] || customer.status], ['Prislista', customer.price_list_id],
+              ['Kontaktperson', customer.contact_name || '—'],
+              ['Födelsedag', customer.contact_birthday ? (() => {
+                const nb = nextBirthday(customer.contact_birthday)
+                const when = nb.daysUntil === 0 ? 'idag 🎉' : nb.daysUntil === 1 ? 'imorgon' : `om ${nb.daysUntil} dagar`
+                return `${formatBirthday(customer.contact_birthday)}${nb.turns ? ` · fyller ${nb.turns}` : ''} (${when})`
+              })() : '—'],
             ].map(([label, value]) => (
               <div key={label}>
                 <div style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>{label}</div>
@@ -364,7 +371,7 @@ export default function CustomerDetailPage() {
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)' }}>{fmt(o.total)} kr</div>
-                        <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(76,175,125,.12)', color: 'var(--green)', fontWeight: 700 }}>{o.status}</span>
+                        <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(76,175,125,.12)', color: 'var(--green)', fontWeight: 700 }}>{ORDER_STATUS_LABEL[o.status as OrderStatus] || o.status}</span>
                       </div>
                     </div>
                   ))}
@@ -443,7 +450,7 @@ export default function CustomerDetailPage() {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--gold)', marginBottom: 4 }}>{fmt(o.total)} kr</div>
-                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(76,175,125,.12)', color: 'var(--green)', fontWeight: 700 }}>{o.status}</span>
+                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(76,175,125,.12)', color: 'var(--green)', fontWeight: 700 }}>{ORDER_STATUS_LABEL[o.status as OrderStatus] || o.status}</span>
                 </div>
               </div>
               {(o as any).order_items?.length > 0 && (
@@ -614,6 +621,7 @@ export default function CustomerDetailPage() {
               { label: 'Telefon', key: 'phone', type: 'tel' },
               { label: 'Stad', key: 'city', type: 'text' },
               { label: 'Org.nr', key: 'org_nr', type: 'text' },
+              { label: 'Kontaktpersonens födelsedag', key: 'contact_birthday', type: 'date' },
             ].map(({ label, key, type }) => (
               <div key={key} style={{ marginBottom: 14 }}>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</label>
