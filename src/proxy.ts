@@ -82,6 +82,9 @@ export async function proxy(request: NextRequest) {
   return supabaseResponse
 }
 
+// Static files from /public (images, the PWA manifest, service worker and
+// offline page) skip the proxy: browsers fetch the manifest without cookies,
+// so running auth on it would hand them the login page instead.
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|js|json|html)$).*)'],
 }

@@ -1,11 +1,5 @@
 'use client'
 import { useEffect, useState } from 'react'
-
-// Register CRM service worker for PWA install
-if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/crm-sw.js').catch(() => {})
-}
-
 import { createClient } from '@/lib/supabase/client'
 import { fmt, formatDate } from '@/lib/utils'
 import { Plus, Users, ShoppingBag, Package, ChevronRight, FileText, GitBranch, Target, Calendar, ChevronLeft } from 'lucide-react'

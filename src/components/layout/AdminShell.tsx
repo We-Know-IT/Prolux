@@ -1,4 +1,5 @@
 'use client'
+import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister'
 import { ReactNode, useState, useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -252,6 +253,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
         </div>
       )}
 
+      <ServiceWorkerRegister />
       <main style={{ flex: 1 }}>
         {children}
       </main>

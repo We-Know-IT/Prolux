@@ -1,4 +1,5 @@
 'use client'
+import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister'
 import { ReactNode, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
@@ -137,6 +138,7 @@ export default function CrmShell({ children }: { children: ReactNode }) {
         </div>
       )}
 
+      <ServiceWorkerRegister />
       <main style={{ flex: 1 }}>
         {children}
       </main>

@@ -1,19 +1,17 @@
 {
+  "id": "/prolux-crm",
   "name": "Prolux CRM",
-  "short_name": "Prolux CRM",
-  "description": "Säljverktyg för Prolux Shine-teamet",
-  "start_url": "/crm/dashboard",
-  "scope": "/crm/",
+  "short_name": "Prolux",
+  "description": "Säljverktyg och admin för Prolux Shine-teamet",
+  "start_url": "/login",
+  "scope": "/",
   "display": "standalone",
-  "orientation": "portrait",
   "background_color": "#0F1115",
   "theme_color": "#0F1115",
+  "lang": "sv",
   "icons": [
-    {
-      "src": "/logo-mark.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
