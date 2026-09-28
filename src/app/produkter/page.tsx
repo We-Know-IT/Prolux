@@ -3,14 +3,13 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PublicShell, useLoginModal, usePublicCart } from '@/components/layout/PublicShell'
-import { fmt } from '@/lib/utils'
 import { Search, Package, ShoppingCart, ChevronRight, ChevronLeft, LayoutGrid } from 'lucide-react'
 import Link from 'next/link'
 import { PRODUCT_BADGE } from '@/lib/product-badge'
 import AddProductCard from '@/components/site-edit/AddProductCard'
 import { popElement } from '@/lib/pop'
+import Price from '@/components/shop/Price'
 
-const DISCOUNT: Record<string, number> = { A: 0.40, B: 0.30, C: 0.20, Standard: 0 }
 const SORT_OPTIONS = ['Populärast', 'Lägsta pris', 'Högsta pris', 'Namn A–Ö']
 
 const PAGE_SIZE = 8
@@ -23,21 +22,12 @@ function ProductsContent() {
   const [loading, setLoading]     = useState(true)
   const [search, setSearch]       = useState('')
   const [selectedCat, setSelectedCat] = useState<string>('all')
-  const [authUser, setAuthUser]   = useState<any>(null)
-  const [customer, setCustomer]   = useState<any>(null)
   const [justAdded, setJustAdded] = useState<string | null>(null)
   const [sort, setSort]           = useState('Popularast')
   const [page, setPage]           = useState(1)
 
   useEffect(() => {
     const sb = createClient()
-    sb.auth.getSession().then(({ data: { session } }) => {
-      setAuthUser(session?.user ?? null)
-      if (session?.user) {
-        sb.from('customers').select('*').eq('auth_user_id', session.user.id).single()
-          .then(({ data }) => setCustomer(data))
-      }
-    })
     Promise.all([
       sb.from('products').select('*').eq('active', true).order('name'),
       sb.from('categories').select('*').order('name'),
@@ -48,12 +38,7 @@ function ProductsContent() {
     })
   }, [])
 
-  const priceList = customer?.price_list_id || 'Standard'
-  const discount  = DISCOUNT[priceList] ?? 0
-
-  function custPrice(listPrice: number) {
-    return Math.round(listPrice * (1 - discount))
-  }
+  const { customer, priceList } = cart
 
   // Filter
   let filtered = products.filter(p => {
@@ -206,7 +191,6 @@ function ProductsContent() {
       ) : (
         <div className="prod-grid" style={{ padding: '24px 40px', gap: 20 } as any}>
           {paged.map(p => {
-            const price = custPrice(p.list_price)
             const added = justAdded === p.id
             return (
               <div key={p.id} style={{ background: '#fff', borderRadius: 12, display: 'flex', flexDirection: 'column', boxShadow: '0 1px 4px rgba(0,0,0,.06)', overflow: 'hidden', transition: 'box-shadow .2s' }}
@@ -237,20 +221,13 @@ function ProductsContent() {
                     </p>
                   </Link>
                   <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: '#111' }}>{fmt(price)} kr</div>
-                      {discount > 0 ? (
-                        <div style={{ fontSize: 12, color: '#bbb', textDecoration: 'line-through' }}>{fmt(p.list_price)} kr</div>
-                      ) : (
-                        <div style={{ fontSize: 11, color: '#999' }}>exkl. moms</div>
-                      )}
-                    </div>
-                    <button
+                    <Price listPrice={p.list_price} showListPrice />
+                    {cart.canShop && <button
                       onClick={e => { popElement(e.currentTarget); addToCart(p) }}
                       style={{ width: 40, height: 40, borderRadius: '50%', background: added ? '#4CAF7D' : '#E8B84B', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .2s', flexShrink: 0 }}
                     >
                       <ShoppingCart size={16} color="#111" strokeWidth={2.5} />
-                    </button>
+                    </button>}
                   </div>
                 </div>
               </div>
@@ -278,14 +255,14 @@ function ProductsContent() {
       )}
 
       {/* ── B2B PROMPT ── */}
-      {!customer && (
+      {!cart.authLoading && !customer && (
         <div style={{ margin: '0 40px 48px', background: '#0D0F13', borderRadius: 12, padding: '36px 40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 20 }}>
           <div>
             <p style={{ color: '#E8B84B', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 6 }}>B2B-partner</p>
             <h3 style={{ color: '#F0EDE8', fontSize: 20, fontWeight: 700, margin: '0 0 6px' }}>Handla till grossistpris</h3>
             <p style={{ color: '#9BA0AB', fontSize: 14, margin: 0 }}>Registrera dig som företagskund och få upp till 40% rabatt.</p>
           </div>
-          <button onClick={openLogin} style={{ padding: '13px 28px', background: '#E8B84B', color: '#0F1115', borderRadius: 8, border: 'none', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+          <button onClick={() => openLogin(true, 'business')} style={{ padding: '13px 28px', background: '#E8B84B', color: '#0F1115', borderRadius: 8, border: 'none', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
             Bli B2B-kund
           </button>
         </div>

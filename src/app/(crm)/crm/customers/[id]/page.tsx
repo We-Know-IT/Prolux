@@ -154,7 +154,7 @@ export default function CustomerDetailPage() {
 
   function startEdit() {
     if (!customer) return
-    setEditForm({ company: customer.company, contact_name: customer.contact_name, email: customer.email, phone: customer.phone || '', city: customer.city || '', org_nr: customer.org_nr || '', price_list_id: customer.price_list_id, status: customer.status, account_manager: customer.account_manager || '', birthday: customer.birthday || '' })
+    setEditForm({ company: customer.company, contact_name: customer.contact_name, email: customer.email, phone: customer.phone || '', city: customer.city || '', org_nr: customer.org_nr || '', price_list_id: customer.price_list_id, status: customer.status, account_manager: customer.account_manager || '', birthday: customer.birthday || '', customer_type: customer.customer_type === 'private' ? 'private' : 'business' })
     setEditMode(true)
   }
 
@@ -271,6 +271,9 @@ export default function CustomerDetailPage() {
               <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 5, background: PL_BADGE_COLOR[customer.price_list_id], color: PL_TEXT_COLOR[customer.price_list_id], fontWeight: 700, marginLeft: 4 }}>
                 {PRICE_LIST_LABEL[customer.price_list_id]}
               </span>
+              {customer.customer_type === 'private' && (
+                <span className="badge badge-blue" style={{ marginLeft: 4 }}>Privatkund</span>
+              )}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -632,6 +635,18 @@ export default function CustomerDetailPage() {
                   style={{ width: '100%', padding: '9px 13px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
               </div>
             ))}
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.06em' }}>Kundtyp</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {([['business', 'Företag · exkl. moms'], ['private', 'Privat · inkl. moms']] as const).map(([t, l]) => (
+                  <button key={t} onClick={() => setEditForm(f => ({ ...f, customer_type: t }))}
+                    style={{ flex: 1, padding: '8px 4px', background: editForm.customer_type === t ? 'rgba(74,143,212,.12)' : 'var(--bg3)', border: `1px solid ${editForm.customer_type === t ? 'var(--blue)' : 'var(--line)'}`, borderRadius: 8, color: editForm.customer_type === t ? 'var(--text)' : 'var(--text2)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.06em' }}>Prislista</label>

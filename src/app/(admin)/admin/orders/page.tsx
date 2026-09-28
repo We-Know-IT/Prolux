@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import IncVat from '@/components/orders/IncVat'
+import { withVat, VAT_RATE } from '@/lib/pricing'
 import { fmt, formatDateTime } from '@/lib/utils'
 import { X } from 'lucide-react'
 import ShipOrderForm from '@/components/orders/ShipOrderForm'
@@ -100,9 +102,9 @@ export default function AdminOrders() {
 
   function exportCSV() {
     const csv = [
-      'Order #,Kund,Datum,Belopp,Status',
+      'Order #,Kund,Datum,Belopp exkl. moms,Belopp inkl. moms,Status',
       ...filtered.map(o =>
-        `${o.order_nr},${o.customers?.company || o.delivery_name || ''},${formatDateTime(o.created_at)},${o.subtotal},${STATUS_LABELS[o.status] || o.status}`
+        `${o.order_nr},${o.customers?.company || o.delivery_name || ''},${formatDateTime(o.created_at)},${o.subtotal},${o.total ?? withVat(o.subtotal)},${STATUS_LABELS[o.status] || o.status}`
       ),
     ].join('\n')
     const a = document.createElement('a')
@@ -166,7 +168,7 @@ export default function AdminOrders() {
                   <td style={{ padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
                     <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: 4, background: 'rgba(232,184,75,.15)', color: 'var(--gold)' }}>{o.price_list_id || 'Standard'}</span>
                   </td>
-                  <td style={{ padding: '16px 0', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--gold)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>{fmt(o.subtotal)} kr</td>
+                  <td style={{ padding: '16px 0', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--gold)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>{fmt(o.subtotal)} kr <span style={{ fontSize: 11, color: 'var(--text2)' }}>exkl.</span><IncVat net={o.subtotal} total={o.total} /></td>
                   <td style={{ padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: 4, background: sc.bg, color: sc.color }}>
                       {STATUS_LABELS[o.status] || o.status}
@@ -259,12 +261,18 @@ export default function AdminOrders() {
                       </div>
                       <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text3)' }}>× {item.qty} · {item.product_sku}</div>
                     </div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gold)', fontWeight: 500, whiteSpace: 'nowrap', marginLeft: 12 }}>{fmt(item.total_price)} kr</div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gold)', fontWeight: 500, whiteSpace: 'nowrap', marginLeft: 12, textAlign: 'right' }}>{fmt(item.total_price)} kr<IncVat net={item.total_price} /></div>
                   </div>
                 ))}
-                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 14, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text2)' }}>
-                  <span>TOTALT</span>
-                  <strong style={{ color: 'var(--gold)', fontSize: 18, fontWeight: 400 }}>{fmt(selectedOrder.subtotal)} kr</strong>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 14, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)' }}>
+                  <span>SUMMA EXKL. MOMS</span><span>{fmt(selectedOrder.subtotal)} kr</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 6, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text2)' }}>
+                  <span>MOMS 25 %</span><span>{fmt(selectedOrder.vat_amount ?? Math.round(selectedOrder.subtotal * VAT_RATE))} kr</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text2)' }}>
+                  <span>TOTALT INKL. MOMS</span>
+                  <strong style={{ color: 'var(--gold)', fontSize: 18, fontWeight: 400 }}>{fmt(selectedOrder.total ?? withVat(selectedOrder.subtotal))} kr</strong>
                 </div>
               </div>
 

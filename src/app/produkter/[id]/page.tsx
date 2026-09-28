@@ -4,13 +4,12 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PublicShell, usePublicCart } from '@/components/layout/PublicShell'
-import { fmt } from '@/lib/utils'
 import { stockStatus } from '@/lib/stock'
 import { ShoppingCart, Truck, ShieldCheck, ChevronRight, Minus, Plus, Package } from 'lucide-react'
 import Link from 'next/link'
 import { popElement } from '@/lib/pop'
+import Price from '@/components/shop/Price'
 
-const DISCOUNT: Record<string, number> = { A: 0.40, B: 0.30, C: 0.20, Standard: 0 }
 
 function ProductDetailContent() {
   const { id } = useParams<{ id: string }>()
@@ -20,8 +19,6 @@ function ProductDetailContent() {
   const [product, setProduct]   = useState<any>(null)
   const [related, setRelated]   = useState<any[]>([])
   const [categoryName, setCategoryName] = useState('')
-  const [authUser, setAuthUser] = useState<any>(null)
-  const [customer, setCustomer] = useState<any>(null)
   const [loading, setLoading]   = useState(true)
   const [qty, setQty]           = useState(1)
   const [activeTab, setActiveTab] = useState<'beskrivning'|'specifikationer'>('beskrivning')
@@ -29,13 +26,6 @@ function ProductDetailContent() {
 
   useEffect(() => {
     const sb = createClient()
-    sb.auth.getSession().then(({ data: { session } }) => {
-      setAuthUser(session?.user ?? null)
-      if (session?.user) {
-        sb.from('customers').select('*').eq('auth_user_id', session.user.id).single()
-          .then(({ data }) => setCustomer(data))
-      }
-    })
     sb.from('products').select('*').eq('id', id).eq('active', true).maybeSingle().then(async ({ data: p }) => {
       setProduct(p)
       setLoading(false)
@@ -53,9 +43,7 @@ function ProductDetailContent() {
     })
   }, [id])
 
-  const priceList = customer?.price_list_id || 'Standard'
-  const discount  = DISCOUNT[priceList] ?? 0
-  const custPrice = product ? Math.round(product.list_price * (1 - discount)) : 0
+  const { priceList, canShop, authUser, isPrivate } = cart
   const stock     = stockStatus(product?.stock_qty)
   // Short intro next to the price: the description's first paragraph.
   const intro     = (product?.description || '').split(/\n\s*\n/)[0].trim()
@@ -125,7 +113,7 @@ function ProductDetailContent() {
               {product.name}
             </h1>
 
-            <p style={{ fontSize: 12, color: '#aaa', marginBottom: 16 }}>Exkl. moms · Exkl. frakt</p>
+            {authUser && <p style={{ fontSize: 12, color: '#777', marginBottom: 16 }}>{isPrivate ? 'Inkl. moms' : 'Exkl. moms'} · Exkl. frakt</p>}
 
             {intro && (
               <p style={{ fontSize: 14, color: '#444', lineHeight: 1.7, marginBottom: 28, maxWidth: 440 }}>{intro}</p>
@@ -133,15 +121,12 @@ function ProductDetailContent() {
 
             {/* Price + stock */}
             <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 32, fontWeight: 800, color: '#111' }}>{fmt(custPrice)} kr</span>
-              {discount > 0 && (
-                <span style={{ fontSize: 16, color: '#aaa', textDecoration: 'line-through' }}>{fmt(product.list_price)} kr</span>
-              )}
+              <Price listPrice={product.list_price} size="lg" showListPrice />
               <span style={{ fontSize: 12, fontWeight: 700, color: stock.color, background: stock.bg, padding: '4px 10px', borderRadius: 20 }}>{stock.label}</span>
             </div>
 
-            {/* Qty + Add to cart */}
-            <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center' }}>
+            {/* Qty + Add to cart (logged-in customers only) */}
+            {canShop && <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #e0e0e0', borderRadius: 8, overflow: 'hidden' }}>
                 <button onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 42, height: 52, border: 'none', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555' }}>
                   <Minus size={16} />
@@ -158,7 +143,8 @@ function ProductDetailContent() {
                 <ShoppingCart size={18} />
                 {added ? 'Tillagd!' : 'Lägg i varukorg'}
               </button>
-            </div>
+            </div>}
+            {!authUser && <p style={{ fontSize: 13, color: '#555', margin: '0 0 20px' }}>Logga in eller skapa ett konto för att se priset och beställa.</p>}
 
             {/* Trust badges */}
             <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
@@ -227,7 +213,6 @@ function ProductDetailContent() {
             </div>
             <div className="rel-grid">
               {related.map(p => {
-                const rPrice = Math.round(p.list_price * (1 - discount))
                 return (
                   <div key={p.id} style={{ border: '1px solid #e8e8e8', borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
                     <Link href={`/produkter/${p.id}`} style={{ textDecoration: 'none', display: 'block' }}>
@@ -245,12 +230,13 @@ function ProductDetailContent() {
                       <Link href={`/produkter/${p.id}`} style={{ textDecoration: 'none' }}>
                         <p style={{ fontSize: 13, fontWeight: 600, color: '#111', margin: '4px 0 12px', lineHeight: 1.3 }}>{p.name}</p>
                       </Link>
-                      <button
+                      <div style={{ marginBottom: 10 }}><Price listPrice={p.list_price} size="sm" /></div>
+                      {canShop && <button
                         onClick={e => { popElement(e.currentTarget); cart.addItem({ id: p.id, name: p.name, brand: p.brand, list_price: p.list_price, image_url: p.image_url, unit: p.unit }, priceList) }}
                         style={{ width: '100%', padding: '8px 0', background: '#E8B84B', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: 'pointer', color: '#0F1115', letterSpacing: '.04em', textTransform: 'uppercase' }}
                       >
                         KÖP NU
-                      </button>
+                      </button>}
                     </div>
                   </div>
                 )

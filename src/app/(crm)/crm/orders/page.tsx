@@ -4,6 +4,8 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Product, Customer, Category, CartItem, Order, OrderItem, OrderStatus, ORDER_STATUS_LABEL } from '@/types'
 import { custPrice, fmt, formatDateTime } from '@/lib/utils'
+import IncVat from '@/components/orders/IncVat'
+import { withVat } from '@/lib/pricing'
 import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star, X } from 'lucide-react'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { currentStaff, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
@@ -77,7 +79,7 @@ function ProductRow({ p, selectedCustomer, getQty, addToCart, updateQty, badge, 
         </div>
         <div style={{ fontSize: 11, color: 'var(--text3)' }}>{p.brand} · {p.unit}</div>
       </div>
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)', flexShrink: 0 }}>{fmt(price)} kr</div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)', flexShrink: 0, textAlign: 'right' }}>{fmt(price)} kr<IncVat net={price} /></div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
         <button onClick={() => updateQty(p.id, -1)} style={{ width: 28, height: 28, borderRadius: 6, background: qty > 0 ? 'var(--bg4)' : 'transparent', border: `1px solid ${qty > 0 ? 'var(--border)' : 'transparent'}`, color: 'var(--text)', cursor: qty > 0 ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: qty > 0 ? 1 : 0 }}>
           <Minus size={12} />
@@ -129,7 +131,7 @@ function ProductSheet({ p, categoryName, selectedCustomer, qty, onAdd, onRemove,
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--gold)' }}>{fmt(price)} kr</span>
             {price < p.list_price && <span style={{ fontSize: 15, color: 'var(--text2)', textDecoration: 'line-through' }}>{fmt(p.list_price)} kr</span>}
-            <span style={{ fontSize: 12, color: 'var(--text2)' }}>exkl. moms{selectedCustomer ? ` · prislista ${pl}` : ''}</span>
+            <span style={{ fontSize: 12, color: 'var(--text2)' }}>exkl. moms · {fmt(withVat(price))} kr inkl. moms{selectedCustomer ? ` · prislista ${pl}` : ''}</span>
           </div>
           <span style={{ alignSelf: 'flex-start', fontSize: 12, fontWeight: 700, color: stock.color, background: stock.bg, padding: '4px 10px', borderRadius: 20 }}>{stock.label}</span>
           {p.description && (
@@ -523,7 +525,7 @@ export default function CrmOrdersPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 480 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)' }}>
-              {['Order', 'Datum', 'Kund', 'Säljare', 'Summa inkl. moms', 'Status'].map(h => (
+              {['Order', 'Datum', 'Kund', 'Säljare', 'Summa', 'Status'].map(h => (
                 <th key={h} style={{ padding: '12px 16px', textAlign: 'left', color: 'var(--text3)', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
               ))}
             </tr>
@@ -545,7 +547,7 @@ export default function CrmOrdersPage() {
                     <td style={{ padding: '12px 16px', color: 'var(--text2)' }}>{formatDateTime(o.created_at)}</td>
                     <td style={{ padding: '12px 16px', color: 'var(--text)', fontWeight: 500 }}>{(o as any).customers?.company || '—'}</td>
                     <td style={{ padding: '12px 16px', color: o.assigned_to ? 'var(--text2)' : 'var(--red)' }}>{o.assigned_to || 'Saknas'}</td>
-                    <td style={{ padding: '12px 16px', color: 'var(--gold)', fontWeight: 700 }}>{fmt(o.total)} kr</td>
+                    <td style={{ padding: '12px 16px', color: 'var(--gold)', fontWeight: 700 }}>{fmt(o.subtotal)} kr <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text2)' }}>exkl.</span><IncVat net={o.subtotal} total={o.total} /></td>
                     <td style={{ padding: '12px 16px' }}>
                       {isOpen ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -760,7 +762,7 @@ export default function CrmOrdersPage() {
                     {hasDiscount && <div style={{ fontSize: 11, color: 'var(--text3)', textDecoration: 'line-through' }}>{fmt(i.product.list_price)} kr</div>}
                     <div style={{ color: hasDiscount ? 'var(--green)' : 'var(--text2)', fontWeight: hasDiscount ? 600 : 400 }}>{fmt(i.unitPrice)} kr</div>
                   </td>
-                  <td style={{ padding: '11px 14px', fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap' }}>{fmt(i.qty * i.unitPrice)} kr</td>
+                  <td style={{ padding: '11px 14px', fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap' }}>{fmt(i.qty * i.unitPrice)} kr<IncVat net={i.qty * i.unitPrice} /></td>
                 </tr>
               )
             })}
@@ -774,6 +776,9 @@ export default function CrmOrdersPage() {
               <span>-{fmt(discountAmt)} kr</span>
             </div>
           )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text)' }}>
+            <span>Summa exkl. moms</span><span>{fmt(afterDiscount)} kr</span>
+          </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text2)' }}>
             <span>Moms (25%)</span><span>{fmt(vat)} kr</span>
           </div>
@@ -942,7 +947,7 @@ export default function CrmOrdersPage() {
       {/* Mobile: floating cart button */}
       {isMobile && cart.length > 0 && !showMobileCart && (
         <button onClick={() => setShowMobileCart(true)} style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: 'var(--gold)', border: 'none', borderRadius: 30, color: '#111', fontSize: 14, fontWeight: 700, padding: '14px 28px', cursor: 'pointer', zIndex: 500, display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 4px 20px rgba(232,184,75,.4)' }}>
-          <ShoppingCart size={18} /> Varukorg ({cartCount}) · {fmt(subtotal)} kr
+          <ShoppingCart size={18} /> Varukorg ({cartCount}) · {fmt(subtotal)} kr exkl. moms
         </button>
       )}
 
@@ -967,11 +972,14 @@ export default function CrmOrdersPage() {
                     <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--gold)', minWidth: 20, textAlign: 'center' }}>{i.qty}</span>
                     <button onClick={() => updateQty(i.product.id, 1)} style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--bg4)', border: '1px solid var(--line)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={12} /></button>
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginLeft: 12, minWidth: 60, textAlign: 'right' }}>{fmt(i.qty * i.unitPrice)} kr</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginLeft: 12, minWidth: 60, textAlign: 'right' }}>{fmt(i.qty * i.unitPrice)} kr<IncVat net={i.qty * i.unitPrice} /></div>
                 </div>
               ))}
             </div>
             <div style={{ padding: '14px 20px', borderTop: '1px solid var(--line)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text)', marginBottom: 6 }}>
+                <span>Summa exkl. moms</span><span>{fmt(subtotal)} kr</span>
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text2)', marginBottom: 6 }}>
                 <span>Moms (25%)</span><span>{fmt(Math.round(subtotal * 0.25))} kr</span>
               </div>
@@ -1030,7 +1038,7 @@ export default function CrmOrdersPage() {
                             <button onClick={() => addToCart(i.product)} style={{ width: 22, height: 22, borderRadius: 4, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={10} /></button>
                           </div>
                         </td>
-                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text)' }}>{fmt(i.qty * i.unitPrice)} kr</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text)' }}>{fmt(i.qty * i.unitPrice)} kr<IncVat net={i.qty * i.unitPrice} /></td>
                       </tr>
                     )
                   })}
@@ -1039,7 +1047,7 @@ export default function CrmOrdersPage() {
             </div>
             <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13, color: 'var(--text2)' }}>
-                <span>Delsumma</span><span>{fmt(subtotal)} kr</span>
+                <span>Summa exkl. moms</span><span>{fmt(subtotal)} kr</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, fontSize: 13, color: 'var(--text2)' }}>
                 <span>Moms (25%)</span><span>{fmt(Math.round(subtotal * 0.25))} kr</span>

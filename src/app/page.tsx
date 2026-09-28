@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { PublicShell, useLoginModal, usePublicCart } from '@/components/layout/PublicShell'
+import Price from '@/components/shop/Price'
 import { fmt, formatDate } from '@/lib/utils'
 import { DEFAULT_HOME, DEFAULT_TRUST, HomeContent as SiteHomeContent } from '@/lib/site-content'
 import { useSiteContent, useIsEditingSite, EditableText, EditableImage } from '@/components/site-edit/SiteEdit'
@@ -230,8 +231,7 @@ function PortalHome({ user, products }: { user: SupaUser; products: any[] }) {
                       <div style={{ fontSize: 13, fontWeight: 600, color: '#111', flex: 1, lineHeight: 1.3, marginBottom: 10 }}>{p.name}</div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                         <div>
-                          <div style={{ fontSize: 17, fontWeight: 800, color: '#111' }}>{fmt(price)} kr</div>
-                          {disc > 0 && <div style={{ fontSize: 10, color: '#bbb' }}><s>{fmt(p.list_price)}</s> listpris</div>}
+                          <Price listPrice={p.list_price} showListPrice />
                         </div>
                         <Link href="/produkter" style={{ padding: '7px 14px', borderRadius: 7, background: '#111', color: '#fff', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>Beställ</Link>
                       </div>
@@ -674,12 +674,11 @@ function CustomerPortalSection({ customer, authUser, openLogin }: { customer: an
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
                 {recommended.map(p => {
-                  const price = Math.round(p.list_price * (1 - disc))
                   return (
                     <div key={p.id} style={{ background: '#F9F7F3', border: '1px solid rgba(0,0,0,.06)', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: '#111', lineHeight: 1.3 }}>{p.name}</div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: '#C9971A' }}>{fmt(price)} kr</div>
+                        <Price listPrice={p.list_price} size="sm" />
                         <button onClick={e => { popElement(e.currentTarget); cart.addItem({ id: p.id, name: p.name, brand: p.brand || '', list_price: p.list_price, image_url: p.image_url, unit: p.unit || '' }, pl) }}
                           style={{ padding: '5px 10px', borderRadius: 6, background: '#111', color: '#fff', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
                           + Lägg till
@@ -934,16 +933,13 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
                       <div style={{ fontSize: 10, color: '#bbb', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3 }}>{p.brand}</div>
                       <Link href={`/produkter/${p.id}`} style={{ fontSize: 13, fontWeight: 600, color: '#111', flex: 1, lineHeight: 1.35, minHeight: '2.7em', marginBottom: 12, textDecoration: 'none' }}>{p.name}</Link>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                        <div>
-                          <div style={{ fontSize: 16, fontWeight: 800, color: '#111' }}>{fmt(Math.round(p.list_price * (1 - (DISCOUNT[priceList] ?? 0))))} kr</div>
-                          <div style={{ fontSize: 10, color: '#aaa' }}>exkl. moms</div>
-                        </div>
-                        <button onClick={e => { popElement(e.currentTarget); cart.addItem(p, priceList) }} aria-label={`Lägg ${p.name} i varukorgen`}
+                        <Price listPrice={p.list_price} size="sm" />
+                        {cart.canShop && <button onClick={e => { popElement(e.currentTarget); cart.addItem(p, priceList) }} aria-label={`Lägg ${p.name} i varukorgen`}
                           style={{ width: 36, height: 36, borderRadius: '50%', background: '#C9971A', color: '#111', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background .15s' }}
                           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#111'; (e.currentTarget as HTMLButtonElement).style.color = '#fff' }}
                           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#C9971A'; (e.currentTarget as HTMLButtonElement).style.color = '#111' }}>
                           <ShoppingCart size={14} />
-                        </button>
+                        </button>}
                       </div>
                     </div>
                   </div>

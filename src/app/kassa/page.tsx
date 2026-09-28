@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { PublicShell, useLoginModal, usePublicCart } from '@/components/layout/PublicShell'
 import { fmt } from '@/lib/utils'
-import { Package, Minus, Plus, Trash2, FileText, CheckCircle, ArrowLeft, Tag, X } from 'lucide-react'
+import { withVat } from '@/lib/pricing'
+import { Package, Minus, Plus, Trash2, FileText, CheckCircle, ArrowLeft, Tag, X, Lock } from 'lucide-react'
 
 // Matches the free-shipping promise on the site. The cost below it is not
 // set yet, so it is shown as added on top.
@@ -36,6 +37,7 @@ function CheckoutContent() {
   const [error, setError]       = useState('')
   const [done, setDone]         = useState<(Totals & { order_nr: number; email: string }) | null>(null)
   const prefilled = useRef(false)
+  const isPrivate = cart.isPrivate
 
   // Fill in what we know about a logged-in customer, once.
   useEffect(() => {
@@ -58,7 +60,7 @@ function CheckoutContent() {
   // totals shown are exactly what the order will be.
   const itemsKey = JSON.stringify(cart.items.map(i => [i.id, i.qty]))
   useEffect(() => {
-    if (cart.items.length === 0) return
+    if (cart.items.length === 0 || !cart.canShop) return
     let cancelled = false
     const t = setTimeout(async () => {
       const { data, error: err } = await createClient().rpc('place_order', {
@@ -76,14 +78,15 @@ function CheckoutContent() {
       setTotals(data as Totals)
     }, 250)
     return () => { cancelled = true; clearTimeout(t) }
-  }, [itemsKey, code, cart.priceList]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [itemsKey, code, cart.priceList, cart.canShop]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function applyCode() {
     setCodeError('')
     if (codeInput.trim()) setCode(codeInput.trim().toUpperCase())
   }
 
-  const required: (keyof typeof EMPTY_FORM)[] = ['company', 'contact_name', 'email', 'address', 'zip', 'city']
+  // Private customers have no company: their name goes on the order instead.
+  const required: (keyof typeof EMPTY_FORM)[] = isPrivate ? ['contact_name', 'email', 'address', 'zip', 'city'] : ['company', 'contact_name', 'email', 'address', 'zip', 'city']
   const missing = required.filter(k => !form[k].trim())
   const emailOk = /^\S+@\S+\.\S+$/.test(form.email.trim())
 
@@ -94,7 +97,7 @@ function CheckoutContent() {
     setPlacing(true)
     const { data, error: err } = await createClient().rpc('place_order', {
       p_items: cart.items.map(i => ({ product_id: i.id, qty: i.qty })),
-      p_delivery: form,
+      p_delivery: isPrivate ? { ...form, company: form.contact_name, org_nr: '' } : form,
       p_campaign_code: code || null,
     })
     setPlacing(false)
@@ -118,11 +121,31 @@ function CheckoutContent() {
       <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 32, fontWeight: 400, color: '#111', margin: '0 0 10px' }}>Tack för din beställning!</h1>
       <p style={{ fontSize: 15, color: '#444', margin: '0 0 6px' }}>Order <strong>#{done.order_nr}</strong> har tagits emot.</p>
       <p style={{ fontSize: 14, color: '#666', margin: '0 0 28px', lineHeight: 1.6 }}>
-        Vi bekräftar ordern och skickar fakturan till {done.email}. Totalt {fmt(done.total)} kr inkl. moms.
+        Vi bekräftar ordern och skickar fakturan till {done.email}. Totalt {fmt(done.total)} kr inkl. moms{!isPrivate && ` (${fmt(done.subtotal)} kr exkl. moms)`}.
       </p>
       <Link href="/produkter" style={{ display: 'inline-block', padding: '13px 28px', borderRadius: 9, background: '#111', color: '#fff', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
         Fortsätt handla
       </Link>
+    </div>
+  )
+
+  // Shopping needs an account (and a customer one: staff order from the CRM).
+  if (cart.authLoading) return <div style={{ minHeight: '60vh' }} />
+  if (!cart.canShop) return (
+    <div style={{ maxWidth: 560, margin: '0 auto', padding: '140px 20px 100px', textAlign: 'center' }}>
+      <Lock size={44} color="#999" strokeWidth={1.5} style={{ margin: '0 auto 16px', display: 'block' }} />
+      <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 400, color: '#111', margin: '0 0 10px' }}>
+        {cart.authUser ? 'Kassan är för kundkonton' : 'Logga in för att handla'}
+      </h1>
+      <p style={{ fontSize: 14, color: '#555', margin: '0 0 24px', lineHeight: 1.6 }}>
+        {cart.authUser ? 'Personal lägger ordrar för kunder i CRM:et.' : 'Du behöver ett konto för att se priser och beställa.'}
+      </p>
+      {!cart.authUser && (
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button type="button" onClick={() => openLogin()} style={{ padding: '13px 28px', borderRadius: 9, background: '#111', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer' }}>Logga in</button>
+          <button type="button" onClick={() => openLogin(true)} style={{ padding: '13px 28px', borderRadius: 9, background: '#E8B84B', color: '#0D0900', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer' }}>Skapa konto</button>
+        </div>
+      )}
     </div>
   )
 
@@ -162,21 +185,12 @@ function CheckoutContent() {
             value={form.website} onChange={e => setForm(f => ({ ...f, website: e.target.value }))} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          {!cart.authLoading && !cart.authUser && (
-            <div style={{ ...card, padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 14, color: '#333' }}>Har du ett företagskonto? Logga in för dina priser.</span>
-              <button type="button" onClick={openLogin} style={{ padding: '8px 16px', borderRadius: 8, background: 'transparent', border: '1.5px solid #111', color: '#111', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                Logga in
-              </button>
-            </div>
-          )}
-
           <section style={card}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, color: '#111', margin: '0 0 16px' }}>Företag & kontakt</h2>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: '#111', margin: '0 0 16px' }}>{isPrivate ? 'Kontaktuppgifter' : 'Företag & kontakt'}</h2>
             <div className="kassa-2">
-              {field('company', 'Företag', { req: true, auto: 'organization' })}
-              {field('org_nr', 'Org.nr', { placeholder: '556123-4567' })}
-              {field('contact_name', 'Kontaktperson', { req: true, auto: 'name' })}
+              {!isPrivate && field('company', 'Företag', { req: true, auto: 'organization' })}
+              {!isPrivate && field('org_nr', 'Org.nr', { placeholder: '556123-4567' })}
+              {field('contact_name', isPrivate ? 'Namn' : 'Kontaktperson', { req: true, auto: 'name' })}
               {field('phone', 'Telefon', { type: 'tel', auto: 'tel' })}
             </div>
             <div style={{ marginTop: 14 }}>{field('email', 'E-post', { type: 'email', req: true, auto: 'email' })}</div>
@@ -196,12 +210,12 @@ function CheckoutContent() {
               <FileText size={17} /> Betalning: faktura
             </h2>
             <p style={{ fontSize: 13, color: '#555', margin: '0 0 16px', lineHeight: 1.6 }}>
-              Vi bekräftar ordern och skickar fakturan till er. Ange gärna er referens eller inköpsnummer.
+              {isPrivate ? 'Vi bekräftar ordern och skickar fakturan till dig.' : 'Vi bekräftar ordern och skickar fakturan till er. Ange gärna er referens eller inköpsnummer.'}
             </p>
-            <div className="kassa-2">
+            {!isPrivate && <div className="kassa-2">
               {field('reference', 'Er referens / PO-nummer')}
               {field('invoice_email', 'Faktura-e-post', { type: 'email', placeholder: 'Om annan än ovan' })}
-            </div>
+            </div>}
             <div style={{ marginTop: 14 }}>
               <label style={label} htmlFor="k-message">Meddelande</label>
               <textarea id="k-message" rows={3} value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
@@ -227,7 +241,10 @@ function CheckoutContent() {
                       <button type="button" aria-label="Öka antal" onClick={() => cart.updateQty(item.id, item.qty + 1)} style={{ width: 28, height: 28, background: '#F5F3EE', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#333' }}><Plus size={12} /></button>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: '#C9971A' }}>{fmt(item.unit_price * item.qty)} kr</span>
+                      <span style={{ textAlign: 'right', lineHeight: 1.2 }}>
+                        <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: '#C9971A' }}>{fmt(isPrivate ? withVat(item.unit_price * item.qty) : item.unit_price * item.qty)} kr</span>
+                        <span style={{ display: 'block', fontSize: 10, color: '#777' }}>{isPrivate ? 'inkl. moms' : `exkl. moms · ${fmt(withVat(item.unit_price * item.qty))} kr inkl.`}</span>
+                      </span>
                       <button type="button" aria-label="Ta bort" onClick={() => cart.removeItem(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999', padding: 2 }}><Trash2 size={14} /></button>
                     </div>
                   </div>
@@ -262,19 +279,34 @@ function CheckoutContent() {
               <div style={{ color: '#777' }}>Räknar…</div>
             ) : (
               <>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Delsumma exkl. moms</span><span style={{ color: '#111' }}>{fmt(totals.subtotal)} kr</span></div>
-                {totals.discount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#1F7A4D' }}><span>Kampanjrabatt</span><span>−{fmt(totals.discount)} kr</span></div>}
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Moms 25 %</span><span style={{ color: '#111' }}>{fmt(totals.vat)} kr</span></div>
+                {isPrivate ? (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Varor inkl. moms</span><span style={{ color: '#111' }}>{fmt(withVat(totals.subtotal))} kr</span></div>
+                    {totals.discount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#1F7A4D' }}><span>Kampanjrabatt</span><span>−{fmt(withVat(totals.subtotal) - totals.total)} kr</span></div>}
+                  </>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Delsumma exkl. moms</span><span style={{ color: '#111' }}>{fmt(totals.subtotal)} kr</span></div>
+                    {totals.discount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#1F7A4D' }}><span>Kampanjrabatt</span><span>−{fmt(totals.discount)} kr</span></div>}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#111' }}><span>Totalt exkl. moms</span><span>{fmt(totals.subtotal - totals.discount)} kr</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Moms 25 %</span><span style={{ color: '#111' }}>{fmt(totals.vat)} kr</span></div>
+                  </>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>Frakt</span>
                   <span style={{ color: totals.subtotal >= FREE_SHIPPING_FROM ? '#1F7A4D' : '#111' }}>{totals.subtotal >= FREE_SHIPPING_FROM ? 'Fri frakt' : 'Tillkommer'}</span>
                 </div>
                 {totals.subtotal < FREE_SHIPPING_FROM && (
-                  <div style={{ fontSize: 12, color: '#666' }}>Fri frakt från {fmt(FREE_SHIPPING_FROM)} kr exkl. moms – {fmt(FREE_SHIPPING_FROM - totals.subtotal)} kr kvar.</div>
+                  <div style={{ fontSize: 12, color: '#666' }}>
+                    {isPrivate
+                      ? `Fri frakt från ${fmt(withVat(FREE_SHIPPING_FROM))} kr inkl. moms – ${fmt(withVat(FREE_SHIPPING_FROM) - withVat(totals.subtotal))} kr kvar.`
+                      : `Fri frakt från ${fmt(FREE_SHIPPING_FROM)} kr exkl. moms – ${fmt(FREE_SHIPPING_FROM - totals.subtotal)} kr kvar.`}
+                  </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, paddingTop: 10, borderTop: '1px solid rgba(0,0,0,.07)', fontSize: 17, fontWeight: 700, color: '#111' }}>
                   <span>Totalt inkl. moms</span><span style={{ color: '#C9971A' }}>{fmt(totals.total)} kr</span>
                 </div>
+                {isPrivate && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666' }}><span>Varav moms 25 %</span><span>{fmt(totals.vat)} kr</span></div>}
               </>
             )}
           </div>

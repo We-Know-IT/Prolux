@@ -10,8 +10,10 @@ import { DEFAULT_CONTACT, ContactContent } from '@/lib/site-content'
 import { SiteEditProvider, useSiteContent, EditableText } from '@/components/site-edit/SiteEdit'
 import type { User as SupaUser } from '@supabase/supabase-js'
 import { userRole } from '@/lib/roles'
+import { DISCOUNT, VAT_RATE, withVat, customerTypeOf, VISITOR_TYPE_KEY, type CustomerType } from '@/lib/pricing'
+import VisitorTypeModal from '@/components/shop/VisitorTypeModal'
 
-export const LoginModalContext = createContext<() => void>(() => {})
+export const LoginModalContext = createContext<(startReg?: boolean, type?: 'business' | 'private') => void>(() => {})
 export function useLoginModal() { return useContext(LoginModalContext) }
 
 /* ── Cart context ───────────────────────────────────────── */
@@ -29,15 +31,16 @@ interface CartCtx {
   authLoading: boolean
   customer: any
   priceList: string
+  isPrivate: boolean   // private customers see prices incl. VAT
+  canShop: boolean     // logged-in customers; everyone else must log in first
 }
 export const CartContext = createContext<CartCtx>({
   items: [], addItem: () => {}, removeItem: () => {}, updateQty: () => {}, clearCart: () => {},
   count: 0, subtotal: 0, openCart: () => {},
-  authUser: null, authLoading: true, customer: null, priceList: 'Standard',
+  authUser: null, authLoading: true, customer: null, priceList: 'Standard', isPrivate: false, canShop: false,
 })
 export function usePublicCart() { return useContext(CartContext) }
 
-const DISCOUNT: Record<string, number> = { A: 0.40, B: 0.30, C: 0.20, Standard: 0 }
 const CART_KEY = 'prolux-cart'
 
 const NAV_PUBLIC = [
@@ -82,7 +85,10 @@ function PublicShellInner({ children }: { children: ReactNode }) {
   const [authLoading, setAuthLoading] = useState(true)
   const [customer, setCustomer]   = useState<any>(null)
   const [regMode, setRegMode] = useState(false)
-  const [regForm, setRegForm] = useState({ email: '', password: '', company: '', contact_name: '', phone: '' })
+  const EMPTY_REG = { email: '', password: '', company: '', org_nr: '', contact_name: '', phone: '' }
+  const [regForm, setRegForm] = useState(EMPTY_REG)
+  const [regType, setRegType] = useState<CustomerType>('business')
+  const [visitorOpen, setVisitorOpen] = useState(false)
   const [regLoading, setRegLoading] = useState(false)
   const [regError, setRegError] = useState('')
   const [regDone, setRegDone] = useState(false)
@@ -137,8 +143,26 @@ function PublicShellInner({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  function openLogin(startReg = false)  { setLoginOpen(true); setMenuOpen(false); setError(''); setRegError(''); setRegMode(startReg) }
-  function closeLogin() { setLoginOpen(false); setEmail(''); setPassword(''); setError(''); setRegMode(false); setRegForm({ email: '', password: '', company: '', contact_name: '', phone: '' }); setRegError(''); setRegDone(false) }
+  function openLogin(startReg = false, type?: CustomerType) {
+    setLoginOpen(true); setMenuOpen(false); setError(''); setRegError(''); setRegMode(startReg === true)
+    let t = type
+    if (!t) { try { t = localStorage.getItem(VISITOR_TYPE_KEY) === 'private' ? 'private' : 'business' } catch { t = 'business' } }
+    setRegType(t)
+  }
+  function closeLogin() { setLoginOpen(false); setEmail(''); setPassword(''); setError(''); setRegMode(false); setRegForm(EMPTY_REG); setRegError(''); setRegDone(false) }
+
+  // First visit without an account: ask "Företag eller privat?" once.
+  useEffect(() => {
+    if (authLoading || authUser) return
+    let chosen: string | null = null
+    try { chosen = localStorage.getItem(VISITOR_TYPE_KEY) } catch { /* storage blocked: ask anyway */ }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!chosen) setVisitorOpen(true)
+  }, [authLoading, authUser])
+
+  function rememberVisitorType(t: CustomerType | 'unknown') {
+    try { if (!localStorage.getItem(VISITOR_TYPE_KEY) || t !== 'unknown') localStorage.setItem(VISITOR_TYPE_KEY, t) } catch { /* ignore */ }
+  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -161,7 +185,8 @@ function PublicShellInner({ children }: { children: ReactNode }) {
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
-    if (!regForm.company.trim()) { setRegError('Företagsnamn krävs'); return }
+    const priv = regType === 'private'
+    if (priv ? !regForm.contact_name.trim() : !regForm.company.trim()) { setRegError(priv ? 'Namn krävs' : 'Företagsnamn krävs'); return }
     setRegLoading(true); setRegError('')
     const sb = createClient()
     const { data, error: signUpErr } = await sb.auth.signUp({
@@ -172,20 +197,22 @@ function PublicShellInner({ children }: { children: ReactNode }) {
     if (signUpErr) { setRegError(signUpErr.message); setRegLoading(false); return }
     if (data.user) {
       const { data: custData, error: custErr } = await sb.from('customers').insert({
-        company: regForm.company,
+        company: priv ? regForm.contact_name.trim() : regForm.company.trim(),
         contact_name: regForm.contact_name,
+        org_nr: priv ? null : (regForm.org_nr.trim() || null),
         email: regForm.email,
         phone: regForm.phone,
         auth_user_id: data.user.id,
         price_list_id: 'Standard',
         status: 'active',
+        customer_type: regType,
       }).select().single()
       if (!custErr && custData) {
         await sb.from('activities').insert({
           customer_id: custData.id,
           type: 'note',
           title: 'Nytt konto skapat',
-          body: `Kund registrerade sig via webbshoppen.\n\nFöretag: ${custData.company}\nKontakt: ${custData.contact_name || '—'}\nE-post: ${custData.email}\nTelefon: ${custData.phone || '—'}`,
+          body: `${priv ? 'Privatkund' : 'Företagskund'} registrerade sig via webbshoppen.\n\n${priv ? 'Namn' : 'Företag'}: ${custData.company}\nKontakt: ${custData.contact_name || '—'}\nE-post: ${custData.email}\nTelefon: ${custData.phone || '—'}`,
           created_by: 'System',
         })
       }
@@ -220,7 +247,14 @@ function PublicShellInner({ children }: { children: ReactNode }) {
     return cartItems.map(i => ({ ...i, unit_price: Math.round(i.list_price * (1 - disc)) }))
   }, [cartItems, priceList])
 
+  const role = userRole(authUser)
+  const isCustomer = !!authUser && role !== 'admin' && role !== 'crm'
+  const isPrivate = customerTypeOf(customer) === 'private'
+  // Prices and the cart are for logged-in customers only.
+  const canShop = isCustomer
+
   const addItem = useCallback((p: { id: string; name: string; brand: string; list_price: number; image_url: string | null; unit: string }, pl: string) => {
+    if (!canShop) { openLogin(); return }
     const disc = DISCOUNT[pl] ?? 0
     const unit_price = Math.round(p.list_price * (1 - disc))
     setCartItems(prev => {
@@ -230,7 +264,7 @@ function PublicShellInner({ children }: { children: ReactNode }) {
     })
     // The cart stays closed; its counter pops instead (see cartBump).
     setCartBump(b => b + 1)
-  }, [])
+  }, [canShop]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const removeItem = useCallback((id: string) => setCartItems(prev => prev.filter(i => i.id !== id)), [])
   const updateQty  = useCallback((id: string, qty: number) => {
@@ -241,11 +275,9 @@ function PublicShellInner({ children }: { children: ReactNode }) {
   const count      = cartItems.reduce((s, i) => s + i.qty, 0)
   const subtotal   = pricedItems.reduce((s, i) => s + i.unit_price * i.qty, 0)
 
-  const role = userRole(authUser)
+  const regBlocked = regLoading || !regForm.email || !regForm.password || !(regType === 'private' ? regForm.contact_name : regForm.company).trim()
   const displayName = customer?.contact_name || authUser?.user_metadata?.full_name || authUser?.email?.split('@')[0] || 'Kund'
-  const isCustomer = authUser && role !== 'admin' && role !== 'crm'
-  // Guests can shop too, so everyone but staff gets the cart button.
-  const showCart = !authUser || isCustomer
+  const showCart = canShop
 
   // Compact: icon with a count badge, so the header never runs out of room.
   const cartButton = showCart ? (
@@ -263,7 +295,7 @@ function PublicShellInner({ children }: { children: ReactNode }) {
 
   const navBg = scrolled ? 'rgba(13,15,20,.97)' : 'rgba(13,15,20,.92)'
 
-  const cartCtx: CartCtx = { items: pricedItems, addItem, removeItem, updateQty, clearCart, count, subtotal, openCart: () => setCartOpen(true), authUser, authLoading, customer, priceList }
+  const cartCtx: CartCtx = { items: pricedItems, addItem, removeItem, updateQty, clearCart, count, subtotal, openCart: () => setCartOpen(true), authUser, authLoading, customer, priceList, isPrivate, canShop }
 
   return (
     <CartContext.Provider value={cartCtx}>
@@ -462,7 +494,7 @@ function PublicShellInner({ children }: { children: ReactNode }) {
         <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(0,0,0,.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div>
             <div style={{ fontSize: 17, fontWeight: 700, color: '#111' }}>Varukorg</div>
-            {count > 0 && <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{count} {count === 1 ? 'vara' : 'varor'} · {fmt(subtotal)} kr exkl. moms</div>}
+            {count > 0 && <div style={{ fontSize: 12, color: '#777', marginTop: 2 }}>{count} {count === 1 ? 'vara' : 'varor'} · {isPrivate ? `${fmt(withVat(subtotal))} kr inkl. moms` : `${fmt(subtotal)} kr exkl. moms`}</div>}
           </div>
           <button onClick={() => setCartOpen(false)} style={{ padding: 8, background: '#F5F3EE', border: 'none', borderRadius: 8, cursor: 'pointer', color: '#555', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <X size={18} />
@@ -500,7 +532,10 @@ function PublicShellInner({ children }: { children: ReactNode }) {
                         </button>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ fontSize: 15, fontWeight: 700, color: '#C9971A' }}>{fmt(item.unit_price * item.qty)} kr</span>
+                        <span style={{ textAlign: 'right', lineHeight: 1.2 }}>
+                          <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: '#C9971A' }}>{fmt(isPrivate ? withVat(item.unit_price * item.qty) : item.unit_price * item.qty)} kr</span>
+                          <span style={{ display: 'block', fontSize: 10, color: '#777' }}>{isPrivate ? 'inkl. moms' : `exkl. moms · ${fmt(withVat(item.unit_price * item.qty))} kr inkl.`}</span>
+                        </span>
                         <button onClick={() => removeItem(item.id)} style={{ padding: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: '#ccc' }}>
                           <Trash2 size={14} />
                         </button>
@@ -512,17 +547,17 @@ function PublicShellInner({ children }: { children: ReactNode }) {
             </div>
 
             <div style={{ padding: '16px 24px 24px', borderTop: '1px solid rgba(0,0,0,.07)', flexShrink: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 13, color: '#888' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 13, color: '#666' }}>
                 <span>Delsumma exkl. moms</span>
                 <span style={{ fontWeight: 600, color: '#111' }}>{fmt(subtotal)} kr</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, fontSize: 12, color: '#bbb' }}>
-                <span>Moms 25%</span>
-                <span>{fmt(Math.round(subtotal * 0.25))} kr</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, fontSize: 12, color: '#777' }}>
+                <span>{isPrivate ? 'Varav moms 25 %' : 'Moms 25 %'}</span>
+                <span>{fmt(Math.round(subtotal * VAT_RATE))} kr</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20, fontSize: 16, fontWeight: 700, color: '#111', paddingTop: 12, borderTop: '1px solid rgba(0,0,0,.07)' }}>
                 <span>Totalt inkl. moms</span>
-                <span style={{ color: '#C9971A' }}>{fmt(subtotal + Math.round(subtotal * 0.25))} kr</span>
+                <span style={{ color: '#C9971A' }}>{fmt(withVat(subtotal))} kr</span>
               </div>
               <Link href="/kassa" onClick={() => setCartOpen(false)}
                 style={{ display: 'block', width: '100%', padding: '14px', borderRadius: 9, background: '#111', color: '#fff', fontSize: 15, fontWeight: 700, textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}>
@@ -606,6 +641,15 @@ function PublicShellInner({ children }: { children: ReactNode }) {
         </div>
       </footer>
 
+      {visitorOpen && !loginOpen && (
+        <VisitorTypeModal
+          onChoose={t => rememberVisitorType(t)}
+          onClose={() => { rememberVisitorType('unknown'); setVisitorOpen(false) }}
+          onLogin={() => { setVisitorOpen(false); openLogin(false) }}
+          onSignup={t => { setVisitorOpen(false); openLogin(true, t) }}
+        />
+      )}
+
       {/* ── LOGIN / REGISTER MODAL ──────────────────────────── */}
       {loginOpen && (
         <div onClick={closeLogin} style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, animation: 'fadeIn .15s ease' }}>
@@ -675,14 +719,30 @@ function PublicShellInner({ children }: { children: ReactNode }) {
               </div>
             ) : (
               <form onSubmit={handleSignup} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <p style={{ fontSize: 13, color: '#888', margin: '0 0 4px', textAlign: 'center' }}>Skapa ditt B2B-konto — det tar en minut</p>
-                {[
+                <div role="radiogroup" aria-label="Kontotyp" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {([['business', 'Företag'], ['private', 'Privat']] as const).map(([t, l]) => (
+                    <button key={t} type="button" role="radio" aria-checked={regType === t} onClick={() => { setRegType(t); setRegError(''); rememberVisitorType(t) }}
+                      style={{ padding: '10px', borderRadius: 8, border: `1.5px solid ${regType === t ? '#111' : 'rgba(0,0,0,.12)'}`, background: regType === t ? '#111' : '#fff', color: regType === t ? '#fff' : '#333', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+                <p style={{ fontSize: 13, color: '#666', margin: '0 0 4px', textAlign: 'center' }}>
+                  {regType === 'private' ? 'Skapa ditt konto — priser visas inkl. moms' : 'Skapa ditt företagskonto — priser visas exkl. moms'}
+                </p>
+                {(regType === 'private' ? [
+                  { key: 'contact_name', label: 'Namn *', placeholder: 'Erik Lindgren', type: 'text' },
+                  { key: 'email', label: 'E-post *', placeholder: 'erik@exempel.se', type: 'email' },
+                  { key: 'password', label: 'Välj lösenord *', placeholder: 'Minst 6 tecken', type: 'password' },
+                  { key: 'phone', label: 'Telefon', placeholder: '070-123 45 67', type: 'tel' },
+                ] : [
                   { key: 'company', label: 'Företagsnamn *', placeholder: 'AB Bilservice', type: 'text' },
+                  { key: 'org_nr', label: 'Org.nr', placeholder: '556123-4567', type: 'text' },
                   { key: 'contact_name', label: 'Kontaktperson', placeholder: 'Erik Lindgren', type: 'text' },
                   { key: 'email', label: 'E-post *', placeholder: 'erik@foretag.se', type: 'email' },
                   { key: 'password', label: 'Välj lösenord *', placeholder: 'Minst 6 tecken', type: 'password' },
                   { key: 'phone', label: 'Telefon', placeholder: '08-123 45 67', type: 'tel' },
-                ].map(({ key, label, placeholder, type }) => (
+                ]).map(({ key, label, placeholder, type }) => (
                   <div key={key}>
                     <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#888', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.08em' }}>{label}</label>
                     <input type={type} value={(regForm as any)[key]} onChange={e => setRegForm(f => ({ ...f, [key]: e.target.value }))} placeholder={placeholder} style={S.inp}
@@ -691,10 +751,10 @@ function PublicShellInner({ children }: { children: ReactNode }) {
                   </div>
                 ))}
                 {regError && <div style={{ fontSize: 12, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px' }}>{regError}</div>}
-                <button type="submit" disabled={regLoading || !regForm.company || !regForm.email || !regForm.password} style={{ width: '100%', padding: '13px', background: (regLoading || !regForm.company || !regForm.email || !regForm.password) ? '#ddd' : '#111', color: (regLoading || !regForm.company || !regForm.email || !regForm.password) ? '#999' : '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 14, border: 'none', borderRadius: 8, cursor: (regLoading || !regForm.company || !regForm.email || !regForm.password) ? 'default' : 'pointer', marginTop: 4 }}>
+                <button type="submit" disabled={regBlocked} style={{ width: '100%', padding: '13px', background: regBlocked ? '#ddd' : '#111', color: regBlocked ? '#777' : '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 14, border: 'none', borderRadius: 8, cursor: regBlocked ? 'default' : 'pointer', marginTop: 4 }}>
                   {regLoading ? 'Skapar konto…' : 'Skapa konto'}
                 </button>
-                <p style={{ fontSize: 11, color: '#bbb', textAlign: 'center', margin: 0 }}>Ditt konto kopplas direkt till vår B2B-portal och CRM.</p>
+                <p style={{ fontSize: 11, color: '#888', textAlign: 'center', margin: 0 }}>Du behöver ett konto för att se priser och beställa.</p>
               </form>
             )}
           </div>

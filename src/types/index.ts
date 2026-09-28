@@ -32,6 +32,7 @@ export interface Customer {
   org_nr: string | null
   price_list_id: PriceList
   status: 'active' | 'inactive' | 'prospect'
+  customer_type?: 'business' | 'private'
   notes: string | null
   birthday: string | null
   last_order_at: string | null
