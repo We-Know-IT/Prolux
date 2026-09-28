@@ -43,8 +43,8 @@ const CART_KEY = 'prolux-cart'
 const NAV_PUBLIC = [
   { href: '/',             label: 'Hem' },
   { href: '/produkter',    label: 'Produkter' },
-  { href: '/#pro-center',  label: 'Bli Återförsäljare' },
-  { href: '/guider',       label: 'Bilvårdsutbildning' },
+  { href: '/#pro-center',  label: 'Återförsäljare' },
+  { href: '/guider',       label: 'Utbildning' },
   { href: '/om-oss',       label: 'Om Oss' },
   { href: '/om-oss#kontakta-oss', label: 'Kontakt' },
 ]
@@ -297,7 +297,7 @@ function PublicShellInner({ children }: { children: ReactNode }) {
       </div>
 
       {/* ── Topbar ─────────────────────────────────────────── */}
-      <header style={{
+      <header className="pub-header" style={{
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 200,
         height: 64,
         background: navBg,
@@ -316,8 +316,8 @@ function PublicShellInner({ children }: { children: ReactNode }) {
           </div>
           {/* Shown only where the header has room (see .pub-brand-logos below). */}
           <div className="pub-brand-logos" style={{ alignItems: 'center', gap: 10, paddingLeft: 12, borderLeft: '1px solid rgba(255,255,255,.15)' }}>
-            <Image src="/brands/frescura.svg" alt="Frescura" width={100} height={9} style={{ display: 'block', height: 10, width: 'auto' }} />
-            <Image src="/brands/virtus.svg" alt="Virtus" width={25} height={26} style={{ display: 'block', height: 28, width: 'auto' }} />
+            <Image className="pub-logo-frescura" src="/brands/frescura.svg" alt="Frescura" width={100} height={9} style={{ display: 'block', height: 10, width: 'auto' }} />
+            <Image className="pub-logo-virtus" src="/brands/virtus.svg" alt="Virtus" width={25} height={26} style={{ display: 'block', height: 28, width: 'auto' }} />
           </div>
         </Link>
 
@@ -326,7 +326,7 @@ function PublicShellInner({ children }: { children: ReactNode }) {
           {NAV_PUBLIC.map(({ href, label }) => {
             const active = !href.includes('#') && href !== '/' && pathname.startsWith(href)
             return (
-              <Link key={label} href={href} style={{
+              <Link key={label} href={href} className="pub-nav-link" style={{
                 padding: '7px 9px',
                 color: active ? '#E8B84B' : 'rgba(255,255,255,.8)',
                 fontSize: 12, fontWeight: active ? 700 : 600,
@@ -345,8 +345,8 @@ function PublicShellInner({ children }: { children: ReactNode }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 {/* Min portal button for customers */}
                 {isCustomer && (
-                  <button onClick={() => { sessionStorage.setItem('scrollToPortal', '1'); window.location.pathname === '/' ? (() => { const el = document.getElementById('min-portal'); el ? el.scrollIntoView({ behavior: 'smooth' }) : null })() : (window.location.href = '/') }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, background: 'rgba(255,255,255,.1)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 13, fontWeight: 600, transition: 'all .2s' }}>
-                    <Package size={15} /> Min portal
+                  <button title="Min portal" aria-label="Min portal" className="pub-portal-btn" onClick={() => { sessionStorage.setItem('scrollToPortal', '1'); window.location.pathname === '/' ? (() => { const el = document.getElementById('min-portal'); el ? el.scrollIntoView({ behavior: 'smooth' }) : null })() : (window.location.href = '/') }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, background: 'rgba(255,255,255,.1)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 13, fontWeight: 600, transition: 'all .2s' }}>
+                    <Package size={15} /> <span className="pub-portal-label">Min portal</span>
                   </button>
                 )}
                 {cartButton}
@@ -357,7 +357,7 @@ function PublicShellInner({ children }: { children: ReactNode }) {
                     <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,0,0,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#111', flexShrink: 0 }}>
                       {displayName[0]?.toUpperCase()}
                     </div>
-                    {displayName}
+                    <span className="pub-user-name" style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</span>
                     {priceList && priceList !== 'Standard' && <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: 'rgba(0,0,0,.15)', color: '#111', fontWeight: 700 }}>{priceList}</span>}
                     <ChevronDown size={13} />
                   </button>
@@ -708,8 +708,20 @@ function PublicShellInner({ children }: { children: ReactNode }) {
         /* The closed cart drawer and decorative shapes sit off-screen; never let them scroll the page sideways. */
         html, body { overflow-x: clip; }
         .pub-brand-logos   { display: none; }
-        @media (min-width: 560px) and (max-width: 1259px), (min-width: 1560px) {
-          .pub-brand-logos { display: flex; }
+        @media (min-width: 560px) { .pub-brand-logos { display: flex; } }
+        /* Small laptops: a slightly tighter header so the brand logos fit next to the full menu. */
+        @media (min-width: 1260px) and (max-width: 1365px) {
+          .pub-header          { gap: 12px !important; padding-inline: 18px !important; }
+          .pub-nav-link        { padding: 7px 7px !important; }
+          .pub-brand-logos     { gap: 8px !important; padding-left: 10px !important; }
+          .pub-logo-frescura   { height: 8px !important; }
+          .pub-logo-virtus     { height: 24px !important; }
+        }
+        /* Logged-in customers: "Min portal" as an icon and a shorter name until there is room. */
+        @media (min-width: 1260px) and (max-width: 1535px) {
+          .pub-portal-label    { display: none; }
+          .pub-portal-btn      { padding: 8px 10px !important; }
+          .pub-user-name       { max-width: 110px !important; }
         }
         @media (min-width: 1260px) {
           .pub-desktop-nav   { display: flex !important; }
