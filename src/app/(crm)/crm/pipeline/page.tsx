@@ -6,6 +6,7 @@ import { fmt, formatDate } from '@/lib/utils'
 import { Plus, X, User, ChevronDown } from 'lucide-react'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { SALESPEOPLE } from '@/lib/team'
+import { useMe } from '@/hooks/useMe'
 
 const supabase = createClient()
 
@@ -16,6 +17,7 @@ const STAGE_COLORS: Record<DealStage, string> = {
 
 
 export default function CrmPipelinePage() {
+  const me = useMe()
   const [deals, setDeals] = useState<(Deal & { customers?: Customer })[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
@@ -24,7 +26,7 @@ export default function CrmPipelinePage() {
   const [dragging, setDragging] = useState<string | null>(null)
   const [form, setForm] = useState({
     title: '', customer_id: '', value: '', stage: 'Prospekt' as DealStage,
-    expected_close: '', notes: '', assigned_to: 'Bashar'
+    expected_close: '', notes: '', assigned_to: ''
   })
   // Inline new customer
   const [showNewCust, setShowNewCust] = useState(false)
@@ -78,7 +80,7 @@ export default function CrmPipelinePage() {
     setSavingCust(false)
   }
 
-  const EMPTY_FORM = { title: '', customer_id: '', value: '', stage: 'Prospekt' as DealStage, expected_close: '', notes: '', assigned_to: 'Bashar' }
+  const EMPTY_FORM = { title: '', customer_id: '', value: '', stage: 'Prospekt' as DealStage, expected_close: '', notes: '', assigned_to: me.name }
 
   function openNew() {
     setEditingId(null)

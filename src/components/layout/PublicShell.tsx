@@ -86,6 +86,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
   // (every page mounts its own PublicShell) and reaching the checkout.
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const cartLoaded = useRef(false)
+  const [cartBump, setCartBump] = useState(0)
 
   useEffect(() => {
     try {
@@ -225,7 +226,8 @@ export function PublicShell({ children }: { children: ReactNode }) {
       if (ex) return prev.map(i => i.id === p.id ? { ...i, qty: i.qty + 1 } : i)
       return [...prev, { id: p.id, name: p.name, brand: p.brand, unit_price, qty: 1, image_url: p.image_url, unit: p.unit, list_price: p.list_price }]
     })
-    setCartOpen(true)
+    // The cart stays closed; its counter pops instead (see cartBump).
+    setCartBump(b => b + 1)
   }, [])
 
   const removeItem = useCallback((id: string) => setCartItems(prev => prev.filter(i => i.id !== id)), [])
@@ -240,6 +242,20 @@ export function PublicShell({ children }: { children: ReactNode }) {
   const role = userRole(authUser)
   const displayName = customer?.contact_name || authUser?.user_metadata?.full_name || authUser?.email?.split('@')[0] || 'Kund'
   const isCustomer = authUser && role !== 'admin' && role !== 'crm'
+  // Guests can shop too, so everyone but staff gets the cart button.
+  const showCart = !authUser || isCustomer
+
+  const cartButton = showCart ? (
+<button key={`cart-${cartBump}`} className={cartBump ? 'pl-pop' : undefined} onClick={() => setCartOpen(true)} aria-label={`Varukorg, ${count} varor`} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 8, background: count > 0 ? '#E8B84B' : 'rgba(255,255,255,.1)', border: 'none', cursor: 'pointer', color: count > 0 ? '#111' : '#fff', fontSize: 13, fontWeight: 600, transition: 'all .2s' }}>
+                    <ShoppingCart size={16} />
+                    {count > 0 ? `${count} ${count === 1 ? 'vara' : 'varor'}` : 'Varukorg'}
+                    {count > 0 && (
+                      <span style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', background: '#fff', color: '#111', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {count}
+                      </span>
+                    )}
+                  </button>
+  ) : null
 
   const navBg = scrolled ? 'rgba(13,15,20,.97)' : 'rgba(13,15,20,.92)'
 
@@ -329,18 +345,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
                     <Package size={15} /> Min portal
                   </button>
                 )}
-                {/* Cart button for customers */}
-                {isCustomer && (
-                  <button onClick={() => setCartOpen(true)} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 8, background: count > 0 ? '#E8B84B' : 'rgba(255,255,255,.1)', border: 'none', cursor: 'pointer', color: count > 0 ? '#111' : '#fff', fontSize: 13, fontWeight: 600, transition: 'all .2s' }}>
-                    <ShoppingCart size={16} />
-                    {count > 0 ? `${count} vara${count > 1 ? 'r' : ''}` : 'Varukorg'}
-                    {count > 0 && (
-                      <span style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', background: '#fff', color: '#111', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {count}
-                      </span>
-                    )}
-                  </button>
-                )}
+                {cartButton}
 
                 {/* User dropdown */}
                 <div style={{ position: 'relative' }}>
@@ -377,6 +382,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
               </div>
             ) : (
               <>
+                {cartButton}
                 <button onClick={() => openLogin(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 22px', borderRadius: 24, background: '#E8B84B', color: '#0D0900', fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', letterSpacing: '.04em' }}>
                   Skapa Konto
                 </button>
@@ -390,8 +396,8 @@ export function PublicShell({ children }: { children: ReactNode }) {
 
         {/* Mobile: cart icon + hamburger */}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          {isCustomer && count > 0 && (
-            <button onClick={() => setCartOpen(true)} className="pub-mobile-btn" style={{ position: 'relative', padding: 8, background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex' }}>
+          {showCart && count > 0 && (
+            <button key={`mcart-${cartBump}`} onClick={() => setCartOpen(true)} className={`pub-mobile-btn${cartBump ? ' pl-pop' : ''}`} aria-label={`Varukorg, ${count} varor`} style={{ position: 'relative', padding: 8, background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex' }}>
               <ShoppingCart size={22} />
               <span style={{ position: 'absolute', top: 2, right: 2, width: 16, height: 16, borderRadius: '50%', background: '#E8B84B', color: '#111', fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{count}</span>
             </button>
@@ -452,7 +458,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
         <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(0,0,0,.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div>
             <div style={{ fontSize: 17, fontWeight: 700, color: '#111' }}>Varukorg</div>
-            {count > 0 && <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{count} vara{count > 1 ? 'r' : ''} · {fmt(subtotal)} kr exkl. moms</div>}
+            {count > 0 && <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{count} {count === 1 ? 'vara' : 'varor'} · {fmt(subtotal)} kr exkl. moms</div>}
           </div>
           <button onClick={() => setCartOpen(false)} style={{ padding: 8, background: '#F5F3EE', border: 'none', borderRadius: 8, cursor: 'pointer', color: '#555', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <X size={18} />
@@ -701,6 +707,11 @@ export function PublicShell({ children }: { children: ReactNode }) {
           .pub-desktop-right { display: flex !important; }
           .pub-mobile-btn    { display: none !important; }
         }
+        .pl-pop { animation: pl-pop .45s cubic-bezier(.3,1.4,.5,1); }
+        @keyframes pl-pop {
+          0% { transform: scale(1); } 35% { transform: scale(1.18); } 65% { transform: scale(.96); } 100% { transform: scale(1); }
+        }
+        @media (prefers-reduced-motion: reduce) { .pl-pop { animation: none; } }
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(-8px); }
           to   { opacity: 1; transform: translateY(0); }

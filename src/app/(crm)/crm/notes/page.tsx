@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatDate } from '@/lib/utils'
 import { Plus, X, Search, StickyNote, Bell, Phone, Mail, Users } from 'lucide-react'
+import { useMe } from '@/hooks/useMe'
 
 const supabase = createClient()
 
@@ -46,6 +47,7 @@ const glass: React.CSSProperties = {
 }
 
 export default function CrmNotesPage() {
+  const me = useMe()
   const [activities, setActivities] = useState<Activity[]>([])
   const [reminders,  setReminders]  = useState<Reminder[]>([])
   const [customers,  setCustomers]  = useState<{ id: string; company: string }[]>([])
@@ -97,7 +99,7 @@ export default function CrmNotesPage() {
       type: noteType,
       title: noteTitle.trim() || titles[noteType],
       body: noteBody.trim(),
-      created_by: 'Bashar',
+      created_by: me.name || 'CRM',
     }).select('id,customer_id,type,title,body,created_by,created_at,customers(company)').single()
     setSaving(false)
     if (!error && data) {

@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
-import { salespersonName } from '@/lib/team'
+import { currentStaff } from '@/lib/team'
 import { LayoutDashboard, GitBranch, Users, ShoppingCart, LogOut, Menu, X, CalendarDays, StickyNote } from 'lucide-react'
 
 const NAV = [
@@ -27,12 +27,13 @@ export default function CrmShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null
     let timer: ReturnType<typeof setTimeout> | undefined
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      const me = salespersonName(user)
+    currentStaff(supabase).then(({ name: me }) => {
+      if (!me) return
       channel = supabase
         .channel(`orders-for-${me}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders', filter: `assigned_to=eq.${me}` }, payload => {
           const o = payload.new as any
+          if (o.status === 'draft' || o.status === 'quote') return   // not an order yet
           setOrderToast({ id: o.id, nr: o.order_nr, name: o.delivery_name || 'Ny kund' })
           clearTimeout(timer)
           timer = setTimeout(() => setOrderToast(null), 8000)

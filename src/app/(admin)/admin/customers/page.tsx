@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { fmt } from '@/lib/utils'
 import { X } from 'lucide-react'
+import { isLiveOrder } from '@/lib/team'
 
 const PL_COLORS: Record<string, { bg: string; color: string }> = {
   A:        { bg: 'rgba(232,184,75,.15)',  color: '#E8B84B' },
@@ -136,7 +137,7 @@ export default function AdminCustomers() {
   )
 
   const totalRevenue = (c: any) =>
-    orders.filter(o => o.customer_id === c.id && o.status !== 'cancelled').reduce((s: number, o: any) => s + (o.subtotal || 0), 0)
+    orders.filter(o => o.customer_id === c.id && isLiveOrder(o.status)).reduce((s: number, o: any) => s + (o.subtotal || 0), 0)
 
   return (
     <div>

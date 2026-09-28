@@ -6,6 +6,7 @@ import { PublicShell, useLoginModal, usePublicCart } from '@/components/layout/P
 import { fmt } from '@/lib/utils'
 import { Search, Package, ShoppingCart, ChevronRight, ChevronLeft, LayoutGrid } from 'lucide-react'
 import Link from 'next/link'
+import { popElement } from '@/lib/pop'
 
 const DISCOUNT: Record<string, number> = { A: 0.40, B: 0.30, C: 0.20, Standard: 0 }
 const SORT_OPTIONS = ['Populärast', 'Lägsta pris', 'Högsta pris', 'Namn A–Ö']
@@ -248,7 +249,7 @@ function ProductsContent() {
                       )}
                     </div>
                     <button
-                      onClick={() => addToCart(p)}
+                      onClick={e => { popElement(e.currentTarget); addToCart(p) }}
                       style={{ width: 40, height: 40, borderRadius: '50%', background: added ? '#4CAF7D' : '#E8B84B', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .2s', flexShrink: 0 }}
                     >
                       <ShoppingCart size={16} color="#111" strokeWidth={2.5} />

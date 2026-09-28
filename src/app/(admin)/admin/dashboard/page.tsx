@@ -5,13 +5,13 @@ import { fmt } from '@/lib/utils'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
-import { SALESPEOPLE, monthRange, budgetAchieved } from '@/lib/team'
+import { SALESPEOPLE, monthRange, budgetAchieved, isLiveOrder } from '@/lib/team'
 import { useBudgetHistory } from '@/hooks/useBudgetHistory'
 import BudgetHistoryChart from '@/components/BudgetHistoryChart'
 import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, Trophy, ArrowRight, Calendar, ChevronLeft, ChevronRight, Activity } from 'lucide-react'
 
 const STATUS_LABELS: Record<string, string> = {
-  draft: 'Utkast', pending: 'Väntande', confirmed: 'Bekräftad',
+  draft: 'Utkast', quote: 'Offert', pending: 'Väntande', confirmed: 'Bekräftad',
   packed: 'Packad', shipped: 'Skickad', delivered: 'Levererad', cancelled: 'Avbruten',
 }
 const STATUS_CSS: Record<string, { bg: string; color: string }> = {
@@ -21,7 +21,8 @@ const STATUS_CSS: Record<string, { bg: string; color: string }> = {
   shipped:   { bg: 'rgba(66,153,225,.12)',  color: '#4299E1' },
   delivered: { bg: 'rgba(76,175,125,.12)',  color: '#4CAF7D' },
   cancelled: { bg: 'rgba(224,82,82,.12)',   color: '#E05252' },
-  draft:     { bg: 'rgba(78,85,102,.12)',   color: '#4E5566' },
+  draft:     { bg: 'rgba(155,160,171,.12)', color: '#9BA0AB' },
+  quote:     { bg: 'rgba(155,110,232,.12)', color: '#9B6EE8' },
 }
 
 function workingDaysInMonth(year: number, month: number) {
@@ -172,7 +173,7 @@ export default function AdminDashboard() {
       const d = new Date(); d.setDate(d.getDate() - i)
       buckets[d.toISOString().slice(0, 10)] = 0
     }
-    orders.filter(o => o.status !== 'cancelled').forEach(o => {
+    orders.filter(o => isLiveOrder(o.status)).forEach(o => {
       const d = o.created_at?.slice(0, 10)
       if (d && d in buckets) buckets[d] += o.subtotal || 0
     })
@@ -240,7 +241,7 @@ export default function AdminDashboard() {
   const ACT_LABEL: Record<string, string> = { call: 'Samtal', email: 'E-post', meeting: 'Möte', note: 'Anteckning', order: 'Order', demo: 'Demo' }
   const ACT_COLOR: Record<string, string> = { call: 'var(--green)', email: 'var(--blue)', meeting: 'var(--gold)', note: 'var(--text3)', order: '#6AAFF0', demo: 'var(--gold)' }
 
-  const revenue         = orders.filter(o => o.status !== 'cancelled').reduce((s, o) => s + (o.subtotal || 0), 0)
+  const revenue         = orders.filter(o => isLiveOrder(o.status)).reduce((s, o) => s + (o.subtotal || 0), 0)
   const pendingCount    = orders.filter(o => o.status === 'pending').length
   const todayOrders     = orders.filter(o => new Date(o.created_at).toDateString() === new Date().toDateString()).length
   const activeCustomers = customers.filter(c => c.status === 'active').length
@@ -253,7 +254,7 @@ export default function AdminDashboard() {
   // Budget credit: this month's orders per assignee.
   const { start: salesStart, end: salesEnd } = monthRange(now)
   const ordersThisMonth = orders.filter(o => o.created_at >= salesStart && o.created_at <= salesEnd)
-  const soldBySP        = budgetAchieved(ordersThisMonth, wonDeals, orders.filter(o => o.status !== 'cancelled'))
+  const soldBySP        = budgetAchieved(ordersThisMonth, wonDeals, orders.filter(o => isLiveOrder(o.status)))
   const soldThisMonth   = Object.values(soldBySP).reduce((a, b) => a + b, 0)
   const unassignedCount = orders.filter(o => !o.assigned_to && o.status === 'pending').length
 

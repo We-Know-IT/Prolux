@@ -6,12 +6,22 @@ import { Product, Customer, Category, CartItem, Order, OrderItem, OrderStatus, O
 import { custPrice, fmt, formatDateTime } from '@/lib/utils'
 import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star } from 'lucide-react'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
-import { SALESPEOPLE, salespersonName, canConfirmOrder } from '@/lib/team'
+import { SALESPEOPLE, currentStaff, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
 import ShipOrderForm from '@/components/orders/ShipOrderForm'
-import { userRole } from '@/lib/roles'
 
 const supabase = createClient()
 type View = 'new' | 'confirm' | 'history'
+
+// Product picture in the cart; the icon stands in when a product has none.
+function Thumb({ p, size = 36 }: { p: Product; size?: number }) {
+  return (
+    <div style={{ width: size, height: size, borderRadius: 6, background: '#F4F2EE', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      {p.image_url
+        ? <img src={p.image_url} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+        : <Package size={Math.round(size * 0.45)} color="#999" />}
+    </div>
+  )
+}
 
 const AFFINITY: Record<string, string[]> = {
   'rapidet':   ['magic', 'gommalux', 'green power'],
@@ -100,7 +110,12 @@ export default function CrmOrdersPage() {
   const [discountEnabled, setDiscountEnabled] = useState(false)
   const [isMobile, setIsMobile]           = useState(false)
   const [showMobileCart, setShowMobileCart] = useState(false)
-  const [delivery, setDelivery]           = useState('Direkt')
+  const [delivery, setDelivery]           = useState('Standard (2-3 dagar)')
+  // Per cart line: handed over from the car, or shipped from the warehouse.
+  const [lineFrom, setLineFrom]           = useState<Record<string, 'car' | 'ship'>>({})
+  // A draft or quote being edited; saving updates it instead of creating a new order.
+  const [editingOrder, setEditingOrder]   = useState<{ id: string; order_nr: number; status: string } | null>(null)
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'open' | 'orders'>('all')
   const [assignee, setAssignee]           = useState('')
   const [customerDeals, setCustomerDeals] = useState<{ id: string; title: string; value: number; stage: string }[]>([])
   const [dealId, setDealId]               = useState('')
@@ -191,7 +206,7 @@ export default function CrmOrdersPage() {
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => { setMyName(salespersonName(user)); setIsAdmin(userRole(user) === 'admin') })
+    currentStaff(supabase).then(me => { setMyName(me.name); setIsAdmin(me.isAdmin) })
   }, [])
 
   function selectCustomerAndLoad(c: Customer) {
@@ -209,7 +224,7 @@ export default function CrmOrdersPage() {
     setCustomerDeals([]); setDealId('')
     const [{ data: deals }, { data: linked, error }] = await Promise.all([
       supabase.from('deals').select('id,title,value,stage').eq('customer_id', c.id).neq('stage', 'Förlorad').order('created_at', { ascending: false }),
-      supabase.from('orders').select('deal_id').eq('customer_id', c.id).not('deal_id', 'is', null).neq('status', 'cancelled'),
+      supabase.from('orders').select('deal_id').eq('customer_id', c.id).not('deal_id', 'is', null).not('status', 'in', NOT_LIVE_FILTER),
     ])
     if (error || !deals) return // orders.deal_id missing: migration 0006 not run yet
     const taken = new Set((linked || []).map((o: any) => o.deal_id))
@@ -243,14 +258,26 @@ export default function CrmOrdersPage() {
   const vat   = Math.round(afterDiscount * 0.25)
   const total = afterDiscount + vat
 
-  async function placeOrder() {
+  function resetOrderForm() {
+    setCart([]); setSelectedCustomer(null); setCustomerSearch(''); setProductSearch('')
+    setDiscount(''); setDiscountEnabled(false); setDelivery('Standard (2-3 dagar)'); setLineFrom({})
+    setLastBought([]); setSelectedCategory('all'); setCustomerDeals([]); setDealId(''); setEditingOrder(null)
+  }
+
+  // Draft (utkast) and quote (offert) are saved without affecting stock or
+  // budget; "pending" is a real order the salesperson then confirms.
+  async function saveOrder(status: 'draft' | 'quote' | 'pending') {
     if (!selectedCustomer || cart.length === 0 || placing) return
     setPlacing(true)
-    const { data: order, error } = await supabase.from('orders').insert({
+    const carLines  = cart.filter(i => lineFrom[i.product.id] === 'car').length
+    const shipLines = cart.length - carLines
+    const deliveryNote = [
+      carLines  ? `Från bilen (${carLines} rad${carLines > 1 ? 'er' : ''})` : '',
+      shipLines ? `Frakt: ${delivery}` : '',
+    ].filter(Boolean).join(' · ')
+    const fields = {
       customer_id: selectedCustomer.id,
-      // Placed as pending: the salesperson confirms it from the history or dashboard.
-      status: 'pending' as OrderStatus,
-      created_by: myName || null,
+      status: status as OrderStatus,
       price_list_id: selectedCustomer.price_list_id,
       delivery_name: selectedCustomer.company,
       delivery_city: selectedCustomer.city,
@@ -259,26 +286,109 @@ export default function CrmOrdersPage() {
       // No manager on the customer: the salesperson placing it receives it.
       assigned_to: assignee || (selectedCustomer.account_manager ? null : myName || null),
       ...(dealId ? { deal_id: dealId } : {}),
-      notes: `Leverans: ${delivery}${discountAmt ? ` | Rabatt: ${discountAmt} kr` : ''}`
-    }).select().single()
-    if (error || !order) { showToast('Fel vid orderläggning'); setPlacing(false); return }
-    // An order on a deal means the deal is won.
-    const linkedDeal = customerDeals.find(d => d.id === dealId)
-    if (linkedDeal && linkedDeal.stage !== 'Vunnen') {
-      await supabase.from('deals').update({ stage: 'Vunnen', updated_at: new Date().toISOString() }).eq('id', linkedDeal.id)
+      notes: `Leverans: ${deliveryNote}${discountAmt ? ` | Rabatt: ${discountAmt} kr` : ''}`,
     }
-    await supabase.from('order_items').insert(cart.map(i => ({
+
+    let order: any = null
+    let error: any = null
+    if (editingOrder) {
+      // The draft/quote holds no stock, so its old lines can simply be replaced.
+      await supabase.from('order_items').delete().eq('order_id', editingOrder.id)
+      ;({ data: order, error } = await supabase.from('orders').update(fields).eq('id', editingOrder.id).select().single())
+    } else {
+      ;({ data: order, error } = await supabase.from('orders').insert({ ...fields, created_by: myName || null }).select().single())
+    }
+    if (error || !order) { showToast('Kunde inte spara ordern'); setPlacing(false); return }
+
+    const { error: itemsError } = await supabase.from('order_items').insert(cart.map(i => ({
       order_id: order.id, product_id: i.product.id,
       product_name: i.product.name, product_sku: i.product.sku,
       qty: i.qty, unit_price: i.unitPrice, list_price: i.product.list_price,
-      total_price: i.qty * i.unitPrice
+      total_price: i.qty * i.unitPrice,
+      delivery: lineFrom[i.product.id] === 'car' ? 'car' : 'ship',
     })))
-    setOrders(os => [{ ...order, customers: selectedCustomer }, ...os])
-    setCart([]); setSelectedCustomer(null); setCustomerSearch(''); setProductSearch('')
-    setDiscount(''); setDiscountEnabled(false); setDelivery('Direkt')
-    setLastBought([]); setSelectedCategory('all'); setCustomerDeals([]); setDealId('')
+    if (itemsError) {
+      if (!editingOrder) await supabase.from('orders').delete().eq('id', order.id)
+      showToast('Orderraderna kunde inte sparas. Har migration 0014 körts?')
+      setPlacing(false); return
+    }
+
+    // An order on a deal means the deal is won.
+    const linkedDeal = customerDeals.find(d => d.id === dealId)
+    if (status === 'pending' && linkedDeal && linkedDeal.stage !== 'Vunnen') {
+      await supabase.from('deals').update({ stage: 'Vunnen', updated_at: new Date().toISOString() }).eq('id', linkedDeal.id)
+    }
+
+    const saved = { ...order, customers: selectedCustomer }
+    setOrders(os => editingOrder ? os.map(o => o.id === order.id ? saved : o) : [saved, ...os])
+    resetOrderForm()
     setPlacing(false); setView('history')
-    showToast(`Order #${order.order_nr} skapad — bekräfta den när den är klar`)
+    showToast(status === 'draft' ? `Utkast #${order.order_nr} sparat`
+      : status === 'quote' ? `Offert #${order.order_nr} skapad`
+      : `Order #${order.order_nr} skapad — bekräfta den när den är klar`)
+  }
+
+  // Reopen a draft or quote in the order form.
+  async function openForEdit(o: any) {
+    const customer = customers.find(c => c.id === o.customers?.id)
+    if (!customer) { showToast('Kunden hittades inte'); return }
+    const { data: items } = await supabase.from('order_items').select('*').eq('order_id', o.id)
+    const lines: CartItem[] = []
+    const from: Record<string, 'car' | 'ship'> = {}
+    for (const it of items || []) {
+      const product = products.find(p => p.id === it.product_id)
+      if (!product) continue
+      lines.push({ product, qty: it.qty, unitPrice: Number(it.unit_price) })
+      from[product.id] = it.delivery === 'car' ? 'car' : 'ship'
+    }
+    setSelectedCustomer(customer)
+    setCart(lines); setLineFrom(from)
+    setAssignee(o.assigned_to || '')
+    const linesTotal = lines.reduce((sum, l) => sum + l.qty * l.unitPrice, 0)
+    const disc = Math.round(linesTotal - (o.subtotal || 0))
+    setDiscountEnabled(disc > 0); setDiscount(disc > 0 ? String(disc) : '')
+    loadLastBought(customer)
+    await loadCustomerDeals(customer)
+    if (o.deal_id) setDealId(o.deal_id)
+    setEditingOrder({ id: o.id, order_nr: o.order_nr, status: o.status })
+    setView('confirm')
+  }
+
+  async function deleteOpenOrder(o: any) {
+    const kind = o.status === 'quote' ? 'offerten' : 'utkastet'
+    if (!confirm(`Radera ${kind} #${o.order_nr}?`)) return
+    await supabase.from('order_items').delete().eq('order_id', o.id)
+    const { error } = await supabase.from('orders').delete().eq('id', o.id)
+    if (error) { showToast('Kunde inte radera'); return }
+    setOrders(os => os.filter(x => x.id !== o.id))
+    showToast(`${kind[0].toUpperCase() + kind.slice(1)} raderat`)
+  }
+
+  // Opens Gmail with the quote written out, like the quote tool on the customer card.
+  async function mailQuote(o: any) {
+    const customer = customers.find(c => c.id === o.customers?.id)
+    if (!customer?.email) { showToast('Kunden saknar e-postadress'); return }
+    const { data: items } = await supabase.from('order_items').select('product_name,qty,unit_price,delivery').eq('order_id', o.id)
+    const rows = (items || []).map((it: any) =>
+      `• ${it.product_name} — ${it.qty} st × ${fmt(Number(it.unit_price))} kr = ${fmt(it.qty * Number(it.unit_price))} kr${it.delivery === 'car' ? ' (levereras direkt)' : ''}`)
+    const body = [
+      `Hej ${customer.contact_name || ''},`.trim(),
+      '',
+      `Här kommer offert #${o.order_nr} från ProLuxShine:`,
+      '',
+      ...rows,
+      '',
+      `Summa exkl. moms: ${fmt(o.subtotal)} kr`,
+      `Moms 25 %: ${fmt(o.vat_amount)} kr`,
+      `Totalt inkl. moms: ${fmt(o.total)} kr`,
+      '',
+      'Svara på detta mejl så lägger vi ordern.',
+      '',
+      'Med vänliga hälsningar,',
+      myName || 'ProLuxShine',
+    ].join('\n')
+    const sub = `Offert #${o.order_nr} från ProLuxShine`
+    window.open(`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(customer.email)}&su=${encodeURIComponent(sub)}&body=${encodeURIComponent(body)}`, '_blank')
   }
 
   async function confirmOrder(id: string) {
@@ -322,9 +432,20 @@ export default function CrmOrdersPage() {
         <button onClick={() => setOnlyMine(m => !m)} style={{ marginLeft: 'auto', marginRight: 10, padding: '8px 14px', background: onlyMine ? 'rgba(232,184,75,.12)' : 'transparent', border: `1px solid ${onlyMine ? 'rgba(232,184,75,.35)' : 'var(--line)'}`, borderRadius: 8, color: onlyMine ? 'var(--gold)' : 'var(--text2)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
           {onlyMine ? 'Visa alla' : 'Bara mina'}
         </button>
-        <button onClick={() => setView('new')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', background: 'var(--gold)', border: 'none', borderRadius: 8, color: '#111', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+        <button onClick={() => { resetOrderForm(); setView('new') }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', background: 'var(--gold)', border: 'none', borderRadius: 8, color: '#111', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
           <Plus size={15} /> Ny order
         </button>
+      </div>
+      <div role="tablist" style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+        {([['all', 'Alla'], ['open', `Utkast & offerter (${orders.filter(o => o.status === 'draft' || o.status === 'quote').length})`], ['orders', 'Ordrar']] as const).map(([k, l]) => (
+          <button key={k} role="tab" aria-selected={historyFilter === k} onClick={() => setHistoryFilter(k)}
+            style={{ padding: '7px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              background: historyFilter === k ? 'rgba(232,184,75,.12)' : 'transparent',
+              border: `1px solid ${historyFilter === k ? 'rgba(232,184,75,.35)' : 'var(--line)'}`,
+              color: historyFilter === k ? 'var(--text)' : 'var(--text2)' }}>
+            {l}
+          </button>
+        ))}
       </div>
       <div style={{ background: 'var(--bg3)', border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden', overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 480 }}>
@@ -338,7 +459,11 @@ export default function CrmOrdersPage() {
           <tbody>
             {loading ? (
               <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'var(--text3)' }}>Laddar...</td></tr>
-            ) : orders.filter(o => !onlyMine || o.assigned_to === myName || o.created_by === myName).map(o => {
+            ) : orders
+              .filter(o => !onlyMine || o.assigned_to === myName || o.created_by === myName)
+              .filter(o => historyFilter === 'all' || (historyFilter === 'open') === (o.status === 'draft' || o.status === 'quote'))
+              .map(o => {
+              const isOpen = o.status === 'draft' || o.status === 'quote'
               const expanded = expandedOrderId === o.id
               const items = orderItemsById[o.id]
               return (
@@ -350,7 +475,15 @@ export default function CrmOrdersPage() {
                     <td style={{ padding: '12px 16px', color: o.assigned_to ? 'var(--text2)' : 'var(--red)' }}>{o.assigned_to || 'Saknas'}</td>
                     <td style={{ padding: '12px 16px', color: 'var(--gold)', fontWeight: 700 }}>{fmt(o.total)} kr</td>
                     <td style={{ padding: '12px 16px' }}>
-                      {o.status === 'pending' && canConfirmOrder(o, myName, isAdmin) ? (
+                      {isOpen ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: o.status === 'quote' ? 'rgba(155,110,232,.14)' : 'var(--bg4)', color: 'var(--text)', fontWeight: 700 }}>
+                            {ORDER_STATUS_LABEL[o.status]}
+                          </span>
+                          <button onClick={e => { e.stopPropagation(); openForEdit(o) }}
+                            style={{ fontSize: 11, padding: '4px 10px', borderRadius: 5, background: 'var(--gold)', border: 'none', color: '#111', fontWeight: 700, cursor: 'pointer' }}>Öppna</button>
+                        </div>
+                      ) : o.status === 'pending' && canConfirmOrder(o, myName, isAdmin) ? (
                         <button onClick={e => { e.stopPropagation(); confirmOrder(o.id) }} disabled={confirmingId === o.id}
                           style={{ fontSize: 11, padding: '4px 10px', borderRadius: 5, background: 'var(--gold)', border: 'none', color: '#111', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', opacity: confirmingId === o.id ? .6 : 1 }}>
                           {confirmingId === o.id ? 'Bekräftar…' : 'Bekräfta'}
@@ -373,12 +506,23 @@ export default function CrmOrdersPage() {
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingTop: 8 }}>
                             {items.map(item => (
                               <span key={item.id} style={{ fontSize: 11, padding: '3px 8px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 5, color: 'var(--text2)' }}>
-                                {item.product_name} ×{item.qty}
+                                {item.product_name} ×{item.qty}{(item as any).delivery === 'car' ? ' · från bilen' : ''}
                               </span>
                             ))}
                           </div>
                         )}
-                        {o.status !== 'pending' && (canConfirmOrder(o, myName, isAdmin) || o.transport_order_id) && (
+                        {isOpen && (
+                          <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                            {o.status === 'quote' && (
+                              <button onClick={() => mailQuote(o)} style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Mejla offerten</button>
+                            )}
+                            <button onClick={() => openForEdit(o)} style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                              {o.status === 'quote' ? 'Gör om till order' : 'Fortsätt med utkastet'}
+                            </button>
+                            <button onClick={() => deleteOpenOrder(o)} style={{ padding: '7px 12px', borderRadius: 7, background: 'transparent', border: '1px solid rgba(224,82,82,.35)', color: 'var(--red)', fontSize: 12, cursor: 'pointer' }}>Radera</button>
+                          </div>
+                        )}
+                        {!isOpen && o.status !== 'pending' && (canConfirmOrder(o, myName, isAdmin) || o.transport_order_id) && (
                           <div style={{ marginTop: 14 }}>
                             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Frakt & spårning</div>
                             {canConfirmOrder(o, myName, isAdmin)
@@ -409,9 +553,11 @@ export default function CrmOrdersPage() {
   if (view === 'confirm' && selectedCustomer) return (
     <div style={{ padding: '24px 20px', maxWidth: 720, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Bekräfta order</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
+          {editingOrder ? `${editingOrder.status === 'quote' ? 'Offert' : 'Utkast'} #${editingOrder.order_nr}` : 'Granska order'}
+        </h1>
         <button onClick={() => setView('new')} style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--text2)', fontSize: 13, cursor: 'pointer' }}>
-          <ArrowLeft size={15} /> Gå tillbaka och ändra order
+          <ArrowLeft size={15} /> Ändra produkter
         </button>
       </div>
       <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, marginBottom: 16 }}>
@@ -473,28 +619,39 @@ export default function CrmOrdersPage() {
         </div>
       )}
       <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Truck size={15} color="var(--text3)" /> Leverans
+        <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Truck size={15} color="var(--text2)" /> Leverans
         </h3>
-        <div style={{ position: 'relative' }}>
-          <select value={delivery} onChange={e => setDelivery(e.target.value)}
-            style={{ width: '100%', padding: '11px 36px 11px 14px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 14, outline: 'none', appearance: 'none', cursor: 'pointer' }}>
-            <option>Direkt</option>
-            <option>Standard (2-3 dagar)</option>
-            <option>Express (nästa dag)</option>
-          </select>
-          <ChevronDown size={15} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', pointerEvents: 'none' }} />
+        <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 12px' }}>
+          Välj per rad nedan: <strong style={{ color: 'var(--text)' }}>Bilen</strong> lämnas direkt till kunden och dras inte från lagret, <strong style={{ color: 'var(--text)' }}>Frakt</strong> skickas från lagret.
+        </p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: cart.some(i => lineFrom[i.product.id] !== 'car') ? 12 : 0 }}>
+          <button type="button" onClick={() => setLineFrom(Object.fromEntries(cart.map(i => [i.product.id, 'car'])))}
+            style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, cursor: 'pointer' }}>Allt från bilen</button>
+          <button type="button" onClick={() => setLineFrom({})}
+            style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, cursor: 'pointer' }}>Allt med frakt</button>
         </div>
+        {cart.some(i => lineFrom[i.product.id] !== 'car') && (
+          <div style={{ position: 'relative' }}>
+            <select value={delivery} onChange={e => setDelivery(e.target.value)} aria-label="Fraktsätt"
+              style={{ width: '100%', padding: '11px 36px 11px 14px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 14, outline: 'none', appearance: 'none', cursor: 'pointer' }}>
+              <option>Standard (2-3 dagar)</option>
+              <option>Express (nästa dag)</option>
+            </select>
+            <ChevronDown size={15} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', pointerEvents: 'none' }} />
+          </div>
+        )}
       </div>
       <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 24 }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
           <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: 0 }}>Kassan</h3>
         </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', minWidth: 560, borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)' }}>
-              {['Produkt', 'Antal', 'À-pris', 'Summa'].map(h => (
-                <th key={h} style={{ padding: '10px 20px', textAlign: 'left', color: 'var(--text3)', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>{h}</th>
+              {['Produkt', 'Leverans', 'Antal', 'À-pris', 'Summa'].map(h => (
+                <th key={h} style={{ padding: '10px 14px', textAlign: 'left', color: 'var(--text2)', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -503,21 +660,41 @@ export default function CrmOrdersPage() {
               const hasDiscount = i.unitPrice < i.product.list_price
               return (
                 <tr key={i.product.id} style={{ borderBottom: '1px solid var(--border2)' }}>
-                  <td style={{ padding: '11px 20px' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--text)' }}>{i.product.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text3)' }}>{i.product.brand} · {i.product.unit}</div>
+                  <td style={{ padding: '11px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <Thumb p={i.product} size={40} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, color: 'var(--text)' }}>{i.product.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text2)' }}>{i.product.brand} · {i.product.unit}</div>
+                      </div>
+                    </div>
                   </td>
-                  <td style={{ padding: '11px 20px', color: 'var(--text2)' }}>{i.qty}</td>
-                  <td style={{ padding: '11px 20px' }}>
+                  <td style={{ padding: '11px 14px' }}>
+                    <div role="group" aria-label={`Leverans för ${i.product.name}`} style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 7, overflow: 'hidden' }}>
+                      {(['car', 'ship'] as const).map(v => {
+                        const on = (lineFrom[i.product.id] || 'ship') === v
+                        return (
+                          <button key={v} type="button" aria-pressed={on} onClick={() => setLineFrom(f => ({ ...f, [i.product.id]: v }))}
+                            style={{ padding: '5px 10px', fontSize: 12, fontWeight: on ? 700 : 500, border: 'none', cursor: 'pointer',
+                              background: on ? 'rgba(232,184,75,.15)' : 'var(--bg4)', color: on ? 'var(--text)' : 'var(--text2)' }}>
+                            {v === 'car' ? 'Bilen' : 'Frakt'}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </td>
+                  <td style={{ padding: '11px 14px', color: 'var(--text2)' }}>{i.qty}</td>
+                  <td style={{ padding: '11px 14px' }}>
                     {hasDiscount && <div style={{ fontSize: 11, color: 'var(--text3)', textDecoration: 'line-through' }}>{fmt(i.product.list_price)} kr</div>}
                     <div style={{ color: hasDiscount ? 'var(--green)' : 'var(--text2)', fontWeight: hasDiscount ? 600 : 400 }}>{fmt(i.unitPrice)} kr</div>
                   </td>
-                  <td style={{ padding: '11px 20px', fontWeight: 700, color: 'var(--text)' }}>{fmt(i.qty * i.unitPrice)} kr</td>
+                  <td style={{ padding: '11px 14px', fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap' }}>{fmt(i.qty * i.unitPrice)} kr</td>
                 </tr>
               )
             })}
           </tbody>
         </table>
+        </div>
         <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {discountAmt > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--green)' }}>
@@ -533,10 +710,23 @@ export default function CrmOrdersPage() {
           </div>
         </div>
       </div>
-      <button onClick={placeOrder} disabled={placing}
-        style={{ width: '100%', padding: '15px 0', background: placing ? 'var(--bg4)' : 'var(--gold)', border: 'none', borderRadius: 10, color: placing ? 'var(--text3)' : '#111', fontSize: 15, fontWeight: 700, cursor: placing ? 'not-allowed' : 'pointer' }}>
-        {placing ? 'Skapar order...' : 'Bekräfta och skapa order'}
-      </button>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+        <button onClick={() => saveOrder('draft')} disabled={placing}
+          style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: placing ? 'not-allowed' : 'pointer' }}>
+          Spara utkast
+        </button>
+        <button onClick={() => saveOrder('quote')} disabled={placing}
+          style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: placing ? 'not-allowed' : 'pointer' }}>
+          Skapa offert
+        </button>
+        <button onClick={() => saveOrder('pending')} disabled={placing}
+          style={{ padding: '14px 0', background: placing ? 'var(--bg4)' : 'var(--gold)', border: 'none', borderRadius: 10, color: placing ? 'var(--text3)' : '#111', fontSize: 14, fontWeight: 700, cursor: placing ? 'not-allowed' : 'pointer' }}>
+          {placing ? 'Sparar…' : 'Lägg order'}
+        </button>
+      </div>
+      <p style={{ fontSize: 12, color: 'var(--text2)', textAlign: 'center', margin: '10px 0 0' }}>
+        Utkast och offerter påverkar inte lager eller budget och syns inte för kunden förrän de blir en order.
+      </p>
     </div>
   )
 
@@ -548,7 +738,15 @@ export default function CrmOrdersPage() {
       {/* LEFT: customer + products */}
       <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px 14px' : '24px 20px', paddingBottom: isMobile && cart.length > 0 ? 90 : undefined }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Skapa ny order</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
+            {editingOrder ? `${editingOrder.status === 'quote' ? 'Offert' : 'Utkast'} #${editingOrder.order_nr}` : 'Skapa ny order'}
+          </h1>
+          {editingOrder && (
+            <button onClick={() => { resetOrderForm(); setView('history') }}
+              style={{ marginLeft: 12, marginRight: 'auto', background: 'none', border: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>
+              Avbryt redigering
+            </button>
+          )}
           <button onClick={() => setView('history')} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 12, cursor: 'pointer' }}>
             Alla ordrar →
           </button>
@@ -686,7 +884,8 @@ export default function CrmOrdersPage() {
             </div>
             <div style={{ overflowY: 'auto', flex: 1, padding: '12px 16px' }}>
               {cart.map(i => (
-                <div key={i.product.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--line2)' }}>
+                <div key={i.product.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--line2)' }}>
+                  <Thumb p={i.product} size={40} />
                   <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{i.product.name}</div>
                     <div style={{ fontSize: 11, color: 'var(--text3)' }}>{i.qty} × {fmt(i.unitPrice)} kr</div>
@@ -744,8 +943,13 @@ export default function CrmOrdersPage() {
                     return (
                       <tr key={i.product.id} style={{ borderBottom: '1px solid var(--border2)' }}>
                         <td style={{ padding: '10px 12px' }}>
-                          <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: 12 }}>{i.product.name}</div>
-                          {hasDiscount && <div style={{ fontSize: 10, color: 'var(--green)' }}>{fmt(i.unitPrice)} kr (ord. {fmt(i.product.list_price)})</div>}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Thumb p={i.product} size={32} />
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: 12 }}>{i.product.name}</div>
+                              {hasDiscount && <div style={{ fontSize: 10, color: 'var(--green)' }}>{fmt(i.unitPrice)} kr (ord. {fmt(i.product.list_price)})</div>}
+                            </div>
+                          </div>
                         </td>
                         <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
@@ -774,7 +978,7 @@ export default function CrmOrdersPage() {
               {!selectedCustomer && <p style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center', marginBottom: 10 }}>Välj en kund för att fortsätta</p>}
               <button onClick={() => { if (selectedCustomer && cart.length > 0) setView('confirm') }} disabled={!selectedCustomer || cart.length === 0}
                 style={{ width: '100%', padding: '13px 0', background: selectedCustomer && cart.length > 0 ? 'var(--gold)' : 'var(--bg4)', border: 'none', borderRadius: 9, color: selectedCustomer && cart.length > 0 ? '#111' : 'var(--text3)', fontSize: 14, fontWeight: 700, cursor: selectedCustomer && cart.length > 0 ? 'pointer' : 'not-allowed' }}>
-                Skapa order
+                {editingOrder ? `Fortsätt med #${editingOrder.order_nr}` : 'Gå vidare'}
               </button>
             </div>
           </>

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
-import { budgetAchieved } from '@/lib/team'
+import { budgetAchieved, NOT_LIVE_FILTER } from '@/lib/team'
 
 export interface BudgetMonth {
   year: number
@@ -35,7 +35,7 @@ export function useBudgetHistory(count = 6) {
     Promise.all([
       sb.from('orders').select('assigned_to,subtotal,status,created_at').gte('created_at', from),
       sb.from('deals').select('id,assigned_to,value,updated_at').eq('stage', 'Vunnen').gte('updated_at', from),
-      sb.from('orders').select('deal_id').not('deal_id', 'is', null).neq('status', 'cancelled'),
+      sb.from('orders').select('deal_id').not('deal_id', 'is', null).not('status', 'in', NOT_LIVE_FILTER),
       sb.from('sales_budgets').select('salesperson,budget,year,month').in('year', years),
     ]).then(([{ data: orders }, { data: won }, { data: linked }, { data: budgets }]) => {
       const inMonth = (iso: string, s: { year: number; month: number }) => {

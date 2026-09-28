@@ -15,6 +15,7 @@ import type { User as SupaUser } from '@supabase/supabase-js'
 import OrderTracking from '@/components/portal/OrderTracking'
 import { userRole } from '@/lib/roles'
 import { featureIcon } from '@/lib/feature-icons'
+import { popElement } from '@/lib/pop'
 
 const DISCOUNT: Record<string, number> = { A: 0.40, B: 0.30, C: 0.20, Standard: 0 }
 
@@ -673,7 +674,7 @@ function CustomerPortalSection({ customer, authUser, openLogin }: { customer: an
                       <div style={{ fontSize: 13, fontWeight: 600, color: '#111', lineHeight: 1.3 }}>{p.name}</div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
                         <div style={{ fontSize: 14, fontWeight: 700, color: '#C9971A' }}>{fmt(price)} kr</div>
-                        <button onClick={() => cart.addItem({ id: p.id, name: p.name, brand: p.brand || '', list_price: p.list_price, image_url: p.image_url, unit: p.unit || '' }, pl)}
+                        <button onClick={e => { popElement(e.currentTarget); cart.addItem({ id: p.id, name: p.name, brand: p.brand || '', list_price: p.list_price, image_url: p.image_url, unit: p.unit || '' }, pl) }}
                           style={{ padding: '5px 10px', borderRadius: 6, background: '#111', color: '#fff', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
                           + Lägg till
                         </button>
@@ -932,7 +933,7 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
                           <div style={{ fontSize: 16, fontWeight: 800, color: '#111' }}>{fmt(Math.round(p.list_price * (1 - (DISCOUNT[priceList] ?? 0))))} kr</div>
                           <div style={{ fontSize: 10, color: '#aaa' }}>exkl. moms</div>
                         </div>
-                        <button onClick={() => cart.addItem(p, priceList)} aria-label={`Lägg ${p.name} i varukorgen`}
+                        <button onClick={e => { popElement(e.currentTarget); cart.addItem(p, priceList) }} aria-label={`Lägg ${p.name} i varukorgen`}
                           style={{ width: 36, height: 36, borderRadius: '50%', background: '#C9971A', color: '#111', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background .15s' }}
                           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#111'; (e.currentTarget as HTMLButtonElement).style.color = '#fff' }}
                           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#C9971A'; (e.currentTarget as HTMLButtonElement).style.color = '#111' }}>

@@ -5,11 +5,10 @@ import { fmt, formatDate, formatDateTime } from '@/lib/utils'
 import { Plus, Users, ShoppingBag, Package, ChevronRight, FileText, GitBranch, Target, Calendar, ChevronLeft, Cake } from 'lucide-react'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
-import { SALESPEOPLE, salespersonName, monthRange, budgetAchieved, canConfirmOrder } from '@/lib/team'
+import { SALESPEOPLE, currentStaff, monthRange, budgetAchieved, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
 import { useBudgetHistory } from '@/hooks/useBudgetHistory'
 import BudgetHistoryChart from '@/components/BudgetHistoryChart'
 import { nextBirthday, formatBirthday } from '@/lib/birthdays'
-import { userRole } from '@/lib/roles'
 
 const supabase = createClient()
 
@@ -51,7 +50,7 @@ export default function CrmDashboardPage() {
   const year  = now.getFullYear()
   const month = now.getMonth()
 
-  const [firstName, setFirstName]         = useState('Bashar')
+  const [firstName, setFirstName]         = useState('')
   const [deals, setDeals]                 = useState<any[]>([])
   const [recentCustomers, setRecentCustomers] = useState<any[]>([])
   const [calMonth, setCalMonth]           = useState(month)
@@ -77,9 +76,9 @@ export default function CrmDashboardPage() {
   const [confirmingId, setConfirmingId]   = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setFirstName(salespersonName(user))
-      setIsAdmin(userRole(user) === 'admin')
+    currentStaff(supabase).then(me => {
+      setFirstName(me.name)
+      setIsAdmin(me.isAdmin)
       setMeLoaded(true)
     })
     loadData()
@@ -107,7 +106,7 @@ export default function CrmDashboardPage() {
       supabase.from('customers').select('id,company').eq('status', 'active').order('company'),
       supabase.from('orders').select('id,order_nr,total,created_at,assigned_to,created_by,customers(id,company)').eq('status', 'pending').order('created_at', { ascending: false }),
       supabase.from('deals').select('id,assigned_to,value').eq('stage', 'Vunnen').gte('updated_at', start).lte('updated_at', end),
-      supabase.from('orders').select('deal_id').not('deal_id', 'is', null).neq('status', 'cancelled'),
+      supabase.from('orders').select('deal_id').not('deal_id', 'is', null).not('status', 'in', NOT_LIVE_FILTER),
     ]).then(([{ data: d }, { data: c }, { data: r }, { data: b }, { data: sold }, { data: ac }, { data: po }, { data: won }, { data: linked }]) => {
       if (d) setDeals(d)
       if (c) setRecentCustomers(c)

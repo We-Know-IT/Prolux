@@ -9,7 +9,7 @@ import { SALESPEOPLE } from '@/lib/team'
 
 
 const STATUS_LABELS: Record<string, string> = {
-  draft: 'Utkast', pending: 'Väntande', confirmed: 'Bekräftad',
+  draft: 'Utkast', quote: 'Offert', pending: 'Väntande', confirmed: 'Bekräftad',
   packed: 'Packad', shipped: 'Skickad', delivered: 'Levererad', cancelled: 'Avbruten',
 }
 const STATUS_CSS: Record<string, { bg: string; color: string }> = {
@@ -20,6 +20,7 @@ const STATUS_CSS: Record<string, { bg: string; color: string }> = {
   delivered: { bg: 'rgba(76,175,125,.12)',  color: '#4CAF7D' },
   cancelled: { bg: 'rgba(224,82,82,.12)',   color: '#E05252' },
   draft:     { bg: 'rgba(155,163,176,.08)', color: '#9BA0AB' },
+  quote:     { bg: 'rgba(155,110,232,.12)', color: '#9B6EE8' },
 }
 
 export default function AdminOrders() {
@@ -249,7 +250,12 @@ export default function AdminOrders() {
                 {orderItems.map(item => (
                   <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,.04)', fontSize: 13 }}>
                     <div>
-                      <div style={{ color: 'var(--text)', fontWeight: 500, marginBottom: 2 }}>{item.product_name}</div>
+                      <div style={{ color: 'var(--text)', fontWeight: 500, marginBottom: 2 }}>
+                        {item.product_name}
+                        {item.delivery === 'car' && (
+                          <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(76,175,125,.14)', color: 'var(--green)' }}>LEVERERAD FRÅN BILEN</span>
+                        )}
+                      </div>
                       <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text3)' }}>× {item.qty} · {item.product_sku}</div>
                     </div>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gold)', fontWeight: 500, whiteSpace: 'nowrap', marginLeft: 12 }}>{fmt(item.total_price)} kr</div>

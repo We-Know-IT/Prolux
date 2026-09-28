@@ -10,6 +10,7 @@ import {
 import type { User as SupaUser } from '@supabase/supabase-js'
 import OrderTracking from '@/components/portal/OrderTracking'
 import { userRole } from '@/lib/roles'
+import { popElement } from '@/lib/pop'
 
 const DISCOUNT: Record<string, number> = { A: 0.40, B: 0.30, C: 0.20, Standard: 0 }
 const STATUS_LABEL: Record<string, string> = { pending: 'Mottagen', confirmed: 'Bekräftad', packed: 'Packad', shipped: 'Skickad', delivered: 'Levererad', cancelled: 'Avbruten' }
@@ -254,7 +255,7 @@ function PortalContent({ user }: { user: SupaUser }) {
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
                         <span style={{ fontSize: 14, fontWeight: 700, color: '#C9971A' }}>{fmt(price)} kr</span>
-                        <button onClick={() => cart.addItem(p, pl)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 5, background: '#111', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                        <button onClick={e => { popElement(e.currentTarget); cart.addItem(p, pl) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 5, background: '#111', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
                           + Lägg till
                         </button>
                       </div>

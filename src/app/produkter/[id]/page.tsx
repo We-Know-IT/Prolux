@@ -8,6 +8,7 @@ import { fmt } from '@/lib/utils'
 import { stockStatus } from '@/lib/stock'
 import { ShoppingCart, Truck, ShieldCheck, ChevronRight, Minus, Plus, Package } from 'lucide-react'
 import Link from 'next/link'
+import { popElement } from '@/lib/pop'
 
 const DISCOUNT: Record<string, number> = { A: 0.40, B: 0.30, C: 0.20, Standard: 0 }
 
@@ -151,7 +152,7 @@ function ProductDetailContent() {
                 </button>
               </div>
               <button
-                onClick={addToCart}
+                onClick={e => { popElement(e.currentTarget); addToCart() }}
                 style={{ flex: 1, height: 52, background: added ? '#4CAF7D' : '#E8B84B', color: '#0F1115', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, letterSpacing: '.04em', textTransform: 'uppercase', transition: 'background .2s' }}
               >
                 <ShoppingCart size={18} />
@@ -245,7 +246,7 @@ function ProductDetailContent() {
                         <p style={{ fontSize: 13, fontWeight: 600, color: '#111', margin: '4px 0 12px', lineHeight: 1.3 }}>{p.name}</p>
                       </Link>
                       <button
-                        onClick={() => { cart.addItem({ id: p.id, name: p.name, brand: p.brand, list_price: p.list_price, image_url: p.image_url, unit: p.unit }, priceList) }}
+                        onClick={e => { popElement(e.currentTarget); cart.addItem({ id: p.id, name: p.name, brand: p.brand, list_price: p.list_price, image_url: p.image_url, unit: p.unit }, priceList) }}
                         style={{ width: '100%', padding: '8px 0', background: '#E8B84B', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: 'pointer', color: '#0F1115', letterSpacing: '.04em', textTransform: 'uppercase' }}
                       >
                         KÖP NU

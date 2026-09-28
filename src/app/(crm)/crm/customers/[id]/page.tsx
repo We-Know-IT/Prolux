@@ -13,6 +13,7 @@ import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { SALESPEOPLE } from '@/lib/team'
 import { nextBirthday, formatBirthday } from '@/lib/birthdays'
+import { useMe } from '@/hooks/useMe'
 
 const supabase = createClient()
 
@@ -57,6 +58,7 @@ const PL_BADGE_COLOR: Record<string, string> = { A: 'rgba(76,175,125,.15)', B: '
 const PL_TEXT_COLOR:  Record<string, string> = { A: 'var(--green)', B: 'var(--blue)', C: '#9B6EE8', Standard: 'var(--text3)' }
 
 export default function CustomerDetailPage() {
+  const me = useMe()
   const { id } = useParams<{ id: string }>()
   const router  = useRouter()
 
@@ -106,7 +108,7 @@ export default function CustomerDetailPage() {
     const titles = { note: 'Anteckning', call: 'Samtal', email: 'E-post', meeting: 'Möte' }
     const { data, error } = await supabase.from('activities').insert({
       customer_id: customer.id, type: noteType,
-      title: titles[noteType], body: noteText, created_by: 'Bashar'
+      title: titles[noteType], body: noteText, created_by: me.name || 'CRM'
     }).select().single()
     if (!error && data) { setActivities(as => [data, ...as]); setNoteText(''); showToast('Sparad') }
   }
@@ -120,7 +122,7 @@ export default function CustomerDetailPage() {
     if (!customer || !reminderText.trim() || !reminderDate) return
     const { data, error } = await supabase.from('reminders').insert({
       customer_id: customer.id, title: reminderText, due_date: reminderDate,
-      priority: reminderPriority, status: 'upcoming', created_by: 'Bashar',
+      priority: reminderPriority, status: 'upcoming', created_by: me.name || 'CRM',
     }).select().single()
     if (!error && data) {
       setReminders(rs => [...rs, data].sort((a, b) => a.due_date.localeCompare(b.due_date)))

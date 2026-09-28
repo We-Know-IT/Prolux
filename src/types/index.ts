@@ -65,7 +65,7 @@ export interface Order {
   customers?: Customer
 }
 
-export type OrderStatus = 'pending' | 'confirmed' | 'packed' | 'shipped' | 'delivered' | 'cancelled'
+export type OrderStatus = 'draft' | 'quote' | 'pending' | 'confirmed' | 'packed' | 'shipped' | 'delivered' | 'cancelled'
 
 export interface OrderItem {
   id: string
@@ -138,6 +138,8 @@ export const PRICE_LIST_LABEL: Record<PriceList, string> = {
 }
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
+  draft: 'Utkast',
+  quote: 'Offert',
   pending: 'Väntande',
   confirmed: 'Bekräftad',
   packed: 'Packad',

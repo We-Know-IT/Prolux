@@ -7,7 +7,7 @@ import { formatDate } from '@/lib/utils'
 import { Plus, Search, Bell, Mail, ChevronRight, Phone } from 'lucide-react'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
-import { SALESPEOPLE, salespersonName } from '@/lib/team'
+import { SALESPEOPLE, currentStaff } from '@/lib/team'
 
 const supabase = createClient()
 
@@ -39,8 +39,7 @@ export default function CrmCustomersPage() {
   useEffect(() => {
     loadData()
     // New customers default to the salesperson creating them.
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      const me = salespersonName(user)
+    currentStaff(supabase).then(({ name: me }) => {
       setMyName(me)
       setNewCustomerForm(f => ({ ...f, account_manager: f.account_manager || me }))
     })
