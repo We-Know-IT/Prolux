@@ -4,14 +4,20 @@ import { userRole, type AppRole } from '@/lib/roles'
 // Salespeople are identified by first name everywhere they are stored:
 // sales_budgets.salesperson, deals.assigned_to, customers.account_manager
 // and orders.assigned_to.
-export const SALESPEOPLE = ['Bashar', 'Stefan', 'Anna', 'Erik']
+// Used only until Personal can be read (migration 0014); see useTeam().
+export const SALESPEOPLE_FALLBACK = ['Bashar', 'Stefan', 'Anna', 'Erik'] as const
 
 // First name from the account itself. Prefer currentStaff(), which also
 // reads the name admin entered under Personal.
 export function salespersonName(user: User | null | undefined, staffFullName?: string | null): string {
-  const full = staffFullName || user?.user_metadata?.full_name || user?.user_metadata?.name
-  if (full) return String(full).trim().split(/\s+/)[0]
-  const local = (user?.email || '').split('@')[0].split(/[._-]/)[0]
+  return firstNameOf(staffFullName || user?.user_metadata?.full_name || user?.user_metadata?.name, user?.email)
+}
+
+// "Anna Svensson" → "Anna"; without a name, "johan.k@…" → "Johan".
+// Must match my_staff_name() in the database (migration 0014).
+export function firstNameOf(fullName?: string | null, email?: string | null): string {
+  if (fullName && fullName.trim()) return fullName.trim().split(/\s+/)[0]
+  const local = (email || '').split('@')[0].split(/[._-]/)[0]
   return local ? local[0].toUpperCase() + local.slice(1) : ''
 }
 

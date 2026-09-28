@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
-import { SALESPEOPLE } from '@/lib/team'
+import { useTeam, teamOptions } from '@/hooks/useTeam'
 import { nextBirthday, formatBirthday } from '@/lib/birthdays'
 import { useMe } from '@/hooks/useMe'
 
@@ -58,6 +58,7 @@ const PL_BADGE_COLOR: Record<string, string> = { A: 'rgba(76,175,125,.15)', B: '
 const PL_TEXT_COLOR:  Record<string, string> = { A: 'var(--green)', B: 'var(--blue)', C: '#9B6EE8', Standard: 'var(--text3)' }
 
 export default function CustomerDetailPage() {
+  const SALESPEOPLE = useTeam()
   const me = useMe()
   const { id } = useParams<{ id: string }>()
   const router  = useRouter()
@@ -649,7 +650,7 @@ export default function CustomerDetailPage() {
               <select value={editForm.account_manager || ''} onChange={e => setEditForm(f => ({ ...f, account_manager: e.target.value }))}
                 style={{ width: '100%', padding: '9px 12px', background: 'var(--bg3)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none' }}>
                 <option value="">— Ingen —</option>
-                {SALESPEOPLE.map(sp => <option key={sp} value={sp}>{sp}</option>)}
+                {teamOptions(SALESPEOPLE, editForm.account_manager).map(sp => <option key={sp} value={sp}>{sp}</option>)}
               </select>
               <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Nya ordrar från kunden går till och räknas på den här säljaren.</div>
             </div>

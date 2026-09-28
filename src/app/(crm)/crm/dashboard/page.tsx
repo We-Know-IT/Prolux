@@ -5,7 +5,8 @@ import { fmt, formatDate, formatDateTime } from '@/lib/utils'
 import { Plus, Users, ShoppingBag, Package, ChevronRight, FileText, GitBranch, Target, Calendar, ChevronLeft, Cake } from 'lucide-react'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
-import { SALESPEOPLE, currentStaff, monthRange, budgetAchieved, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
+import { currentStaff, monthRange, budgetAchieved, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
+import { useTeam } from '@/hooks/useTeam'
 import { useBudgetHistory } from '@/hooks/useBudgetHistory'
 import BudgetHistoryChart from '@/components/BudgetHistoryChart'
 import { nextBirthday, formatBirthday } from '@/lib/birthdays'
@@ -46,6 +47,7 @@ function workingDaysPassed(year: number, month: number): number {
 }
 
 export default function CrmDashboardPage() {
+  const SALESPEOPLE = useTeam()
   const now   = new Date()
   const year  = now.getFullYear()
   const month = now.getMonth()

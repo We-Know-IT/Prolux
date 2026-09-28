@@ -7,11 +7,13 @@ import { formatDate } from '@/lib/utils'
 import { Plus, Search, Bell, Mail, ChevronRight, Phone } from 'lucide-react'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
-import { SALESPEOPLE, currentStaff } from '@/lib/team'
+import { currentStaff } from '@/lib/team'
+import { useTeam, teamOptions } from '@/hooks/useTeam'
 
 const supabase = createClient()
 
 export default function CrmCustomersPage() {
+  const SALESPEOPLE = useTeam()
   const router = useRouter()
   const [customers, setCustomers]     = useState<Customer[]>([])
   const [allReminders, setAllReminders] = useState<{ customer_id: string; due_date: string }[]>([])
@@ -229,7 +231,7 @@ export default function CrmCustomersPage() {
               <select value={newCustomerForm.account_manager} onChange={e => setNewCustomerForm(f => ({ ...f, account_manager: e.target.value }))}
                 style={{ width: '100%', padding: '9px 12px', background: 'var(--bg3)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none' }}>
                 <option value="">— Ingen —</option>
-                {SALESPEOPLE.map(sp => <option key={sp} value={sp}>{sp}</option>)}
+                {teamOptions(SALESPEOPLE, newCustomerForm.account_manager).map(sp => <option key={sp} value={sp}>{sp}</option>)}
               </select>
             </div>
 

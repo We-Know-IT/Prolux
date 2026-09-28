@@ -6,7 +6,8 @@ import { Product, Customer, Category, CartItem, Order, OrderItem, OrderStatus, O
 import { custPrice, fmt, formatDateTime } from '@/lib/utils'
 import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star } from 'lucide-react'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
-import { SALESPEOPLE, currentStaff, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
+import { currentStaff, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
+import { useTeam, teamOptions } from '@/hooks/useTeam'
 import ShipOrderForm from '@/components/orders/ShipOrderForm'
 
 const supabase = createClient()
@@ -88,6 +89,7 @@ function ProductRow({ p, selectedCustomer, getQty, addToCart, updateQty, badge }
 }
 
 export default function CrmOrdersPage() {
+  const SALESPEOPLE = useTeam()
   const searchParams = useSearchParams()
   const autoSelectedRef = useRef(false)
   const [view, setView]                   = useState<View>(() => searchParams.get('view') === 'history' ? 'history' : 'new')
@@ -599,7 +601,7 @@ export default function CrmOrdersPage() {
           <select value={assignee} onChange={e => setAssignee(e.target.value)}
             style={{ width: '100%', padding: '11px 36px 11px 14px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 14, outline: 'none', appearance: 'none', cursor: 'pointer' }}>
             <option value="">{selectedCustomer.account_manager ? `Kundansvarig (${selectedCustomer.account_manager})` : '— Ingen säljare —'}</option>
-            {SALESPEOPLE.map(sp => <option key={sp} value={sp}>{sp}{sp === selectedCustomer.account_manager ? ' (kundansvarig)' : ''}</option>)}
+            {teamOptions(SALESPEOPLE, assignee).map(sp => <option key={sp} value={sp}>{sp}{sp === selectedCustomer.account_manager ? ' (kundansvarig)' : ''}</option>)}
           </select>
           <ChevronDown size={15} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', pointerEvents: 'none' }} />
         </div>

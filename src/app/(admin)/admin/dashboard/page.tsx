@@ -5,7 +5,8 @@ import { fmt } from '@/lib/utils'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
-import { SALESPEOPLE, monthRange, budgetAchieved, isLiveOrder } from '@/lib/team'
+import { monthRange, budgetAchieved, isLiveOrder } from '@/lib/team'
+import { useTeam } from '@/hooks/useTeam'
 import { useBudgetHistory } from '@/hooks/useBudgetHistory'
 import BudgetHistoryChart from '@/components/BudgetHistoryChart'
 import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, Trophy, ArrowRight, Calendar, ChevronLeft, ChevronRight, Activity } from 'lucide-react'
@@ -37,6 +38,7 @@ function workingDaysInMonth(year: number, month: number) {
 }
 
 export default function AdminDashboard() {
+  const SALESPEOPLE = useTeam()
   const router = useRouter()
   const [orders, setOrders]       = useState<any[]>([])
   const [products, setProducts]   = useState<any[]>([])

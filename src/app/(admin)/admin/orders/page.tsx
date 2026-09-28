@@ -5,7 +5,7 @@ import { fmt, formatDateTime } from '@/lib/utils'
 import { X } from 'lucide-react'
 import ShipOrderForm from '@/components/orders/ShipOrderForm'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
-import { SALESPEOPLE } from '@/lib/team'
+import { useTeam, teamOptions } from '@/hooks/useTeam'
 
 
 const STATUS_LABELS: Record<string, string> = {
@@ -24,6 +24,7 @@ const STATUS_CSS: Record<string, { bg: string; color: string }> = {
 }
 
 export default function AdminOrders() {
+  const SALESPEOPLE = useTeam()
   const [orders, setOrders]           = useState<any[]>([])
   const [filtered, setFiltered]       = useState<any[]>([])
   const [search, setSearch]           = useState('')
@@ -217,7 +218,7 @@ export default function AdminOrders() {
                     <select key="a" value={selectedOrder.assigned_to || ''} onChange={e => updateAssignee(selectedOrder.id, e.target.value)}
                       style={{ fontSize: 12, padding: '4px 8px', border: `1px solid ${selectedOrder.assigned_to ? 'var(--border)' : 'var(--red)'}`, borderRadius: 4, background: 'var(--bg3)', color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>
                       <option value="">— Ingen —</option>
-                      {SALESPEOPLE.map(sp => <option key={sp} value={sp}>{sp}</option>)}
+                      {teamOptions(SALESPEOPLE, selectedOrder.assigned_to).map(sp => <option key={sp} value={sp}>{sp}</option>)}
                     </select>
                   )],
                 ].map(([k, v]) => (

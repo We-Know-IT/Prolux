@@ -5,7 +5,7 @@ import { Deal, Customer, DEAL_STAGES, DealStage } from '@/types'
 import { fmt, formatDate } from '@/lib/utils'
 import { Plus, X, User, ChevronDown } from 'lucide-react'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
-import { SALESPEOPLE } from '@/lib/team'
+import { useTeam, teamOptions } from '@/hooks/useTeam'
 import { useMe } from '@/hooks/useMe'
 
 const supabase = createClient()
@@ -17,6 +17,7 @@ const STAGE_COLORS: Record<DealStage, string> = {
 
 
 export default function CrmPipelinePage() {
+  const SALESPEOPLE = useTeam()
   const me = useMe()
   const [deals, setDeals] = useState<(Deal & { customers?: Customer })[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -315,7 +316,7 @@ export default function CrmPipelinePage() {
                 <select value={form.assigned_to} onChange={e => setForm(f => ({ ...f, assigned_to: e.target.value }))}
                   style={{ width: '100%', padding: '9px 12px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none' }}>
                   <option value="">— Ingen —</option>
-                  {SALESPEOPLE.map(s => <option key={s} value={s}>{s}</option>)}
+                  {teamOptions(SALESPEOPLE, form.assigned_to).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
 
