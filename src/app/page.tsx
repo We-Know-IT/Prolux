@@ -675,14 +675,21 @@ function CustomerPortalSection({ customer, authUser, openLogin }: { customer: an
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
                 {recommended.map(p => {
                   return (
-                    <div key={p.id} style={{ background: '#F9F7F3', border: '1px solid rgba(0,0,0,.06)', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#111', lineHeight: 1.3 }}>{p.name}</div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
+                    <div key={p.id} style={{ background: '#F9F7F3', border: '1px solid rgba(0,0,0,.06)', borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                      <Link href={`/produkter/${p.id}`} aria-label={p.name} style={{ height: 150, background: '#fff', borderBottom: '1px solid rgba(0,0,0,.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 14 }}>
+                        {p.image_url
+                          ? <img src={p.image_url} alt={p.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', mixBlendMode: 'multiply' }} />
+                          : <Package size={40} color="#bbb" strokeWidth={1} />}
+                      </Link>
+                      <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+                      <Link href={`/produkter/${p.id}`} style={{ fontSize: 13, fontWeight: 600, color: '#111', lineHeight: 1.3, textDecoration: 'none' }}>{p.name}</Link>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 'auto' }}>
                         <Price listPrice={p.list_price} size="sm" />
                         <button onClick={e => { popElement(e.currentTarget); cart.addItem({ id: p.id, name: p.name, brand: p.brand || '', list_price: p.list_price, image_url: p.image_url, unit: p.unit || '' }, pl) }}
-                          style={{ padding: '5px 10px', borderRadius: 6, background: '#111', color: '#fff', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
-                          + Lägg till
+                          style={{ width: '100%', padding: '8px 10px', borderRadius: 7, background: '#111', color: '#fff', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          + Lägg i varukorg
                         </button>
+                      </div>
                       </div>
                     </div>
                   )
