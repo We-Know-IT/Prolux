@@ -4,6 +4,7 @@ import { ReactNode, useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import WebshopLink from '@/components/layout/WebshopLink'
 import { createClient } from '@/lib/supabase/client'
 import { currentStaff } from '@/lib/team'
 import { LayoutDashboard, GitBranch, Users, ShoppingCart, LogOut, Menu, X, CalendarDays, StickyNote } from 'lucide-react'
@@ -65,7 +66,7 @@ export default function CrmShell({ children }: { children: ReactNode }) {
       }}>
         {/* Logo */}
         <Link href="/crm/dashboard" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', flexShrink: 0, marginRight: 4 }}>
-          <Image src="/logo.svg" alt="Prolux Shine" width={131} height={38} priority style={{ display: 'block' }} />
+          <Image src="/logo.svg" alt="Prolux Shine" width={166} height={30} priority style={{ display: 'block', height: 30, width: 'auto' }} />
         </Link>
 
         {/* Desktop nav pills */}
@@ -92,6 +93,7 @@ export default function CrmShell({ children }: { children: ReactNode }) {
 
         {/* Right side */}
         <div className="crm-desktop-right" style={{ display: 'none', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
+          <WebshopLink variant="bar" />
           <button onClick={logout} style={{
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '6px 12px',
@@ -149,6 +151,7 @@ export default function CrmShell({ children }: { children: ReactNode }) {
             )
           })}
           <div style={{ flex: 1 }} />
+          <WebshopLink variant="menu" />
           <button onClick={logout} style={{
             display: 'flex', alignItems: 'center', gap: 12,
             padding: '14px 18px', background: 'rgba(255,255,255,.03)',

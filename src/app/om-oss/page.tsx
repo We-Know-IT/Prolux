@@ -8,6 +8,12 @@ import { useRef, useEffect, useState } from 'react'
 import { DEFAULT_OM_OSS, DEFAULT_CONTACT, OmOssContent as OmOssPageData, ContactContent } from '@/lib/site-content'
 import { useSiteContent, EditableText, EditableImage } from '@/components/site-edit/SiteEdit'
 
+// Official brand logos, matched on the brand name in Om oss content.
+const BRAND_LOGO: Record<string, { src: string; w: number; h: number }> = {
+  frescura: { src: '/brands/frescura.svg', w: 200, h: 18 },
+  virtus:   { src: '/brands/virtus.svg',   w: 56,  h: 58 },
+}
+
 function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
   const ref = useRef<HTMLDivElement>(null)
   const [vis, setVis] = useState(false)
@@ -110,7 +116,12 @@ function OmOssContent() {
                     <EditableImage doc="om_oss" path={`brands.${i}.img`} bucket="om-oss-images" />
                   </div>
                   <div style={{ padding: '28px 32px 32px' }}>
-                    <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.15em' }}>Varumärke</p>
+                    {BRAND_LOGO[b.name.trim().toLowerCase()] ? (
+                      <Image src={BRAND_LOGO[b.name.trim().toLowerCase()].src} alt={b.name} width={BRAND_LOGO[b.name.trim().toLowerCase()].w} height={BRAND_LOGO[b.name.trim().toLowerCase()].h}
+                        style={{ display: 'block', height: BRAND_LOGO[b.name.trim().toLowerCase()].h, width: 'auto', marginBottom: 14 }} />
+                    ) : (
+                      <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.15em' }}>Varumärke</p>
+                    )}
                     <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: 38, fontWeight: 400, color: '#111', margin: '0 0 6px', fontStyle: 'italic', lineHeight: 1 }}><EditableText doc="om_oss" path={`brands.${i}.name`} value={b.name} /></h3>
                     <p style={{ fontSize: 13, fontWeight: 600, color: '#555', margin: '0 0 14px' }}><EditableText doc="om_oss" path={`brands.${i}.tagline`} value={b.tagline} /></p>
                     <p style={{ fontSize: 14, color: '#666', lineHeight: 1.75, margin: '0 0 20px' }}><EditableText doc="om_oss" path={`brands.${i}.desc`} value={b.desc} multiline /></p>

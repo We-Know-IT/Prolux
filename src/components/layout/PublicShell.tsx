@@ -308,14 +308,13 @@ function PublicShellInner({ children }: { children: ReactNode }) {
         boxShadow: scrolled ? '0 2px 20px rgba(0,0,0,.06)' : 'none',
       }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0 }}>
-          <Image src="/logo-mark.svg" alt="Prolux Shine" width={36} height={48} priority style={{ display: 'block' }} />
-          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1, gap: 2 }}>
-            <span style={{ fontFamily: 'var(--font-serif)', fontSize: 16, fontWeight: 700, letterSpacing: '.1em', color: '#fff', textTransform: 'uppercase' }}>Prolux Shine</span>
-            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 8, fontWeight: 500, letterSpacing: '.18em', color: 'rgba(255,255,255,.45)', textTransform: 'uppercase' }}>Bilvårdsprodukter & Drömmar</span>
-            <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
-              <span style={{ fontSize: 9, fontWeight: 800, color: '#E8B84B', letterSpacing: '.06em', border: '1px solid rgba(232,184,75,.4)', padding: '1px 5px', borderRadius: 3 }}>FRESCURA</span>
-              <span style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,.5)', letterSpacing: '.06em', border: '1px solid rgba(255,255,255,.2)', padding: '1px 5px', borderRadius: 3 }}>VIRTUS</span>
-            </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <Image src="/logo.svg" alt="Prolux Shine" width={166} height={30} priority style={{ display: 'block', height: 30, width: 'auto' }} />
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 8, fontWeight: 500, letterSpacing: '.18em', color: 'rgba(255,255,255,.6)', textTransform: 'uppercase', paddingLeft: 32 }}>Bilvårdsprodukter & Drömmar</span>
+          </div>
+          <div className="pub-brand-logos" style={{ display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 12, borderLeft: '1px solid rgba(255,255,255,.15)' }}>
+            <Image src="/brands/frescura.svg" alt="Frescura" width={72} height={7} style={{ display: 'block', height: 9, width: 'auto' }} />
+            <Image src="/brands/virtus.svg" alt="Virtus" width={22} height={23} style={{ display: 'block', height: 26, width: 'auto' }} />
           </div>
         </Link>
 
@@ -542,15 +541,18 @@ function PublicShellInner({ children }: { children: ReactNode }) {
             {/* Col 1 — Brand */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                <Image src="/logo-mark.svg" alt="Prolux Shine" width={22} height={30} style={{ display: 'block' }} />
-                <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1, gap: 1 }}>
-                  <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, fontWeight: 400, letterSpacing: '.14em', color: '#fff', textTransform: 'uppercase' }}>Prolux</span>
-                  <span style={{ fontFamily: 'var(--font-sans)', fontSize: 6.5, fontWeight: 700, letterSpacing: '.45em', color: '#E8B84B', textTransform: 'uppercase' }}>Shine</span>
-                </div>
+                <Image src="/logo.svg" alt="Prolux Shine" width={188} height={34} style={{ display: 'block', height: 34, width: 'auto' }} />
               </div>
-              <p style={{ fontSize: 14, color: 'rgba(255,255,255,.55)', lineHeight: 1.75, maxWidth: 240, marginBottom: 20 }}>
+              <p style={{ fontSize: 14, color: 'rgba(255,255,255,.65)', lineHeight: 1.75, maxWidth: 240, marginBottom: 20 }}>
                 Exklusiv distributör för premium bilvårdssystem i Norden. Vi levererar prestanda och resultat till professionella användare.
               </p>
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.6)', textTransform: 'uppercase', letterSpacing: '.12em', marginBottom: 10 }}>Officiell distributör av</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <Image src="/brands/frescura.svg" alt="Frescura" width={110} height={10} style={{ display: 'block', height: 12, width: 'auto' }} />
+                  <Image src="/brands/virtus.svg" alt="Virtus" width={34} height={36} style={{ display: 'block', height: 36, width: 'auto' }} />
+                </div>
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
                 <a href={`mailto:${contact.email}`} style={{ fontSize: 14, color: 'rgba(255,255,255,.6)', textDecoration: 'none' }}><EditableText doc="contact" path="email" value={contact.email} /></a>
                 <a href={`tel:${contact.phone.replace(/[^+\d]/g, '')}`} style={{ fontSize: 14, color: 'rgba(255,255,255,.6)', textDecoration: 'none' }}><EditableText doc="contact" path="phone" value={contact.phone} /></a>
@@ -609,11 +611,7 @@ function PublicShellInner({ children }: { children: ReactNode }) {
               <X size={18} />
             </button>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-              <Image src="/logo-mark.svg" alt="Prolux Shine" width={36} height={49} style={{ display: 'block' }} />
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                <span style={{ fontFamily: 'var(--font-serif)', fontSize: 16, fontWeight: 400, letterSpacing: '.18em', color: '#111', textTransform: 'uppercase' }}>Prolux</span>
-                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 7.5, fontWeight: 700, letterSpacing: '.45em', color: '#C9971A', textTransform: 'uppercase' }}>Shine</span>
-              </div>
+              <Image src="/logo-full-dark.svg" alt="Prolux Shine" width={124} height={91} style={{ display: 'block', height: 88, width: 'auto' }} />
             </div>
 
             {/* Tabs */}
@@ -704,6 +702,7 @@ function PublicShellInner({ children }: { children: ReactNode }) {
         .pub-desktop-nav   { display: none !important; }
         .pub-desktop-right { display: none !important; }
         .pub-mobile-btn    { display: flex !important; }
+        @media (max-width: 1379px) { .pub-brand-logos { display: none !important; } }
         @media (min-width: 860px) {
           .pub-desktop-nav   { display: flex !important; }
           .pub-desktop-right { display: flex !important; }

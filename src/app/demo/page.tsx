@@ -63,7 +63,7 @@ function CrmShell({ screen, setScreen, children }: { screen: Screen, setScreen: 
         display: 'flex', alignItems: 'center', paddingInline: 20, gap: 12,
       }}>
         <button onClick={() => setScreen('dashboard')} style={{ background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, padding: 0, display: 'flex', alignItems: 'center' }}>
-          <Image src="/logo.svg" alt="Prolux Shine" width={118} height={34} priority style={{ display: 'block' }} />
+          <Image src="/logo.svg" alt="Prolux Shine" width={166} height={30} priority style={{ display: 'block', height: 30, width: 'auto' }} />
         </button>
         <nav style={{ display: 'none', gap: 2, flex: 1, justifyContent: 'center' }} className="desktop-nav-demo">
           {NAV.map(({ key, label, icon: Icon }) => {

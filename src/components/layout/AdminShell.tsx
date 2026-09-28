@@ -4,6 +4,7 @@ import { ReactNode, useState, useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import WebshopLink from '@/components/layout/WebshopLink'
 import { createClient } from '@/lib/supabase/client'
 import { LayoutDashboard, ShoppingBag, Users, Tag, Megaphone, Zap, LogOut, UserCog, Menu, X, GitBranch, CalendarDays, StickyNote, Bell, FileText } from 'lucide-react'
 
@@ -74,7 +75,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
       }}>
         {/* Logo */}
         <Link href="/admin/dashboard" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', flexShrink: 0, marginRight: 4 }}>
-          <Image src="/logo.svg" alt="Prolux Shine" width={131} height={38} priority style={{ display: 'block' }} />
+          <Image src="/logo.svg" alt="Prolux Shine" width={166} height={30} priority style={{ display: 'block', height: 30, width: 'auto' }} />
         </Link>
 
         {/* Desktop nav pills */}
@@ -164,6 +165,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
             </div>
             <span style={{ fontSize: 12, color: 'var(--text2)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</span>
           </div>
+          <WebshopLink variant="bar" />
           <button onClick={logout} style={{
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '6px 12px',
@@ -243,6 +245,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
             <div style={{ fontSize: 13, color: 'var(--text2)', fontWeight: 500 }}>{email}</div>
             <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Administratör</div>
           </div>
+          <WebshopLink variant="menu" />
           <button onClick={logout} style={{
             display: 'flex', alignItems: 'center', gap: 12,
             padding: '14px 18px', background: 'rgba(255,255,255,.03)',
