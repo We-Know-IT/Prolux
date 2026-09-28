@@ -6,7 +6,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Menu, X, ChevronRight, ShoppingCart, User, LogOut, Package, ChevronDown, Minus, Plus, Trash2, FileText, MailCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt } from '@/lib/utils'
-import { getSiteContent, DEFAULT_CONTACT, ContactContent } from '@/lib/site-content'
+import { DEFAULT_CONTACT, ContactContent } from '@/lib/site-content'
+import { SiteEditProvider, useSiteContent, EditableText } from '@/components/site-edit/SiteEdit'
 import type { User as SupaUser } from '@supabase/supabase-js'
 import { userRole } from '@/lib/roles'
 
@@ -60,7 +61,12 @@ const S = {
   } as React.CSSProperties,
 }
 
+// Admins can edit the page's texts in place (see components/site-edit).
 export function PublicShell({ children }: { children: ReactNode }) {
+  return <SiteEditProvider><PublicShellInner>{children}</PublicShellInner></SiteEditProvider>
+}
+
+function PublicShellInner({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const [menuOpen, setMenuOpen]   = useState(false)
@@ -80,7 +86,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
   const [regLoading, setRegLoading] = useState(false)
   const [regError, setRegError] = useState('')
   const [regDone, setRegDone] = useState(false)
-  const [contact, setContact] = useState<ContactContent>(DEFAULT_CONTACT)
+  const contact = useSiteContent<ContactContent>('contact', DEFAULT_CONTACT)
 
   // Cart state. Kept in localStorage so it survives moving between pages
   // (every page mounts its own PublicShell) and reaching the checkout.
@@ -102,10 +108,6 @@ export function PublicShell({ children }: { children: ReactNode }) {
     if (!cartLoaded.current) return
     try { localStorage.setItem(CART_KEY, JSON.stringify(cartItems)) } catch { /* ignore */ }
   }, [cartItems])
-
-  useEffect(() => {
-    getSiteContent('contact', DEFAULT_CONTACT).then(setContact)
-  }, [])
 
   useEffect(() => {
     const sb = createClient()
@@ -550,8 +552,8 @@ export function PublicShell({ children }: { children: ReactNode }) {
                 Exklusiv distributör för premium bilvårdssystem i Norden. Vi levererar prestanda och resultat till professionella användare.
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
-                <a href={`mailto:${contact.email}`} style={{ fontSize: 14, color: 'rgba(255,255,255,.6)', textDecoration: 'none' }}>{contact.email}</a>
-                <a href={`tel:${contact.phone.replace(/[^+\d]/g, '')}`} style={{ fontSize: 14, color: 'rgba(255,255,255,.6)', textDecoration: 'none' }}>{contact.phone}</a>
+                <a href={`mailto:${contact.email}`} style={{ fontSize: 14, color: 'rgba(255,255,255,.6)', textDecoration: 'none' }}><EditableText doc="contact" path="email" value={contact.email} /></a>
+                <a href={`tel:${contact.phone.replace(/[^+\d]/g, '')}`} style={{ fontSize: 14, color: 'rgba(255,255,255,.6)', textDecoration: 'none' }}><EditableText doc="contact" path="phone" value={contact.phone} /></a>
               </div>
               <div style={{ display: 'flex', gap: 14 }}>
                 {['IG', 'FB', 'YT'].map(s => (

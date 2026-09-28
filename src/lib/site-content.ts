@@ -61,6 +61,7 @@ export const DEFAULT_TRUST: TrustItem[] = [
 ]
 
 export const DEFAULT_HOME: HomeContent = {
+  trust: DEFAULT_TRUST,
   hero: [
     { image_url: 'https://fopshubqliboxgokbhnr.supabase.co/storage/v1/object/public/hero-images/hero-1.png', label: 'Kvalitetsgaranti från Italien', heading: 'Prolux Shine', sub: 'Premiumleverantör av italienska bilvårdsprodukter — skapade för proffs och entusiaster.' },
     { image_url: 'https://fopshubqliboxgokbhnr.supabase.co/storage/v1/object/public/hero-images/hero-2.png', label: 'Professionell bilvård', heading: 'Rätt teknik.\nRätt produkter.', sub: 'Komplett sortiment för handtvätt, maskinpolering och lackskydd.' },

@@ -6,7 +6,8 @@ import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { PublicShell, useLoginModal, usePublicCart } from '@/components/layout/PublicShell'
 import { fmt, formatDate } from '@/lib/utils'
-import { getSiteContent, DEFAULT_HOME, DEFAULT_TRUST, HomeContent as SiteHomeContent } from '@/lib/site-content'
+import { DEFAULT_HOME, DEFAULT_TRUST, HomeContent as SiteHomeContent } from '@/lib/site-content'
+import { useSiteContent, useIsEditingSite, EditableText, EditableImage } from '@/components/site-edit/SiteEdit'
 import {
   ArrowRight, ChevronRight, Package,
   ShoppingCart, ShoppingBag, ExternalLink, User, Lock, Save, Check, ClipboardList, RefreshCw, Sparkles
@@ -373,17 +374,18 @@ const HERO_TEXT = [
   { label: 'Fälg & Exteriör', heading: 'Rena fälgar.\nKlara resultat.', sub: 'Starka rengöringsmedel formulerade för professionella biltvättar och detailingföretag.' },
 ]
 
-function HeroSlider({ openLogin, loggedIn, heroImages, heroText }: { openLogin: () => void; loggedIn?: boolean; heroImages: string[]; heroText: typeof HERO_TEXT }) {
+function HeroSlider({ openLogin, loggedIn, heroImages, heroText, paused = false }: { openLogin: () => void; loggedIn?: boolean; heroImages: string[]; heroText: typeof HERO_TEXT; paused?: boolean }) {
   const [current, setCurrent] = useState(0)
   const slides = heroImages.length >= 3 ? heroImages.slice(0, 3) : heroImages.length > 0 ? [heroImages[0], heroImages[0], heroImages[0]] : []
   const total = heroText.length
 
   useEffect(() => {
+    if (paused) return   // hold the slide still while an admin edits it
     const t = setInterval(() => {
       setCurrent(c => (c + 1) % total)
     }, 4000)
     return () => clearInterval(t)
-  }, [total])
+  }, [total, paused])
 
   const slide = heroText[current]
 
@@ -397,6 +399,8 @@ function HeroSlider({ openLogin, loggedIn, heroImages, heroText }: { openLogin: 
         </div>
       ))}
 
+      <EditableImage doc="home" path={`hero.${current}.image_url`} bucket="hero-images" top={140} />
+
       {/* Fallback dark bg when no images */}
       {slides.length === 0 && <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, #0a0c10, #1a1400)' }} />}
 
@@ -409,13 +413,13 @@ function HeroSlider({ openLogin, loggedIn, heroImages, heroText }: { openLogin: 
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 48px 80px', width: '100%' }}>
           <div key={current} style={{ animation: 'fadeUp .5s ease' }}>
             <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.65)', textTransform: 'uppercase', letterSpacing: '.2em' }}>
-              {slide.label}
+              <EditableText doc="home" path={`hero.${current}.label`} value={slide.label} />
             </p>
             <h1 style={{ fontFamily: 'var(--font-sans)', fontSize: 'clamp(42px, 6vw, 88px)', fontWeight: 800, color: '#fff', margin: '0 0 16px', lineHeight: 1.0, letterSpacing: '-.02em', whiteSpace: 'pre-line', textTransform: 'uppercase' }}>
-              {slide.heading}
+              <EditableText doc="home" path={`hero.${current}.heading`} value={slide.heading} multiline />
             </h1>
             <p style={{ fontSize: 15, color: 'rgba(255,255,255,.75)', lineHeight: 1.65, margin: '0 0 32px', maxWidth: 480 }}>
-              {slide.sub}
+              <EditableText doc="home" path={`hero.${current}.sub`} value={slide.sub} multiline />
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <Link href="/produkter" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 32px', borderRadius: 40, background: '#E8B84B', color: '#0F1115', fontSize: 14, fontWeight: 700, textDecoration: 'none', letterSpacing: '.02em' }}>
@@ -841,40 +845,39 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
   const cart = usePublicCart()
   const priceList = customer?.price_list_id || 'Standard'
   const heroImg = products.find(p => p.image_url)?.image_url || null
-  const [siteHome, setSiteHome] = useState<SiteHomeContent>(DEFAULT_HOME)
-  const trust = (siteHome.trust ?? DEFAULT_TRUST).filter(t => t.title.trim())
-
-  useEffect(() => {
-    getSiteContent('home', DEFAULT_HOME).then(setSiteHome)
-  }, [])
+  const siteHome = useSiteContent<SiteHomeContent>('home', DEFAULT_HOME)
+  const editingSite = useIsEditingSite()
+  // Keep each item's position in the saved list (`at`) for editing; empty
+  // items are hidden from visitors but stay editable in edit mode.
+  const trust = (siteHome.trust ?? DEFAULT_TRUST).map((t, at) => ({ ...t, at })).filter(t => editingSite || t.title.trim())
 
   return (
     <>
       {/* ── ANNOUNCEMENT BAR ── */}
       <div style={{ background: '#111', padding: '8px 24px', marginTop: 0 }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', justifyContent: 'center', gap: 'clamp(16px,4vw,48px)', flexWrap: 'wrap' }}>
-          {trust.map(({ icon, title }) => { const Icon = featureIcon(icon); return (
-            <div key={title} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'rgba(255,255,255,.8)', whiteSpace: 'nowrap' }}>
+          {trust.map(({ icon, title, at }) => { const Icon = featureIcon(icon); return (
+            <div key={at} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'rgba(255,255,255,.8)', whiteSpace: 'nowrap' }}>
               <Icon size={13} color="#C9971A" strokeWidth={2} />
-              {title}
+              <EditableText doc="home" path={`trust.${at}.title`} value={title} />
             </div>
           ) })}
         </div>
       </div>
 
       {/* ── HERO — image slider ── */}
-      <HeroSlider openLogin={openLogin} loggedIn={!!authUser} heroImages={siteHome.hero.map(h => h.image_url)} heroText={siteHome.hero} />
+      <HeroSlider openLogin={openLogin} loggedIn={!!authUser} heroImages={siteHome.hero.map(h => h.image_url)} heroText={siteHome.hero} paused={editingSite} />
 
       {/* ── TRUST STRIP ── */}
       <section style={{ background: 'transparent', borderBottom: '1px solid rgba(0,0,0,.07)' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px' }}>
           <div className="trust-grid" style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(trust.length, 1)},1fr)` }}>
-            {trust.map(({ icon, title, sub }, i) => { const Icon = featureIcon(icon); return (
-              <div key={title} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 16px', borderRight: i < trust.length - 1 ? '1px solid rgba(0,0,0,.07)' : 'none' }}>
+            {trust.map(({ icon, title, sub, at }, i) => { const Icon = featureIcon(icon); return (
+              <div key={at} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 16px', borderRight: i < trust.length - 1 ? '1px solid rgba(0,0,0,.07)' : 'none' }}>
                 <Icon size={20} color="#C9971A" strokeWidth={1.5} />
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '.06em' }}>{title}</div>
-                  {sub && <div style={{ fontSize: 12, color: '#555', marginTop: 1 }}>{sub}</div>}
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '.06em' }}><EditableText doc="home" path={`trust.${at}.title`} value={title} /></div>
+                  {(sub || editingSite) && <div style={{ fontSize: 12, color: '#555', marginTop: 1 }}><EditableText doc="home" path={`trust.${at}.sub`} value={sub} /></div>}
                 </div>
               </div>
             ) })}
@@ -888,12 +891,13 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
           <h2 style={{ margin: '0 0 24px', fontSize: 22, fontWeight: 800, color: '#111' }}>Utvalda kategorier</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }} className="cat-grid">
             {siteHome.categories.map((cat, i) => (
-              <Reveal key={cat.name} delay={i * 50}>
+              <Reveal key={i} delay={i * 50}>
                 <Link href="/produkter" style={{ display: 'block', position: 'relative', borderRadius: 12, overflow: 'hidden', textDecoration: 'none', aspectRatio: '16/10', background: '#1a1a1a', transition: 'transform .2s' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'scale(1.02)' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'none' }}>
                   <img src={cat.img} alt={cat.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                   <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.08)', transition: 'background .2s' }} />
+                  <EditableImage doc="home" path={`categories.${i}.img`} bucket="category-images" />
                 </Link>
               </Reveal>
             ))}
@@ -962,30 +966,30 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, transparent 60%, #0D0F13 100%)' }} />
             {/* PRO CENTER badge overlay */}
             <div style={{ position: 'absolute', bottom: 24, left: 24, background: '#C9971A', color: '#111', fontSize: 11, fontWeight: 800, padding: '6px 14px', borderRadius: 6, textTransform: 'uppercase', letterSpacing: '.1em' }}>
-              {siteHome.proCenter.badge}
+              <EditableText doc="home" path={'proCenter.badge'} value={siteHome.proCenter.badge} />
             </div>
           </div>
           {/* Right — text */}
           <Reveal>
             <div style={{ padding: '48px 40px 48px 48px' }}>
-              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.22em' }}>{siteHome.proCenter.eyebrow}</p>
+              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.22em' }}><EditableText doc="home" path={'proCenter.eyebrow'} value={siteHome.proCenter.eyebrow} /></p>
               <h2 style={{ margin: '0 0 12px', fontFamily: 'var(--font-serif)', fontSize: 'clamp(24px,3vw,38px)', fontWeight: 700, color: '#F0EDE8', lineHeight: 1.1 }}>
-                {siteHome.proCenter.heading}
+                <EditableText doc="home" path={'proCenter.heading'} value={siteHome.proCenter.heading} />
               </h2>
               <p style={{ margin: '0 0 24px', fontSize: 14, color: 'rgba(240,237,232,.55)', lineHeight: 1.7, maxWidth: 480 }}>
-                {siteHome.proCenter.sub}
+                <EditableText doc="home" path={'proCenter.sub'} value={siteHome.proCenter.sub} multiline />
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 24px', marginBottom: 28 }}>
-                {siteHome.proCenter.bullets.map(item => (
-                  <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'rgba(240,237,232,.65)' }}>
+                {siteHome.proCenter.bullets.map((item, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'rgba(240,237,232,.65)' }}>
                     <Check size={14} color="#C9971A" strokeWidth={2.5} />
-                    {item}
+                    <EditableText doc="home" path={`proCenter.bullets.${i}`} value={item} />
                   </div>
                 ))}
               </div>
               {!authUser ? (
                 <button onClick={openLogin} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 26px', borderRadius: 7, background: '#C9971A', color: '#111', fontSize: 14, fontWeight: 800, border: 'none', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '.06em', boxShadow: '0 4px 16px rgba(201,151,26,.3)' }}>
-                  {siteHome.proCenter.ctaLabel} <ArrowRight size={15} />
+                  <EditableText doc="home" path={'proCenter.ctaLabel'} value={siteHome.proCenter.ctaLabel} /> <ArrowRight size={15} />
                 </button>
               ) : (
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 7, background: 'rgba(201,151,26,.12)', border: '1px solid rgba(201,151,26,.25)', color: '#C9971A', fontSize: 13, fontWeight: 600 }}>
@@ -1015,21 +1019,21 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
           </Reveal>
           <Reveal delay={100}>
             <div>
-              <p style={{ fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.14em', marginBottom: 14 }}>{siteHome.brandStory.eyebrow}</p>
+              <p style={{ fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.14em', marginBottom: 14 }}><EditableText doc="home" path={'brandStory.eyebrow'} value={siteHome.brandStory.eyebrow} /></p>
               <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(24px,3.5vw,40px)', fontWeight: 700, color: '#111', margin: '0 0 18px', lineHeight: 1.15 }}>
-                {siteHome.brandStory.heading}
+                <EditableText doc="home" path={'brandStory.heading'} value={siteHome.brandStory.heading} />
               </h2>
               {siteHome.brandStory.paragraphs.map((p, i) => (
                 <p key={i} style={{ fontSize: 14, color: '#555', lineHeight: 1.8, marginBottom: i === siteHome.brandStory.paragraphs.length - 1 ? 28 : 20 }}>
-                  {p}
+                  <EditableText doc="home" path={`brandStory.paragraphs.${i}`} value={p} multiline />
                 </p>
               ))}
               <div style={{ display: 'flex', gap: 24 }}>
                 <div style={{ paddingBottom: 8, borderBottom: '2px solid #111', cursor: 'pointer' }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>{siteHome.brandStory.brand1}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#111' }}><EditableText doc="home" path={'brandStory.brand1'} value={siteHome.brandStory.brand1} /></span>
                 </div>
                 <div style={{ paddingBottom: 8, borderBottom: '2px solid transparent', cursor: 'pointer' }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#aaa' }}>{siteHome.brandStory.brand2}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#aaa' }}><EditableText doc="home" path={'brandStory.brand2'} value={siteHome.brandStory.brand2} /></span>
                 </div>
               </div>
             </div>
@@ -1041,19 +1045,19 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
       <section style={{ background: '#f9f9f9', padding: '64px 24px', borderTop: '1px solid #ebebeb' }}>
         <div style={{ maxWidth: 1160, margin: '0 auto' }}>
           <h2 style={{ fontSize: 'clamp(20px, 2.5vw, 28px)', fontWeight: 800, color: '#111', marginBottom: 36, textAlign: 'center' }}>
-            {siteHome.why.heading}
+            <EditableText doc="home" path={'why.heading'} value={siteHome.why.heading} />
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 28 }} className="features-grid">
-            {siteHome.why.features.map(f => (
-              <Reveal key={f.title}>
+            {siteHome.why.features.map((f, i) => (
+              <Reveal key={i}>
                 <div style={{ background: '#fff', borderRadius: 12, padding: '28px 24px', border: '1px solid #e8e8e8' }}>
                   {(() => { const Icon = featureIcon(f.icon); return (
                     <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(201,151,26,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                       <Icon size={22} color="#A67C12" strokeWidth={1.75} />
                     </div>
                   ) })()}
-                  <div style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 8 }}>{f.title}</div>
-                  <div style={{ fontSize: 13, color: '#666', lineHeight: 1.7 }}>{f.desc}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 8 }}><EditableText doc="home" path={`why.features.${i}.title`} value={f.title} /></div>
+                  <div style={{ fontSize: 13, color: '#666', lineHeight: 1.7 }}><EditableText doc="home" path={`why.features.${i}.desc`} value={f.desc} multiline /></div>
                 </div>
               </Reveal>
             ))}

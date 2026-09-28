@@ -3,8 +3,9 @@ export const dynamic = 'force-dynamic'
 
 import { PublicShell } from '@/components/layout/PublicShell'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
-import { getSiteContent, DEFAULT_GUIDES, GuidesContent, GuideItem, TAG_COLORS } from '@/lib/site-content'
+import { useState } from 'react'
+import { DEFAULT_GUIDES, GuidesContent, GuideItem, TAG_COLORS } from '@/lib/site-content'
+import { useSiteContent, EditableText } from '@/components/site-edit/SiteEdit'
 import { SearchX } from 'lucide-react'
 import { featureIcon } from '@/lib/feature-icons'
 
@@ -14,13 +15,14 @@ function guideBg(tag: string) {
 }
 
 export default function GuiderPage() {
-  const [guides, setGuides] = useState<GuideItem[]>(DEFAULT_GUIDES.items)
+  return <PublicShell><GuiderContent /></PublicShell>
+}
+
+// Inside PublicShell so admins can edit the guides in place.
+function GuiderContent() {
+  const guides: GuideItem[] = useSiteContent<GuidesContent>('guides', DEFAULT_GUIDES).items
   const [activeCategory, setActiveCategory] = useState('Alla')
   const [search, setSearch] = useState('')
-
-  useEffect(() => {
-    getSiteContent<GuidesContent>('guides', DEFAULT_GUIDES).then(c => setGuides(c.items))
-  }, [])
 
   const categories = ['Alla', ...Array.from(new Set(guides.map(g => g.category).filter(Boolean)))]
 
@@ -31,7 +33,7 @@ export default function GuiderPage() {
   })
 
   return (
-    <PublicShell>
+    <>
       <style>{`
         .guides-hero { background: #0D0F13; padding: 64px 0 48px; text-align: center; }
         .guides-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
@@ -104,7 +106,7 @@ export default function GuiderPage() {
             </div>
           ) : (
             <div className="guides-grid">
-              {filtered.map(guide => (
+              {filtered.map(guide => { const at = guides.indexOf(guide); return (
                 <article key={guide.id} style={{ background: '#161920', borderRadius: 12, overflow: 'hidden', border: '1px solid #1E2128', transition: 'transform 0.2s, box-shadow 0.2s' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 32px rgba(0,0,0,0.4)' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}
@@ -116,25 +118,25 @@ export default function GuiderPage() {
                       {guide.tag}
                     </span>
                     <span style={{ position: 'absolute', top: 12, right: 12, background: 'rgba(0,0,0,0.6)', color: '#9BA0AB', fontSize: 11, padding: '3px 10px', borderRadius: 20 }}>
-                      {guide.readTime} läsning
+                      <EditableText doc="guides" path={`items.${at}.readTime`} value={guide.readTime} /> läsning
                     </span>
                   </div>
                   <div style={{ padding: 20 }}>
                     <p style={{ color: '#E8B84B', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
-                      {guide.category}
+                      <EditableText doc="guides" path={`items.${at}.category`} value={guide.category} />
                     </p>
                     <h3 style={{ color: '#F0EDE8', fontSize: 16, fontWeight: 600, marginBottom: 10, lineHeight: 1.4 }}>
-                      {guide.title}
+                      <EditableText doc="guides" path={`items.${at}.title`} value={guide.title} />
                     </h3>
                     <p style={{ color: '#9BA0AB', fontSize: 13, lineHeight: 1.6, marginBottom: 16 }}>
-                      {guide.desc}
+                      <EditableText doc="guides" path={`items.${at}.desc`} value={guide.desc} multiline />
                     </p>
                     <Link href={`/guider/${guide.id}`} style={{ color: '#E8B84B', fontSize: 13, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                       Läs guide →
                     </Link>
                   </div>
                 </article>
-              ))}
+              ) })}
             </div>
           )}
 
@@ -154,6 +156,6 @@ export default function GuiderPage() {
 
         </div>
       </div>
-    </PublicShell>
+    </>
   )
 }

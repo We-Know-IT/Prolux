@@ -5,7 +5,8 @@ import Image from 'next/image'
 import { PublicShell, useLoginModal } from '@/components/layout/PublicShell'
 import { ArrowRight, ChevronRight, Check, Phone, Mail, MapPin } from 'lucide-react'
 import { useRef, useEffect, useState } from 'react'
-import { getSiteContent, DEFAULT_OM_OSS, DEFAULT_CONTACT, OmOssContent as OmOssPageData, ContactContent } from '@/lib/site-content'
+import { DEFAULT_OM_OSS, DEFAULT_CONTACT, OmOssContent as OmOssPageData, ContactContent } from '@/lib/site-content'
+import { useSiteContent, EditableText, EditableImage } from '@/components/site-edit/SiteEdit'
 
 function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -24,13 +25,8 @@ function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
 
 function OmOssContent() {
   const openLogin = useLoginModal()
-  const [content, setContent] = useState<OmOssPageData>(DEFAULT_OM_OSS)
-  const [contact, setContact] = useState<ContactContent>(DEFAULT_CONTACT)
-
-  useEffect(() => {
-    getSiteContent('om_oss', DEFAULT_OM_OSS).then(setContent)
-    getSiteContent('contact', DEFAULT_CONTACT).then(setContact)
-  }, [])
+  const content = useSiteContent<OmOssPageData>('om_oss', DEFAULT_OM_OSS)
+  const contact = useSiteContent<ContactContent>('contact', DEFAULT_CONTACT)
 
   return (
     <div style={{ paddingTop: 64, background: '#fff' }}>
@@ -45,12 +41,12 @@ function OmOssContent() {
             <ChevronRight size={12} />
             <span>Om Prolux</span>
           </div>
-          <p style={{ margin: '0 0 16px', fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.22em' }}>{content.hero.label}</p>
+          <p style={{ margin: '0 0 16px', fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.22em' }}><EditableText doc="om_oss" path={'hero.label'} value={content.hero.label} /></p>
           <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(36px,5vw,60px)', fontWeight: 700, color: '#F0EDE8', margin: '0 0 20px', lineHeight: 1.08, letterSpacing: '-.02em', whiteSpace: 'pre-line' }}>
-            {content.hero.heading}
+            <EditableText doc="om_oss" path={'hero.heading'} value={content.hero.heading} multiline />
           </h1>
           <p style={{ fontSize: 16, color: 'rgba(240,237,232,.6)', lineHeight: 1.75, margin: 0, maxWidth: 520, marginInline: 'auto' }}>
-            {content.hero.sub}
+            <EditableText doc="om_oss" path={'hero.sub'} value={content.hero.sub} multiline />
           </p>
         </div>
       </section>
@@ -62,20 +58,20 @@ function OmOssContent() {
             <div>
               <p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.18em' }}>Vår historia</p>
               <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(28px,4vw,44px)', fontWeight: 700, color: '#111', margin: '0 0 20px', lineHeight: 1.1, letterSpacing: '-.02em', whiteSpace: 'pre-line' }}>
-                {content.historia.heading}
+                <EditableText doc="om_oss" path={'historia.heading'} value={content.historia.heading} multiline />
               </h2>
               {content.historia.paragraphs.map((p, i) => (
                 <p key={i} style={{ fontSize: 15, color: '#666', lineHeight: 1.8, margin: i === content.historia.paragraphs.length - 1 ? '0 0 32px' : '0 0 16px' }}>
-                  {p}
+                  <EditableText doc="om_oss" path={`historia.paragraphs.${i}`} value={p} multiline />
                 </p>
               ))}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {content.historia.punkter.map(item => (
-                  <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {content.historia.punkter.map((item, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#F5F2ED', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <Check size={11} color="#C9971A" strokeWidth={2.5} />
                     </div>
-                    <span style={{ fontSize: 14, color: '#444' }}>{item}</span>
+                    <span style={{ fontSize: 14, color: '#444' }}><EditableText doc="om_oss" path={`historia.punkter.${i}`} value={item} /></span>
                   </div>
                 ))}
               </div>
@@ -84,11 +80,11 @@ function OmOssContent() {
           {/* Right side: stats */}
           <Reveal delay={150}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              {content.stats.map(({ value, label, sub }) => (
-                <div key={label} style={{ padding: '28px 24px', border: '1.5px solid rgba(0,0,0,.08)', borderRadius: 14, background: '#F8F5F0' }}>
-                  <div style={{ fontFamily: 'var(--font-serif)', fontSize: 40, fontWeight: 400, color: '#C9971A', lineHeight: 1, marginBottom: 8 }}>{value}</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginBottom: 3 }}>{label}</div>
-                  <div style={{ fontSize: 12, color: '#888' }}>{sub}</div>
+              {content.stats.map(({ value, label, sub }, i) => (
+                <div key={i} style={{ padding: '28px 24px', border: '1.5px solid rgba(0,0,0,.08)', borderRadius: 14, background: '#F8F5F0' }}>
+                  <div style={{ fontFamily: 'var(--font-serif)', fontSize: 40, fontWeight: 400, color: '#C9971A', lineHeight: 1, marginBottom: 8 }}><EditableText doc="om_oss" path={`stats.${i}.value`} value={value} /></div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginBottom: 3 }}><EditableText doc="om_oss" path={`stats.${i}.label`} value={label} /></div>
+                  <div style={{ fontSize: 12, color: '#666' }}><EditableText doc="om_oss" path={`stats.${i}.sub`} value={sub} /></div>
                 </div>
               ))}
             </div>
@@ -107,21 +103,22 @@ function OmOssContent() {
           </Reveal>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }} className="brand-grid">
             {content.brands.map((b, i) => (
-              <Reveal key={b.name} delay={i * 100}>
+              <Reveal key={i} delay={i * 100}>
                 <div style={{ background: '#fff', border: '1.5px solid rgba(0,0,0,.08)', borderRadius: 16, overflow: 'hidden' }}>
-                  <div style={{ height: 200, background: '#F0EDE8', overflow: 'hidden' }}>
+                  <div style={{ height: 200, background: '#F0EDE8', overflow: 'hidden', position: 'relative' }}>
                     <img src={b.img} alt={b.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <EditableImage doc="om_oss" path={`brands.${i}.img`} bucket="om-oss-images" />
                   </div>
                   <div style={{ padding: '28px 32px 32px' }}>
                     <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.15em' }}>Varumärke</p>
-                    <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: 38, fontWeight: 400, color: '#111', margin: '0 0 6px', fontStyle: 'italic', lineHeight: 1 }}>{b.name}</h3>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: '#555', margin: '0 0 14px' }}>{b.tagline}</p>
-                    <p style={{ fontSize: 14, color: '#777', lineHeight: 1.75, margin: '0 0 20px' }}>{b.desc}</p>
+                    <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: 38, fontWeight: 400, color: '#111', margin: '0 0 6px', fontStyle: 'italic', lineHeight: 1 }}><EditableText doc="om_oss" path={`brands.${i}.name`} value={b.name} /></h3>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: '#555', margin: '0 0 14px' }}><EditableText doc="om_oss" path={`brands.${i}.tagline`} value={b.tagline} /></p>
+                    <p style={{ fontSize: 14, color: '#666', lineHeight: 1.75, margin: '0 0 20px' }}><EditableText doc="om_oss" path={`brands.${i}.desc`} value={b.desc} multiline /></p>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 24 }}>
-                      {b.items.map(item => (
-                        <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: '#555' }}>
+                      {b.items.map((item, j) => (
+                        <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: '#555' }}>
                           <Check size={12} color="#C9971A" strokeWidth={2.5} />
-                          {item}
+                          <EditableText doc="om_oss" path={`brands.${i}.items.${j}`} value={item} />
                         </div>
                       ))}
                     </div>
@@ -150,9 +147,9 @@ function OmOssContent() {
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                 {[
-                  { icon: Phone, label: 'Telefon', value: contact.phone, sub: contact.hours },
-                  { icon: Mail,  label: 'E-post',  value: contact.email, sub: 'Svar inom 24h' },
-                  { icon: MapPin, label: 'Adress', value: contact.address, sub: 'Lagerhållning & kontor' },
+                  { icon: Phone, label: 'Telefon', value: <EditableText doc="contact" path="phone" value={contact.phone} />, sub: <EditableText doc="contact" path="hours" value={contact.hours} /> },
+                  { icon: Mail,  label: 'E-post',  value: <EditableText doc="contact" path="email" value={contact.email} />, sub: 'Svar inom 24h' },
+                  { icon: MapPin, label: 'Adress', value: <EditableText doc="contact" path="address" value={contact.address} />, sub: 'Lagerhållning & kontor' },
                 ].map(({ icon: Icon, label, value, sub }) => (
                   <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
                     <div style={{ width: 44, height: 44, borderRadius: 10, background: '#F5F2ED', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -200,10 +197,10 @@ function OmOssContent() {
         <Reveal>
           <div style={{ maxWidth: 600, margin: '0 auto', textAlign: 'center' }}>
             <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(28px,4vw,44px)', fontWeight: 700, color: '#F0EDE8', margin: '0 0 14px', lineHeight: 1.1 }}>
-              {content.cta.heading}
+              <EditableText doc="om_oss" path={'cta.heading'} value={content.cta.heading} />
             </h2>
             <p style={{ fontSize: 15, color: 'rgba(240,237,232,.55)', margin: '0 0 32px', lineHeight: 1.7 }}>
-              {content.cta.sub}
+              <EditableText doc="om_oss" path={'cta.sub'} value={content.cta.sub} multiline />
             </p>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button onClick={openLogin} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '13px 30px', borderRadius: 8, background: '#C9971A', color: '#111', fontSize: 14, fontWeight: 800, border: 'none', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '.06em' }}>
