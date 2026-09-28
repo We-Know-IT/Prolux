@@ -185,14 +185,14 @@ export const DEFAULT_OM_OSS: OmOssContent = {
       tagline: 'Precision utan kompromiss',
       desc: 'Virtus representerar det absolut bästa inom professionell bilvård — keramiska beläggningar, enzymrengöring och detailingprodukter för de som kräver perfektion i varje detalj.',
       items: ['Keramisk coating', 'Enzymbaserade tvättmedel', 'Professionella polish & kompositioner', 'Lackskydd & glansmedel'],
-      img: 'https://proluxshine.com/wp-content/uploads/2025/11/df6ba40f-5d3d-4c32-8cfd-55f9c68de3e7.png',
+      img: '',
     },
     {
       name: 'Frescura',
       tagline: 'Effektivitet i varje droppe',
       desc: 'Frescura är valet för de som jobbar med höga volymer och kräver konsekvent professionell kvalitet dag efter dag. Kostnadseffektiva lösningar utan att kompromissa med resultatet.',
       items: ['Alkaliska avfettningsmedel', 'pH-neutrala bilvårdsprodukter', 'Fälg- och däckvård', 'Interiör- & exteriörrengöring'],
-      img: 'https://proluxshine.com/wp-content/uploads/2025/11/a7ffd562-2bb4-4699-aaeb-ce4da03ba0ac.png',
+      img: '',
     },
   ],
   cta: {

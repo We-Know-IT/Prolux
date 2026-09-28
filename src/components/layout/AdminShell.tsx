@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import WebshopLink from '@/components/layout/WebshopLink'
+import LeadToast from '@/components/crm/LeadToast'
 import { createClient } from '@/lib/supabase/client'
 import { LayoutDashboard, ShoppingBag, Users, Tag, Megaphone, Zap, LogOut, UserCog, Menu, X, GitBranch, CalendarDays, StickyNote, Bell, FileText } from 'lucide-react'
 
@@ -258,6 +259,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
       )}
 
       <ServiceWorkerRegister />
+      <LeadToast href="/admin/crm/pipeline" />
       <main style={{ flex: 1 }}>
         {children}
       </main>

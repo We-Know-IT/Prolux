@@ -7,11 +7,91 @@ import { ArrowRight, ChevronRight, Check, Phone, Mail, MapPin } from 'lucide-rea
 import { useRef, useEffect, useState } from 'react'
 import { DEFAULT_OM_OSS, DEFAULT_CONTACT, OmOssContent as OmOssPageData, ContactContent } from '@/lib/site-content'
 import { useSiteContent, EditableText, EditableImage } from '@/components/site-edit/SiteEdit'
+import { createClient } from '@/lib/supabase/client'
 
 // Official brand logos, matched on the brand name in Om oss content.
 const BRAND_LOGO: Record<string, { src: string; w: number; h: number }> = {
   frescura: { src: '/brands/frescura.svg', w: 200, h: 18 },
   virtus:   { src: '/brands/virtus.svg',   w: 56,  h: 58 },
+}
+
+const brandLogo = (name: string) => BRAND_LOGO[name.trim().toLowerCase()]
+
+// Brand card photo. The old photos were hosted on the WordPress site; when an
+// image is missing or fails to load, show the brand's own logo instead.
+function BrandPhoto({ src, name }: { src: string; name: string }) {
+  const [failed, setFailed] = useState(false)
+  const logo = brandLogo(name)
+  if (!src || failed) return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at 50% 40%, #FFFFFF 0%, #F0EDE8 70%)' }}>
+      {logo
+        ? <Image src={logo.src} alt={name} width={logo.w * 2} height={logo.h * 2} style={{ height: logo.h > 30 ? 110 : 34, width: 'auto', maxWidth: '75%', objectFit: 'contain' }} />
+        : <span style={{ fontFamily: 'var(--font-serif)', fontSize: 40, fontStyle: 'italic', color: '#111' }}>{name}</span>}
+    </div>
+  )
+  return <img src={src} alt={name} onError={() => setFailed(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+}
+
+const INPUT_STYLE: React.CSSProperties = { width: '100%', padding: '10px 13px', background: '#fff', border: '1.5px solid rgba(0,0,0,.1)', borderRadius: 8, fontSize: 14, color: '#111', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }
+const LABEL_STYLE: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 }
+const EMPTY_LEAD = { name: '', company: '', email: '', phone: '', message: '', website: '' }
+
+// "Intresserad av B2B-avtal?" — lands in the CRM as a prospect, a Prospekt
+// deal and a note on the customer card (submit_b2b_lead, migration 0015).
+function B2BLeadForm() {
+  const [lead, setLead] = useState(EMPTY_LEAD)
+  const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle')
+  const [error, setError] = useState('')
+  const set = (k: keyof typeof EMPTY_LEAD) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setLead(l => ({ ...l, [k]: e.target.value }))
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!lead.name.trim() || !lead.company.trim() || !lead.email.trim()) { setError('Fyll i namn, företag och e-post'); return }
+    setState('sending'); setError('')
+    const { error } = await createClient().rpc('submit_b2b_lead', { p_lead: lead })
+    if (error) { setError(error.message || 'Förfrågan kunde inte skickas. Försök igen.'); setState('idle'); return }
+    setState('sent'); setLead(EMPTY_LEAD)
+  }
+
+  if (state === 'sent') return (
+    <div role="status" style={{ background: '#fff', borderRadius: 12, padding: '28px 24px', textAlign: 'center', border: '1.5px solid rgba(76,175,125,.35)' }}>
+      <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(76,175,125,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+        <Check size={22} color="#2E8B57" strokeWidth={2.5} />
+      </div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: '#111', marginBottom: 6 }}>Tack för din förfrågan!</div>
+      <p style={{ fontSize: 14, color: '#666', margin: '0 0 16px', lineHeight: 1.6 }}>En säljare kontaktar dig inom en arbetsdag.</p>
+      <button type="button" onClick={() => setState('idle')} style={{ background: 'none', border: 'none', color: '#8A6510', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Skicka en till</button>
+    </div>
+  )
+
+  return (
+    <form onSubmit={submit} noValidate>
+      {([
+        { key: 'name',    label: 'Ditt namn', placeholder: 'Anna Lindberg',   type: 'text',  auto: 'name' },
+        { key: 'company', label: 'Företag',   placeholder: 'Bilverkstad AB',  type: 'text',  auto: 'organization' },
+        { key: 'email',   label: 'E-post',    placeholder: 'anna@foretag.se', type: 'email', auto: 'email' },
+        { key: 'phone',   label: 'Telefon',   placeholder: '070-123 45 67',   type: 'tel',   auto: 'tel' },
+      ] as const).map(f => (
+        <div key={f.key} style={{ marginBottom: 14 }}>
+          <label htmlFor={`lead-${f.key}`} style={LABEL_STYLE}>{f.label}{f.key !== 'phone' && ' *'}</label>
+          <input id={`lead-${f.key}`} type={f.type} autoComplete={f.auto} placeholder={f.placeholder} value={lead[f.key]} onChange={set(f.key)}
+            required={f.key !== 'phone'} maxLength={f.key === 'company' ? 160 : 120} style={INPUT_STYLE} />
+        </div>
+      ))}
+      <div style={{ marginBottom: 20 }}>
+        <label htmlFor="lead-message" style={LABEL_STYLE}>Meddelande</label>
+        <textarea id="lead-message" placeholder="Berätta kort om ditt företag och era behov..." rows={3} maxLength={2000} value={lead.message} onChange={set('message')} style={{ ...INPUT_STYLE, resize: 'vertical' }} />
+      </div>
+      {/* Honeypot: hidden from people, bots fill it in. */}
+      <div aria-hidden="true" style={{ position: 'absolute', left: -10000, width: 1, height: 1, overflow: 'hidden' }}>
+        <label>Webbplats <input tabIndex={-1} autoComplete="off" value={lead.website} onChange={set('website')} /></label>
+      </div>
+      {error && <p role="alert" style={{ margin: '0 0 14px', fontSize: 13, color: '#C0392B', fontWeight: 600 }}>{error}</p>}
+      <button type="submit" disabled={state === 'sending'} style={{ width: '100%', padding: '13px', background: '#111', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: state === 'sending' ? 'wait' : 'pointer', opacity: state === 'sending' ? .7 : 1, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+        {state === 'sending' ? 'Skickar…' : 'Skicka förfrågan'}
+      </button>
+    </form>
+  )
 }
 
 function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
@@ -112,13 +192,13 @@ function OmOssContent() {
               <Reveal key={i} delay={i * 100}>
                 <div style={{ background: '#fff', border: '1.5px solid rgba(0,0,0,.08)', borderRadius: 16, overflow: 'hidden' }}>
                   <div style={{ height: 200, background: '#F0EDE8', overflow: 'hidden', position: 'relative' }}>
-                    <img src={b.img} alt={b.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <BrandPhoto key={b.img} src={b.img} name={b.name} />
                     <EditableImage doc="om_oss" path={`brands.${i}.img`} bucket="om-oss-images" />
                   </div>
                   <div style={{ padding: '28px 32px 32px' }}>
-                    {BRAND_LOGO[b.name.trim().toLowerCase()] ? (
-                      <Image src={BRAND_LOGO[b.name.trim().toLowerCase()].src} alt={b.name} width={BRAND_LOGO[b.name.trim().toLowerCase()].w} height={BRAND_LOGO[b.name.trim().toLowerCase()].h}
-                        style={{ display: 'block', height: BRAND_LOGO[b.name.trim().toLowerCase()].h, width: 'auto', marginBottom: 14 }} />
+                    {brandLogo(b.name) ? (
+                      <Image src={brandLogo(b.name).src} alt={b.name} width={brandLogo(b.name).w} height={brandLogo(b.name).h}
+                        style={{ display: 'block', height: brandLogo(b.name).h, width: 'auto', marginBottom: 14 }} />
                     ) : (
                       <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.15em' }}>Varumärke</p>
                     )}
@@ -180,24 +260,7 @@ function OmOssContent() {
             <div style={{ background: '#F8F5F0', borderRadius: 16, padding: '36px 32px' }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#111', marginBottom: 6 }}>Intresserad av B2B-avtal?</div>
               <p style={{ fontSize: 14, color: '#888', margin: '0 0 24px', lineHeight: 1.7 }}>Fyll i formuläret så kontaktar vi dig inom en arbetsdag för att diskutera dina behov och vilket prispaket som passar.</p>
-              {[
-                { label: 'Ditt namn', placeholder: 'Anna Lindberg', type: 'text' },
-                { label: 'Företag', placeholder: 'Bilverkstad AB', type: 'text' },
-                { label: 'E-post', placeholder: 'anna@foretag.se', type: 'email' },
-                { label: 'Telefon', placeholder: '070-123 45 67', type: 'tel' },
-              ].map(({ label, placeholder, type }) => (
-                <div key={label} style={{ marginBottom: 14 }}>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 }}>{label}</label>
-                  <input type={type} placeholder={placeholder} style={{ width: '100%', padding: '10px 13px', background: '#fff', border: '1.5px solid rgba(0,0,0,.1)', borderRadius: 8, fontSize: 14, color: '#111', outline: 'none', boxSizing: 'border-box' }} />
-                </div>
-              ))}
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 }}>Meddelande</label>
-                <textarea placeholder="Berätta kort om ditt företag och era behov..." rows={3} style={{ width: '100%', padding: '10px 13px', background: '#fff', border: '1.5px solid rgba(0,0,0,.1)', borderRadius: 8, fontSize: 14, color: '#111', outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
-              </div>
-              <button onClick={() => alert('Tack! Vi kontaktar dig inom en arbetsdag.')} style={{ width: '100%', padding: '13px', background: '#111', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-                Skicka förfrågan
-              </button>
+              <B2BLeadForm />
             </div>
           </Reveal>
         </div>

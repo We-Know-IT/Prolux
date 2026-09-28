@@ -199,6 +199,7 @@ export default function CrmPipelinePage() {
                       <button onClick={e => { e.stopPropagation(); deleteDeal(d.id, d.title) }} aria-label="Radera deal" style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 2, flexShrink: 0 }}><X size={12} /></button>
                     </div>
                     {(d as any).customers && <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 3 }}>{(d as any).customers.company}</div>}
+                    {(d as any).source === 'web' && <span className="badge badge-blue" style={{ display: 'inline-block', marginTop: 6, fontSize: 10 }}>Från webben</span>}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--gold)', fontFamily: 'var(--font-serif)' }}>{fmt(d.value)} kr</span>
                       {(d as any).expected_close && <span style={{ fontSize: 10, color: 'var(--text3)' }}>{formatDate((d as any).expected_close)}</span>}
@@ -212,7 +213,7 @@ export default function CrmPipelinePage() {
                         <span style={{ fontSize: 11, color: 'var(--text3)' }}>{(d as any).assigned_to}</span>
                       </div>
                     )}
-                    {(d as any).notes && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 8, borderTop: '1px solid var(--line2)', paddingTop: 8, lineHeight: 1.4 }}>{(d as any).notes}</div>}
+                    {(d as any).notes && <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 8, borderTop: '1px solid var(--line2)', paddingTop: 8, lineHeight: 1.4, whiteSpace: 'pre-line', display: '-webkit-box', WebkitLineClamp: 6, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{(d as any).notes}</div>}
                     {/* Move buttons */}
                     <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
                       {DEAL_STAGES.filter(s => s !== stage).slice(0, 3).map(s => (
