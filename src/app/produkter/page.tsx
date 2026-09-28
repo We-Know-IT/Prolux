@@ -6,6 +6,8 @@ import { PublicShell, useLoginModal, usePublicCart } from '@/components/layout/P
 import { fmt } from '@/lib/utils'
 import { Search, Package, ShoppingCart, ChevronRight, ChevronLeft, LayoutGrid } from 'lucide-react'
 import Link from 'next/link'
+import { PRODUCT_BADGE } from '@/lib/product-badge'
+import AddProductCard from '@/components/site-edit/AddProductCard'
 import { popElement } from '@/lib/pop'
 
 const DISCOUNT: Record<string, number> = { A: 0.40, B: 0.30, C: 0.20, Standard: 0 }
@@ -203,7 +205,7 @@ function ProductsContent() {
         </div>
       ) : (
         <div className="prod-grid" style={{ padding: '24px 40px', gap: 20 } as any}>
-          {paged.map((p, i) => {
+          {paged.map(p => {
             const price = custPrice(p.list_price)
             const added = justAdded === p.id
             return (
@@ -218,14 +220,9 @@ function ProductsContent() {
                     ) : (
                       <Package size={64} color="#ccc" strokeWidth={1} />
                     )}
-                    {(i === 0 || i === 3) && (
-                      <span style={{ position: 'absolute', top: 12, left: 12, background: '#E8B84B', color: '#111', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 3, textTransform: 'uppercase', letterSpacing: '.05em' }}>
-                        Storsäljare
-                      </span>
-                    )}
-                    {i === 2 && (
-                      <span style={{ position: 'absolute', top: 12, left: 12, background: '#4CAF7D', color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 3, textTransform: 'uppercase', letterSpacing: '.05em' }}>
-                        Nyhet
+                    {PRODUCT_BADGE[p.badge] && (
+                      <span style={{ position: 'absolute', top: 12, left: 12, background: PRODUCT_BADGE[p.badge].bg, color: PRODUCT_BADGE[p.badge].color, fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 3, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+                        {PRODUCT_BADGE[p.badge].label}
                       </span>
                     )}
                   </div>
@@ -259,6 +256,7 @@ function ProductsContent() {
               </div>
             )
           })}
+          <AddProductCard onCreated={p => setProducts(ps => [...ps, p])} />
         </div>
       )}
 

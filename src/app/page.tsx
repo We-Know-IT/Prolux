@@ -17,6 +17,8 @@ import OrderTracking from '@/components/portal/OrderTracking'
 import { userRole } from '@/lib/roles'
 import { featureIcon } from '@/lib/feature-icons'
 import { popElement } from '@/lib/pop'
+import { PRODUCT_BADGE } from '@/lib/product-badge'
+import AddProductCard from '@/components/site-edit/AddProductCard'
 
 const DISCOUNT: Record<string, number> = { A: 0.40, B: 0.30, C: 0.20, Standard: 0 }
 
@@ -30,7 +32,7 @@ function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
     obs.observe(el); return () => obs.disconnect()
   }, [])
   return (
-    <div ref={ref} style={{ opacity: vis ? 1 : 0, transform: vis ? 'none' : 'translateY(22px)', transition: `opacity .55s ease ${delay}ms, transform .55s ease ${delay}ms` }}>
+    <div ref={ref} style={{ height: '100%', opacity: vis ? 1 : 0, transform: vis ? 'none' : 'translateY(22px)', transition: `opacity .55s ease ${delay}ms, transform .55s ease ${delay}ms` }}>
       {children}
     </div>
   )
@@ -829,7 +831,6 @@ function CustomerPortalSection({ customer, authUser, openLogin }: { customer: an
 /* ════════════════════════════════════════════════════════
    MARKETING HOME — professional B2B webshop (v2)
 ════════════════════════════════════════════════════════ */
-const BADGES = ['Storsäljare', 'Storsäljare', 'Nyhet', 'Storsäljare', 'Nyhet', 'Storsäljare', 'Storsäljare', 'Nyhet', 'Storsäljare', 'Nyhet', 'Storsäljare', 'Nyhet']
 
 
 const GUIDES = [
@@ -841,7 +842,7 @@ const GUIDES = [
 
 const BRAND_LOGOS = ['Virtus', 'Frescura', 'Virtus Pro', 'Frescura+', 'ProLux', 'Virtus Elite', 'Frescura Daily']
 
-function MarketingHome({ products, allImages, openLogin, authUser, customer }: { products: any[]; allImages: string[]; openLogin: () => void; authUser?: any; customer?: any }) {
+function MarketingHome({ products, allImages, openLogin, authUser, customer, onProductCreated }: { products: any[]; allImages: string[]; openLogin: () => void; authUser?: any; customer?: any; onProductCreated?: (p: any) => void }) {
   const cart = usePublicCart()
   const priceList = customer?.price_list_id || 'Standard'
   const heroImg = products.find(p => p.image_url)?.image_url || null
@@ -906,7 +907,7 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
       </section>
 
       {/* ── PRODUCTS — Populära produkter ── */}
-      {products.length > 0 && (
+      {(products.length > 0 || editingSite) && (
         <section style={{ background: 'transparent', padding: '0 24px 64px' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, paddingBottom: 16, borderBottom: '2px solid rgba(0,0,0,.12)' }}>
@@ -918,20 +919,20 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(190px,1fr))', gap: 16 }}>
               {products.map((p, i) => (
                 <Reveal key={p.id} delay={i * 40}>
-                  <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column', transition: 'all .2s', position: 'relative', cursor: 'pointer' }}
+                  <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column', transition: 'all .2s', position: 'relative', cursor: 'pointer', height: '100%', boxSizing: 'border-box' }}
                     onMouseEnter={e => { const el = e.currentTarget as HTMLDivElement; el.style.boxShadow = '0 8px 24px rgba(0,0,0,.1)'; el.style.borderColor = '#C9971A' }}
                     onMouseLeave={e => { const el = e.currentTarget as HTMLDivElement; el.style.boxShadow = 'none'; el.style.borderColor = '#eee' }}>
-                    {BADGES[i] && (
-                      <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 2, background: BADGES[i] === 'Nyhet' ? '#111' : '#C9971A', color: BADGES[i] === 'Nyhet' ? '#fff' : '#111', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 4, letterSpacing: '.07em', textTransform: 'uppercase' }}>
-                        {BADGES[i]}
+                    {PRODUCT_BADGE[p.badge] && (
+                      <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 2, background: PRODUCT_BADGE[p.badge].bg, color: PRODUCT_BADGE[p.badge].color, fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 4, letterSpacing: '.07em', textTransform: 'uppercase' }}>
+                        {PRODUCT_BADGE[p.badge].label}
                       </div>
                     )}
-                    <Link href={`/produkter/${p.id}`} aria-label={p.name} style={{ height: 200, background: '#F5F2ED', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 12 }}>
-                      {p.image_url ? <img src={p.image_url} alt={p.name} style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} /> : <Package size={48} color="#ccc" strokeWidth={1} />}
+                    <Link href={`/produkter/${p.id}`} aria-label={p.name} style={{ height: 200, background: '#fff', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '22px 18px 14px' }}>
+                      {p.image_url ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'contain', mixBlendMode: 'multiply' }} /> : <Package size={48} color="#ccc" strokeWidth={1} />}
                     </Link>
                     <div style={{ padding: '12px 14px 14px', flex: 1, display: 'flex', flexDirection: 'column' }}>
                       <div style={{ fontSize: 10, color: '#bbb', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3 }}>{p.brand}</div>
-                      <Link href={`/produkter/${p.id}`} style={{ fontSize: 13, fontWeight: 600, color: '#111', flex: 1, lineHeight: 1.35, marginBottom: 12, textDecoration: 'none' }}>{p.name}</Link>
+                      <Link href={`/produkter/${p.id}`} style={{ fontSize: 13, fontWeight: 600, color: '#111', flex: 1, lineHeight: 1.35, minHeight: '2.7em', marginBottom: 12, textDecoration: 'none' }}>{p.name}</Link>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                         <div>
                           <div style={{ fontSize: 16, fontWeight: 800, color: '#111' }}>{fmt(Math.round(p.list_price * (1 - (DISCOUNT[priceList] ?? 0))))} kr</div>
@@ -948,6 +949,7 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
                   </div>
                 </Reveal>
               ))}
+              <AddProductCard minHeight={300} onCreated={p => onProductCreated?.(p)} />
             </div>
           </div>
         </section>
@@ -1050,7 +1052,7 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer }: {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 28 }} className="features-grid">
             {siteHome.why.features.map((f, i) => (
               <Reveal key={i}>
-                <div style={{ background: '#fff', borderRadius: 12, padding: '28px 24px', border: '1px solid #e8e8e8' }}>
+                <div style={{ background: '#fff', borderRadius: 12, padding: '28px 24px', border: '1px solid #e8e8e8', height: '100%', boxSizing: 'border-box' }}>
                   {(() => { const Icon = featureIcon(f.icon); return (
                     <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(201,151,26,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                       <Icon size={22} color="#A67C12" strokeWidth={1.75} />
@@ -1170,7 +1172,7 @@ function HomeContent() {
         setCustomer(null)
       }
     })
-    sb.from('products').select('id,name,brand,list_price,image_url,unit').eq('active', true).order('sort_order').limit(12)
+    sb.from('products').select('id,name,brand,list_price,image_url,unit,badge').eq('active', true).order('sort_order').limit(12)
       .then(({ data }) => {
         if (data) {
           setProducts(data)
@@ -1202,7 +1204,8 @@ function HomeContent() {
   }, [authChecked, authUser])
 
   if (!authChecked) return <div style={{ minHeight: '100vh', background: '#fff' }} />
-  return <MarketingHome products={products} allImages={allImages} openLogin={openLogin} authUser={authUser} customer={customer} />
+  return <MarketingHome products={products} allImages={allImages} openLogin={openLogin} authUser={authUser} customer={customer}
+    onProductCreated={p => setProducts(ps => [...ps, p])} />
 }
 
 export default function HomePage() {
