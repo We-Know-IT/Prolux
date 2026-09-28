@@ -326,6 +326,7 @@ export default function CrmOrdersPage() {
     return cart.find(i => i.product.id === productId)?.qty || 0
   }
 
+  const allFromCar  = cart.length > 0 && cart.every(i => lineFrom[i.product.id] === 'car')
   const subtotal    = cart.reduce((s, i) => s + i.qty * i.unitPrice, 0)
   const discountAmt = discountEnabled && discount ? parseInt(discount) || 0 : 0
   const afterDiscount = Math.max(0, subtotal - discountAmt)
@@ -345,13 +346,17 @@ export default function CrmOrdersPage() {
     setPlacing(true)
     const carLines  = cart.filter(i => lineFrom[i.product.id] === 'car').length
     const shipLines = cart.length - carLines
+    // Everything handed over from the car: the order is already delivered,
+    // no confirmation needed. Anything to ship keeps the normal flow.
+    const handedOver = status === 'pending' && shipLines === 0
+    const finalStatus: OrderStatus = handedOver ? 'delivered' : status
     const deliveryNote = [
       carLines  ? `Från bilen (${carLines} rad${carLines > 1 ? 'er' : ''})` : '',
       shipLines ? `Frakt: ${delivery}` : '',
     ].filter(Boolean).join(' · ')
     const fields = {
       customer_id: selectedCustomer.id,
-      status: status as OrderStatus,
+      status: finalStatus,
       price_list_id: selectedCustomer.price_list_id,
       delivery_name: selectedCustomer.company,
       delivery_city: selectedCustomer.city,
@@ -399,6 +404,7 @@ export default function CrmOrdersPage() {
     setPlacing(false); setView('history')
     showToast(status === 'draft' ? `Utkast #${order.order_nr} sparat`
       : status === 'quote' ? `Offert #${order.order_nr} skapad`
+      : handedOver ? `Order #${order.order_nr} levererad från bilen`
       : `Order #${order.order_nr} skapad — bekräfta den när den är klar`)
   }
 
@@ -798,9 +804,10 @@ export default function CrmOrdersPage() {
         </button>
         <button onClick={() => saveOrder('pending')} disabled={placing}
           style={{ padding: '14px 0', background: placing ? 'var(--bg4)' : 'var(--gold)', border: 'none', borderRadius: 10, color: placing ? 'var(--text3)' : '#111', fontSize: 14, fontWeight: 700, cursor: placing ? 'not-allowed' : 'pointer' }}>
-          {placing ? 'Sparar…' : 'Lägg order'}
+          {placing ? 'Sparar…' : allFromCar ? 'Lägg order · levererad' : 'Lägg order'}
         </button>
       </div>
+      {allFromCar && <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text2)', textAlign: 'center' }}>Allt levereras från bilen — ordern markeras direkt som levererad.</p>}
       <p style={{ fontSize: 12, color: 'var(--text2)', textAlign: 'center', margin: '10px 0 0' }}>
         Utkast och offerter påverkar inte lager eller budget och syns inte för kunden förrän de blir en order.
       </p>
