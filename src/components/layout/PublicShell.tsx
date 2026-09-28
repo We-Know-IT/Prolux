@@ -314,6 +314,11 @@ function PublicShellInner({ children }: { children: ReactNode }) {
             <Image src="/logo.svg" alt="Prolux Shine" width={166} height={30} priority style={{ display: 'block', height: 30, width: 'auto' }} />
             <span style={{ fontFamily: 'var(--font-sans)', fontSize: 8, fontWeight: 500, letterSpacing: '.18em', color: 'rgba(255,255,255,.6)', textTransform: 'uppercase', paddingLeft: 32 }}>Bilvårdsprodukter & Drömmar</span>
           </div>
+          {/* Shown only where the header has room (see .pub-brand-logos below). */}
+          <div className="pub-brand-logos" style={{ alignItems: 'center', gap: 10, paddingLeft: 12, borderLeft: '1px solid rgba(255,255,255,.15)' }}>
+            <Image src="/brands/frescura.svg" alt="Frescura" width={100} height={9} style={{ display: 'block', height: 10, width: 'auto' }} />
+            <Image src="/brands/virtus.svg" alt="Virtus" width={25} height={26} style={{ display: 'block', height: 28, width: 'auto' }} />
+          </div>
         </Link>
 
         {/* Desktop nav */}
@@ -700,6 +705,12 @@ function PublicShellInner({ children }: { children: ReactNode }) {
         .pub-desktop-nav   { display: none !important; }
         .pub-desktop-right { display: none !important; }
         .pub-mobile-btn    { display: flex !important; }
+        /* The closed cart drawer and decorative shapes sit off-screen; never let them scroll the page sideways. */
+        html, body { overflow-x: clip; }
+        .pub-brand-logos   { display: none; }
+        @media (min-width: 560px) and (max-width: 1259px), (min-width: 1560px) {
+          .pub-brand-logos { display: flex; }
+        }
         @media (min-width: 1260px) {
           .pub-desktop-nav   { display: flex !important; }
           .pub-desktop-right { display: flex !important; }
