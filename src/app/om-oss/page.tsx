@@ -145,7 +145,7 @@ function OmOssContent() {
       </section>
 
       {/* ── KONTAKT ── */}
-      <section style={{ background: '#fff', padding: '80px 24px' }}>
+      <section id="kontakta-oss" style={{ background: '#fff', padding: '80px 24px', scrollMarginTop: 72 }}>
         <div style={{ maxWidth: 1160, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64 }} className="contact-grid">
           <Reveal>
             <div>

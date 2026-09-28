@@ -46,7 +46,7 @@ const NAV_PUBLIC = [
   { href: '/#pro-center',  label: 'Bli Återförsäljare' },
   { href: '/guider',       label: 'Bilvårdsutbildning' },
   { href: '/om-oss',       label: 'Om Oss' },
-  { href: '/om-oss',       label: 'Kontakt' },
+  { href: '/om-oss#kontakta-oss', label: 'Kontakt' },
 ]
 
 
@@ -247,16 +247,18 @@ function PublicShellInner({ children }: { children: ReactNode }) {
   // Guests can shop too, so everyone but staff gets the cart button.
   const showCart = !authUser || isCustomer
 
+  // Compact: icon with a count badge, so the header never runs out of room.
   const cartButton = showCart ? (
-<button key={`cart-${cartBump}`} className={cartBump ? 'pl-pop' : undefined} onClick={() => setCartOpen(true)} aria-label={`Varukorg, ${count} varor`} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 8, background: count > 0 ? '#E8B84B' : 'rgba(255,255,255,.1)', border: 'none', cursor: 'pointer', color: count > 0 ? '#111' : '#fff', fontSize: 13, fontWeight: 600, transition: 'all .2s' }}>
-                    <ShoppingCart size={16} />
-                    {count > 0 ? `${count} ${count === 1 ? 'vara' : 'varor'}` : 'Varukorg'}
-                    {count > 0 && (
-                      <span style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', background: '#fff', color: '#111', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {count}
-                      </span>
-                    )}
-                  </button>
+    <button key={`cart-${cartBump}`} className={cartBump ? 'pl-pop' : undefined} onClick={() => setCartOpen(true)}
+      aria-label={count ? `Varukorg, ${count} ${count === 1 ? 'vara' : 'varor'}` : 'Varukorg'} title="Varukorg"
+      style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 10, background: count > 0 ? '#E8B84B' : 'rgba(255,255,255,.1)', border: 'none', cursor: 'pointer', color: count > 0 ? '#111' : '#fff', flexShrink: 0, transition: 'background .2s' }}>
+      <ShoppingCart size={18} />
+      {count > 0 && (
+        <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 18, height: 18, padding: '0 4px', borderRadius: 9, background: '#fff', color: '#111', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>
+          {count}
+        </span>
+      )}
+    </button>
   ) : null
 
   const navBg = scrolled ? 'rgba(13,15,20,.97)' : 'rgba(13,15,20,.92)'
@@ -312,23 +314,19 @@ function PublicShellInner({ children }: { children: ReactNode }) {
             <Image src="/logo.svg" alt="Prolux Shine" width={166} height={30} priority style={{ display: 'block', height: 30, width: 'auto' }} />
             <span style={{ fontFamily: 'var(--font-sans)', fontSize: 8, fontWeight: 500, letterSpacing: '.18em', color: 'rgba(255,255,255,.6)', textTransform: 'uppercase', paddingLeft: 32 }}>Bilvårdsprodukter & Drömmar</span>
           </div>
-          <div className="pub-brand-logos" style={{ display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 12, borderLeft: '1px solid rgba(255,255,255,.15)' }}>
-            <Image src="/brands/frescura.svg" alt="Frescura" width={72} height={7} style={{ display: 'block', height: 9, width: 'auto' }} />
-            <Image src="/brands/virtus.svg" alt="Virtus" width={22} height={23} style={{ display: 'block', height: 26, width: 'auto' }} />
-          </div>
         </Link>
 
         {/* Desktop nav */}
-        <nav className="pub-desktop-nav" style={{ display: 'none', gap: 0, flex: 1, alignItems: 'center', marginLeft: 24 }}>
+        <nav className="pub-desktop-nav" style={{ display: 'none', gap: 0, flex: 1, alignItems: 'center', justifyContent: 'center', marginLeft: 8 }}>
           {NAV_PUBLIC.map(({ href, label }) => {
             const active = !href.includes('#') && href !== '/' && pathname.startsWith(href)
             return (
               <Link key={label} href={href} style={{
-                padding: '7px 12px',
-                color: active ? '#E8B84B' : 'rgba(255,255,255,.78)',
-                fontSize: 13, fontWeight: active ? 700 : 600,
+                padding: '7px 9px',
+                color: active ? '#E8B84B' : 'rgba(255,255,255,.8)',
+                fontSize: 12, fontWeight: active ? 700 : 600,
                 textDecoration: 'none', transition: 'color .15s', whiteSpace: 'nowrap',
-                letterSpacing: '.04em', textTransform: 'uppercase',
+                letterSpacing: '.03em', textTransform: 'uppercase',
               }}>
                 {label}
               </Link>
@@ -384,10 +382,10 @@ function PublicShellInner({ children }: { children: ReactNode }) {
             ) : (
               <>
                 {cartButton}
-                <button onClick={() => openLogin(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 22px', borderRadius: 24, background: '#E8B84B', color: '#0D0900', fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', letterSpacing: '.04em' }}>
+                <button onClick={() => openLogin(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 20px', borderRadius: 24, background: '#E8B84B', color: '#0D0900', fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', letterSpacing: '.04em', whiteSpace: 'nowrap' }}>
                   Skapa Konto
                 </button>
-                <button onClick={() => openLogin()} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 8, background: 'transparent', color: 'rgba(255,255,255,.8)', fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', letterSpacing: '.06em', textTransform: 'uppercase' }}>
+                <button onClick={() => openLogin()} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, background: 'transparent', color: 'rgba(255,255,255,.8)', fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', letterSpacing: '.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
                   Logga In
                 </button>
               </>
@@ -702,8 +700,7 @@ function PublicShellInner({ children }: { children: ReactNode }) {
         .pub-desktop-nav   { display: none !important; }
         .pub-desktop-right { display: none !important; }
         .pub-mobile-btn    { display: flex !important; }
-        @media (max-width: 1379px) { .pub-brand-logos { display: none !important; } }
-        @media (min-width: 860px) {
+        @media (min-width: 1260px) {
           .pub-desktop-nav   { display: flex !important; }
           .pub-desktop-right { display: flex !important; }
           .pub-mobile-btn    { display: none !important; }
