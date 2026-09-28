@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 import IncVat from '@/components/orders/IncVat'
 import { withVat, VAT_RATE } from '@/lib/pricing'
 import { fmt, formatDateTime } from '@/lib/utils'
@@ -203,6 +204,17 @@ export default function AdminOrders() {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+              {(selectedOrder.status === 'draft' || selectedOrder.status === 'quote') && (
+                <div style={{ marginBottom: 24, padding: 16, borderRadius: 10, background: 'rgba(232,184,75,.07)', border: '1px solid rgba(232,184,75,.25)' }}>
+                  <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text)' }}>
+                    {selectedOrder.status === 'quote' ? 'Offert' : 'Utkast'} — öppna den i ordern för att ändra, mejla offerten eller lägga ordern.
+                  </p>
+                  <Link href={`/admin/crm/orders?edit=${selectedOrder.id}`}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 8, background: 'var(--gold)', color: '#111', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
+                    Öppna i ordern
+                  </Link>
+                </div>
+              )}
               {/* Order info */}
               <div style={{ marginBottom: 24 }}>
                 <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,.04)', display: 'block' }}>Orderinfo</span>

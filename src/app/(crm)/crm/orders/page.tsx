@@ -250,6 +250,19 @@ export default function CrmOrdersPage() {
     }
   }, [loading, customers, products])
 
+  // ?edit=<order id> (e.g. from the admin order list) opens a draft or quote in the form.
+  const editOpenedRef = useRef(false)
+  useEffect(() => {
+    const editId = searchParams.get('edit')
+    if (loading || !editId || editOpenedRef.current || customers.length === 0) return
+    editOpenedRef.current = true
+    supabase.from('orders').select('*,customers(id,company)').eq('id', editId).single().then(({ data }) => {
+      if (!data) { showToast('Ordern hittades inte'); return }
+      if (data.status !== 'draft' && data.status !== 'quote') { setView('history'); showToast(`#${data.order_nr} är redan en order`); return }
+      openForEdit(data)
+    })
+  }, [loading, customers]) // eslint-disable-line react-hooks/exhaustive-deps
+
   async function loadLastBought(customer: Customer) {
     const { data } = await supabase
       .from('orders')
@@ -341,8 +354,10 @@ export default function CrmOrdersPage() {
 
   // Draft (utkast) and quote (offert) are saved without affecting stock or
   // budget; "pending" is a real order the salesperson then confirms.
-  async function saveOrder(status: 'draft' | 'quote' | 'pending') {
-    if (!selectedCustomer || cart.length === 0 || placing) return
+  // mailTo: a tab opened on the click (so it is not blocked as a pop-up) that
+  // gets the quote e-mail once the quote is saved.
+  async function saveOrder(status: 'draft' | 'quote' | 'pending', mailTo?: Window | null) {
+    if (!selectedCustomer || cart.length === 0 || placing) { mailTo?.close(); return }
     setPlacing(true)
     const carLines  = cart.filter(i => lineFrom[i.product.id] === 'car').length
     const shipLines = cart.length - carLines
@@ -377,7 +392,7 @@ export default function CrmOrdersPage() {
     } else {
       ;({ data: order, error } = await supabase.from('orders').insert({ ...fields, created_by: myName || null }).select().single())
     }
-    if (error || !order) { showToast('Kunde inte spara ordern'); setPlacing(false); return }
+    if (error || !order) { mailTo?.close(); showToast('Kunde inte spara ordern'); setPlacing(false); return }
 
     const { error: itemsError } = await supabase.from('order_items').insert(cart.map(i => ({
       order_id: order.id, product_id: i.product.id,
@@ -388,6 +403,7 @@ export default function CrmOrdersPage() {
     })))
     if (itemsError) {
       if (!editingOrder) await supabase.from('orders').delete().eq('id', order.id)
+      mailTo?.close()
       showToast('Orderraderna kunde inte sparas. Har migration 0014 körts?')
       setPlacing(false); return
     }
@@ -399,6 +415,7 @@ export default function CrmOrdersPage() {
     }
 
     const saved = { ...order, customers: selectedCustomer }
+    if (mailTo) await mailQuote(saved, mailTo)
     setOrders(os => editingOrder ? os.map(o => o.id === order.id ? saved : o) : [saved, ...os])
     resetOrderForm()
     setPlacing(false); setView('history')
@@ -445,9 +462,9 @@ export default function CrmOrdersPage() {
   }
 
   // Opens Gmail with the quote written out, like the quote tool on the customer card.
-  async function mailQuote(o: any) {
+  async function mailQuote(o: any, win?: Window | null) {
     const customer = customers.find(c => c.id === o.customers?.id)
-    if (!customer?.email) { showToast('Kunden saknar e-postadress'); return }
+    if (!customer?.email) { win?.close(); showToast('Kunden saknar e-postadress'); return }
     const { data: items } = await supabase.from('order_items').select('product_name,qty,unit_price,delivery').eq('order_id', o.id)
     const rows = (items || []).map((it: any) =>
       `• ${it.product_name} — ${it.qty} st × ${fmt(Number(it.unit_price))} kr = ${fmt(it.qty * Number(it.unit_price))} kr${it.delivery === 'car' ? ' (levereras direkt)' : ''}`)
@@ -468,7 +485,9 @@ export default function CrmOrdersPage() {
       myName || 'ProLuxShine',
     ].join('\n')
     const sub = `Offert #${o.order_nr} från ProLuxShine`
-    window.open(`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(customer.email)}&su=${encodeURIComponent(sub)}&body=${encodeURIComponent(body)}`, '_blank')
+    const url = `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(customer.email)}&su=${encodeURIComponent(sub)}&body=${encodeURIComponent(body)}`
+    if (win) win.location.href = url
+    else window.open(url, '_blank')
   }
 
   async function confirmOrder(id: string) {
@@ -800,7 +819,12 @@ export default function CrmOrdersPage() {
         </button>
         <button onClick={() => saveOrder('quote')} disabled={placing}
           style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: placing ? 'not-allowed' : 'pointer' }}>
-          Skapa offert
+          {editingOrder?.status === 'quote' ? 'Spara offert' : 'Skapa offert'}
+        </button>
+        <button onClick={() => saveOrder('quote', window.open('about:blank', '_blank'))} disabled={placing || !selectedCustomer?.email}
+          title={selectedCustomer?.email ? `Sparar offerten och öppnar ett mejl till ${selectedCustomer.email}` : 'Kunden saknar e-postadress'}
+          style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: placing || !selectedCustomer?.email ? 'not-allowed' : 'pointer', opacity: selectedCustomer?.email ? 1 : .6 }}>
+          Mejla offert
         </button>
         <button onClick={() => saveOrder('pending')} disabled={placing}
           style={{ padding: '14px 0', background: placing ? 'var(--bg4)' : 'var(--gold)', border: 'none', borderRadius: 10, color: placing ? 'var(--text3)' : '#111', fontSize: 14, fontWeight: 700, cursor: placing ? 'not-allowed' : 'pointer' }}>
