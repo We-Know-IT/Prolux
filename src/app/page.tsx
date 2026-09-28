@@ -1040,7 +1040,7 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
       </section>
 
       {/* ── WHY PROLUX — feature grid ── */}
-      <section style={{ background: '#f9f9f9', padding: '64px 24px', borderTop: '1px solid #ebebeb' }}>
+      <section style={{ padding: '64px 24px' }}>
         <div style={{ maxWidth: 1160, margin: '0 auto' }}>
           <h2 style={{ fontSize: 'clamp(20px, 2.5vw, 28px)', fontWeight: 800, color: '#111', marginBottom: 36, textAlign: 'center' }}>
             <EditableText doc="home" path={'why.heading'} value={siteHome.why.heading} />
@@ -1199,7 +1199,7 @@ function HomeContent() {
     return () => clearInterval(poll)
   }, [authChecked, authUser])
 
-  if (!authChecked) return <div style={{ minHeight: '100vh', background: '#fff' }} />
+  if (!authChecked) return <div style={{ minHeight: '100vh' }} />
   return <MarketingHome products={products} allImages={allImages} openLogin={openLogin} authUser={authUser} customer={customer}
     onProductCreated={p => setProducts(ps => [...ps, p])} />
 }

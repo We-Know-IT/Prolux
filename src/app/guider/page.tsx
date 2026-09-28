@@ -69,7 +69,7 @@ function GuiderContent() {
         </div>
       </div>
 
-      <div style={{ background: '#0F1115', minHeight: '100vh' }}>
+      <div style={{ minHeight: '100vh' }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '48px 24px' }}>
 
           {/* Category filter */}
@@ -81,9 +81,9 @@ function GuiderContent() {
                 style={{
                   padding: '8px 18px',
                   borderRadius: 20,
-                  border: activeCategory === cat ? '1px solid #E8B84B' : '1px solid #2A2F3A',
-                  background: activeCategory === cat ? '#E8B84B' : 'transparent',
-                  color: activeCategory === cat ? '#0F1115' : '#9BA0AB',
+                  border: activeCategory === cat ? '1px solid #111' : '1px solid rgba(0,0,0,.15)',
+                  background: activeCategory === cat ? '#111' : 'rgba(255,255,255,.7)',
+                  color: activeCategory === cat ? '#fff' : '#333',
                   fontSize: 13,
                   fontWeight: activeCategory === cat ? 700 : 400,
                   cursor: 'pointer',
@@ -93,14 +93,14 @@ function GuiderContent() {
                 {cat}
               </button>
             ))}
-            <span style={{ marginLeft: 'auto', color: '#5C6270', fontSize: 13, alignSelf: 'center' }}>
+            <span style={{ marginLeft: 'auto', color: '#555', fontSize: 13, alignSelf: 'center' }}>
               {filtered.length} guider
             </span>
           </div>
 
           {/* Grid */}
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '80px 0', color: '#5C6270' }}>
+            <div style={{ textAlign: 'center', padding: '80px 0', color: '#555' }}>
               <SearchX size={40} strokeWidth={1.5} style={{ display: 'block', margin: '0 auto 12px' }} />
               <p style={{ fontSize: 16 }}>Inga guider matchade sökningen.</p>
             </div>

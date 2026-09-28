@@ -115,7 +115,7 @@ function OmOssContent() {
   const contact = useSiteContent<ContactContent>('contact', DEFAULT_CONTACT)
 
   return (
-    <div style={{ paddingTop: 64, background: '#fff' }}>
+    <div style={{ paddingTop: 64 }}>
 
       {/* ── HERO ── */}
       <section style={{ background: '#0D0F13', padding: 'clamp(64px,8vw,100px) 24px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
@@ -138,7 +138,7 @@ function OmOssContent() {
       </section>
 
       {/* ── VÅR HISTORIA ── */}
-      <section style={{ padding: '80px 24px', background: '#fff' }}>
+      <section style={{ padding: '80px 24px' }}>
         <div style={{ maxWidth: 1160, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center' }} className="about-grid">
           <Reveal>
             <div>
@@ -167,7 +167,7 @@ function OmOssContent() {
           <Reveal delay={150}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               {content.stats.map(({ value, label, sub }, i) => (
-                <div key={i} style={{ padding: '28px 24px', border: '1.5px solid rgba(0,0,0,.08)', borderRadius: 14, background: '#F8F5F0' }}>
+                <div key={i} style={{ padding: '28px 24px', border: '1.5px solid rgba(0,0,0,.08)', borderRadius: 14, background: '#fff' }}>
                   <div style={{ fontFamily: 'var(--font-serif)', fontSize: 40, fontWeight: 400, color: '#C9971A', lineHeight: 1, marginBottom: 8 }}><EditableText doc="om_oss" path={`stats.${i}.value`} value={value} /></div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginBottom: 3 }}><EditableText doc="om_oss" path={`stats.${i}.label`} value={label} /></div>
                   <div style={{ fontSize: 12, color: '#666' }}><EditableText doc="om_oss" path={`stats.${i}.sub`} value={sub} /></div>
@@ -179,7 +179,7 @@ function OmOssContent() {
       </section>
 
       {/* ── VARUMÄRKEN ── */}
-      <section style={{ background: '#F8F5F0', padding: '80px 24px' }}>
+      <section style={{ padding: '80px 24px' }}>
         <div style={{ maxWidth: 1160, margin: '0 auto' }}>
           <Reveal>
             <div style={{ textAlign: 'center', marginBottom: 48 }}>
@@ -225,7 +225,7 @@ function OmOssContent() {
       </section>
 
       {/* ── KONTAKT ── */}
-      <section id="kontakta-oss" style={{ background: '#fff', padding: '80px 24px', scrollMarginTop: 72 }}>
+      <section id="kontakta-oss" style={{ padding: '80px 24px', scrollMarginTop: 72 }}>
         <div style={{ maxWidth: 1160, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64 }} className="contact-grid">
           <Reveal>
             <div>
@@ -257,7 +257,7 @@ function OmOssContent() {
             </div>
           </Reveal>
           <Reveal delay={100}>
-            <div style={{ background: '#F8F5F0', borderRadius: 16, padding: '36px 32px' }}>
+            <div style={{ background: '#fff', border: '1.5px solid rgba(0,0,0,.08)', borderRadius: 16, padding: '36px 32px' }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#111', marginBottom: 6 }}>Intresserad av B2B-avtal?</div>
               <p style={{ fontSize: 14, color: '#888', margin: '0 0 24px', lineHeight: 1.7 }}>Fyll i formuläret så kontaktar vi dig inom en arbetsdag för att diskutera dina behov och vilket prispaket som passar.</p>
               <B2BLeadForm />

@@ -57,29 +57,30 @@ function ProductDetailContent() {
   }
 
   if (loading) return (
-    <div style={{ background: '#fff', minHeight: '100vh', marginTop: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa' }}>
       Laddar produkt...
     </div>
   )
 
   if (!product) return (
-    <div style={{ background: '#fff', minHeight: '100vh', marginTop: 64, padding: '80px 48px', textAlign: 'center', color: '#aaa' }}>
+    <div style={{ minHeight: '100vh', padding: '80px 48px', textAlign: 'center', color: '#aaa' }}>
       <p style={{ fontSize: 18 }}>Produkten hittades inte.</p>
       <Link href="/produkter" style={{ color: '#E8B84B', fontWeight: 600 }}>← Tillbaka till produkter</Link>
     </div>
   )
 
   return (
-    <div style={{ background: '#fff', minHeight: '100vh', marginTop: 64 }}>
+    <div style={{ minHeight: '100vh' }}>
       <style>{`
         .pd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: start; }
         .rel-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
         @media (max-width: 860px) { .pd-grid { grid-template-columns: 1fr; gap: 32px; } }
+        @media (max-width: 1200px) { .pd-card { margin: 24px 16px !important; padding: 28px 20px !important; } }
         @media (max-width: 720px) { .rel-grid { grid-template-columns: repeat(2,1fr); } }
       `}</style>
 
       {/* Breadcrumb */}
-      <div style={{ padding: '14px 48px', borderBottom: '1px solid #ebebeb', display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ padding: '14px 48px', borderBottom: '1px solid rgba(0,0,0,.08)', background: 'rgba(255,255,255,.7)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
         <Link href="/" style={{ color: '#888', fontSize: 13, textDecoration: 'none' }}>Hem</Link>
         <ChevronRight size={12} color="#ccc" />
         <Link href="/produkter" style={{ color: '#888', fontSize: 13, textDecoration: 'none' }}>Produkter</Link>
@@ -90,7 +91,7 @@ function ProductDetailContent() {
       </div>
 
       {/* Main product layout */}
-      <div style={{ maxWidth: 1160, margin: '0 auto', padding: '40px 32px' }}>
+      <div className="pd-card" style={{ maxWidth: 1160, margin: '24px auto', padding: '40px 32px', background: '#fff', borderRadius: 16, boxShadow: '0 1px 6px rgba(0,0,0,.05)' }}>
         <div className="pd-grid">
 
           {/* Left — Image */}
