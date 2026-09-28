@@ -9,6 +9,7 @@ import { currentStaff, monthRange, budgetAchieved, canConfirmOrder, NOT_LIVE_FIL
 import { useTeam } from '@/hooks/useTeam'
 import { useBudgetHistory } from '@/hooks/useBudgetHistory'
 import BudgetHistoryChart from '@/components/BudgetHistoryChart'
+import ReminderModal, { type Reminder } from '@/components/crm/ReminderModal'
 import { nextBirthday, formatBirthday } from '@/lib/birthdays'
 
 const supabase = createClient()
@@ -68,11 +69,7 @@ export default function CrmDashboardPage() {
   const [isAdmin, setIsAdmin]             = useState(false)
   const [activeCustomers, setActiveCustomers] = useState<{ id: string; company: string }[]>([])
   const [selectedDay, setSelectedDay]     = useState<string | null>(null)
-  const [showAddReminder, setShowAddReminder] = useState(false)
-  const [remTitle, setRemTitle]           = useState('')
-  const [remCustomer, setRemCustomer]     = useState('')
-  const [remPriority, setRemPriority]     = useState<'low' | 'normal' | 'high'>('normal')
-  const [savingReminder, setSavingReminder] = useState(false)
+  const [remModal, setRemModal]           = useState<{ reminder: Reminder | null } | null>(null)
   const [meLoaded, setMeLoaded]           = useState(false)
   const [pendingOrders, setPendingOrders] = useState<any[]>([])
   const [confirmingId, setConfirmingId]   = useState<string | null>(null)
@@ -158,23 +155,6 @@ export default function CrmDashboardPage() {
     setBudgets(newBudgets)
     setSavingBudget(false)
     setEditBudget(false)
-  }
-
-  async function saveReminder() {
-    if (!remTitle.trim() || !selectedDay) return
-    setSavingReminder(true)
-    const { data, error } = await supabase.from('reminders').insert({
-      customer_id: remCustomer || null,
-      title: remTitle.trim(),
-      due_date: selectedDay,
-      priority: remPriority,
-      status: 'upcoming',
-    }).select('id,customer_id,title,due_date,priority,status,customers(company)').single()
-    setSavingReminder(false)
-    if (!error && data) {
-      setReminders(rs => [...rs, data as any].sort((a, b) => a.due_date.localeCompare(b.due_date)))
-      setRemTitle(''); setRemCustomer(''); setRemPriority('normal'); setShowAddReminder(false)
-    }
   }
 
   async function markReminderDone(id: string) {
@@ -495,22 +475,24 @@ export default function CrmDashboardPage() {
                 ) : (remindersByDate[selectedDay] || []).map((r: any) => (
                   <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0' }}>
                     <div style={{ width: 6, height: 6, borderRadius: '50%', background: PRIORITY_DOT[r.priority], flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, color: 'var(--text)' }}>{r.title}</div>
-                      {r.customers?.company && <div style={{ fontSize: 10, color: 'var(--text3)' }}>{r.customers.company}</div>}
-                    </div>
+                    <button type="button" onClick={() => setRemModal({ reminder: r })} title="Redigera"
+                      style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+                      <div style={{ fontSize: 12, color: 'var(--text)', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.2)', textUnderlineOffset: 3 }}>{r.title}</div>
+                      {r.customers?.company && <div style={{ fontSize: 10, color: 'var(--text2)' }}>{r.customers.company}</div>}
+                    </button>
                     <button onClick={() => markReminderDone(r.id)} style={{ fontSize: 10, padding: '3px 8px', background: 'rgba(76,175,125,.1)', border: '1px solid rgba(76,175,125,.2)', borderRadius: 5, color: 'var(--green)', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>Klar</button>
                     <button onClick={() => deleteReminder(r.id)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 2, flexShrink: 0 }}>×</button>
                   </div>
                 ))}
-                <button onClick={() => setShowAddReminder(true)}
+                <button onClick={() => setRemModal({ reminder: null })}
                   style={{ marginTop: 8, fontSize: 11, padding: '5px 12px', background: 'rgba(232,184,75,.1)', border: '1px solid rgba(232,184,75,.2)', borderRadius: 6, color: 'var(--gold)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
                   + Lägg till aktivitet
                 </button>
               </div>
             )}
             {reminders.filter(r => r.due_date >= todayStr).slice(0, 4).map((r) => (
-              <div key={r.id} style={{ padding: '8px 14px', borderTop: '1px solid rgba(255,255,255,.04)', display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div key={r.id} role="button" tabIndex={0} onClick={() => setRemModal({ reminder: r })} onKeyDown={e => { if (e.key === 'Enter') setRemModal({ reminder: r }) }}
+                style={{ padding: '8px 14px', borderTop: '1px solid rgba(255,255,255,.04)', display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
                 <div style={{ width: 6, height: 6, borderRadius: '50%', background: PRIORITY_DOT[r.priority], flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</div>
@@ -581,48 +563,13 @@ export default function CrmDashboardPage() {
         </div>
       </div>
 
-      {/* Add reminder modal */}
-      {showAddReminder && selectedDay && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div style={{ ...glass, width: '100%', maxWidth: 400, padding: '26px 26px 22px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
-                Ny aktivitet — {new Date(selectedDay + 'T12:00:00').toLocaleDateString('sv-SE', { day: 'numeric', month: 'long' })}
-              </h3>
-              <button onClick={() => setShowAddReminder(false)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer' }}>×</button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.05em' }}>Titel</label>
-                <input value={remTitle} onChange={e => setRemTitle(e.target.value)} placeholder="Vad ska göras?"
-                  style={{ width: '100%', padding: '9px 12px', background: 'var(--bg4)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 7, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.05em' }}>Kund (valfritt)</label>
-                <select value={remCustomer} onChange={e => setRemCustomer(e.target.value)}
-                  style={{ width: '100%', padding: '9px 12px', background: 'var(--bg4)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 7, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}>
-                  <option value="">— Ingen kund —</option>
-                  {activeCustomers.map(c => <option key={c.id} value={c.id}>{c.company}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.05em' }}>Prioritet</label>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {(['low', 'normal', 'high'] as const).map(p => (
-                    <button key={p} onClick={() => setRemPriority(p)}
-                      style={{ flex: 1, padding: '7px 0', fontSize: 12, background: remPriority === p ? `${PRIORITY_DOT[p]}22` : 'rgba(255,255,255,.03)', border: `1px solid ${remPriority === p ? PRIORITY_DOT[p] + '66' : 'rgba(255,255,255,.08)'}`, borderRadius: 6, color: remPriority === p ? PRIORITY_DOT[p] : 'var(--text3)', cursor: 'pointer', fontWeight: remPriority === p ? 700 : 400, fontFamily: 'var(--font-sans)' }}>
-                      {p === 'low' ? 'Låg' : p === 'normal' ? 'Normal' : 'Hög'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <button onClick={saveReminder} disabled={savingReminder || !remTitle.trim()}
-                style={{ width: '100%', padding: '10px 0', marginTop: 4, background: 'var(--gold)', border: 'none', borderRadius: 8, color: '#111', fontSize: 14, fontWeight: 700, cursor: savingReminder ? 'default' : 'pointer', opacity: !remTitle.trim() ? 0.5 : 1 }}>
-                {savingReminder ? 'Sparar...' : 'Spara aktivitet'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Create / edit calendar activity */}
+      {remModal && (
+        <ReminderModal reminder={remModal.reminder} defaultDate={selectedDay || todayStr}
+          customers={activeCustomers} createdBy={firstName || undefined}
+          onSaved={saved => setReminders(rs => [...rs.filter(r => r.id !== saved.id), saved].sort((a, b) => a.due_date.localeCompare(b.due_date)))}
+          onRemoved={id => setReminders(rs => rs.filter(r => r.id !== id))}
+          onClose={() => setRemModal(null)} />
       )}
     </div>
   )

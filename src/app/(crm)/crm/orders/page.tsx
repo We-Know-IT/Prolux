@@ -4,11 +4,12 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Product, Customer, Category, CartItem, Order, OrderItem, OrderStatus, ORDER_STATUS_LABEL } from '@/types'
 import { custPrice, fmt, formatDateTime } from '@/lib/utils'
-import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star } from 'lucide-react'
+import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star, X } from 'lucide-react'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { currentStaff, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
 import { useTeam, teamOptions } from '@/hooks/useTeam'
 import ShipOrderForm from '@/components/orders/ShipOrderForm'
+import { stockStatus } from '@/lib/stock'
 
 const supabase = createClient()
 type View = 'new' | 'confirm' | 'history'
@@ -51,22 +52,24 @@ function getRecommendations(boughtNames: string[], allProducts: Product[]): Prod
   return allProducts.filter(p => recs.has(p.id)).slice(0, 4)
 }
 
-function ProductRow({ p, selectedCustomer, getQty, addToCart, updateQty, badge }: {
+function ProductRow({ p, selectedCustomer, getQty, addToCart, updateQty, badge, onOpen }: {
   p: Product
   selectedCustomer: Customer | null
   getQty: (id: string) => number
   addToCart: (p: Product) => void
   updateQty: (id: string, delta: number) => void
   badge?: 'köpt' | 'rec'
+  onOpen: (p: Product) => void
 }) {
   const qty   = getQty(p.id)
   const price = custPrice(p.list_price, selectedCustomer?.price_list_id || 'Standard')
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', borderBottom: '1px solid var(--border2)', background: badge === 'köpt' ? 'rgba(232,184,75,.03)' : badge === 'rec' ? 'rgba(74,143,212,.02)' : 'transparent' }}>
-      <div style={{ width: 44, height: 44, borderRadius: 8, background: 'var(--bg4)', border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {p.image_url ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Package size={20} color="var(--text3)" />}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <button type="button" onClick={() => onOpen(p)} aria-label={`Visa ${p.name}`}
+        style={{ width: 44, height: 44, padding: 0, borderRadius: 8, background: '#F4F2EE', border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-in' }}>
+        {p.image_url ? <img src={p.image_url} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <Package size={20} color="#999" />}
+      </button>
+      <div onClick={() => onOpen(p)} style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
           {badge === 'köpt' && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(232,184,75,.15)', color: 'var(--gold)', fontWeight: 700 }}>Köpt</span>}
@@ -83,6 +86,72 @@ function ProductRow({ p, selectedCustomer, getQty, addToCart, updateQty, badge }
         <button onClick={() => addToCart(p)} style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Plus size={12} />
         </button>
+      </div>
+    </div>
+  )
+}
+
+// Large picture and details, to show the customer on site.
+function ProductSheet({ p, categoryName, selectedCustomer, qty, onAdd, onRemove, onClose }: {
+  p: Product
+  categoryName: string
+  selectedCustomer: Customer | null
+  qty: number
+  onAdd: () => void
+  onRemove: () => void
+  onClose: () => void
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  const pl    = selectedCustomer?.price_list_id || 'Standard'
+  const price = custPrice(p.list_price, pl)
+  const stock = stockStatus(p.stock_qty)
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
+      <div role="dialog" aria-modal="true" aria-label={p.name} onClick={e => e.stopPropagation()}
+        style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 880, maxHeight: '96vh', overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+        <div style={{ background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 320, padding: 24, position: 'relative' }}>
+          {p.image_url
+            ? <img src={p.image_url} alt={p.name} style={{ maxWidth: '100%', maxHeight: '62vh', objectFit: 'contain' }} />
+            : <Package size={96} strokeWidth={1} color="#bbb" />}
+        </div>
+        <div style={{ padding: '24px 26px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em' }}>{p.brand}</div>
+              <h2 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text)', margin: '4px 0 0', lineHeight: 1.2 }}>{p.name}</h2>
+            </div>
+            <button onClick={onClose} aria-label="Stäng" style={{ background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', padding: 6, display: 'flex' }}><X size={18} /></button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--gold)' }}>{fmt(price)} kr</span>
+            {price < p.list_price && <span style={{ fontSize: 15, color: 'var(--text2)', textDecoration: 'line-through' }}>{fmt(p.list_price)} kr</span>}
+            <span style={{ fontSize: 12, color: 'var(--text2)' }}>exkl. moms{selectedCustomer ? ` · prislista ${pl}` : ''}</span>
+          </div>
+          <span style={{ alignSelf: 'flex-start', fontSize: 12, fontWeight: 700, color: stock.color, background: stock.bg, padding: '4px 10px', borderRadius: 20 }}>{stock.label}</span>
+          {p.description && (
+            <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-line' }}>{p.description}</p>
+          )}
+          <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px', margin: 0, fontSize: 13 }}>
+            {([['Artikelnr', p.sku], ['Kategori', categoryName], ['Enhet', p.unit]] as const).filter(([, v]) => v).map(([k, v]) => (
+              <Fragment key={k}><dt style={{ color: 'var(--text2)' }}>{k}</dt><dd style={{ margin: 0, color: 'var(--text)' }}>{v}</dd></Fragment>
+            ))}
+          </dl>
+          <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: 12, paddingTop: 8 }}>
+            {qty > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button onClick={onRemove} aria-label="Minska" style={{ width: 40, height: 40, borderRadius: 8, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Minus size={16} /></button>
+                <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', minWidth: 24, textAlign: 'center' }}>{qty}</span>
+              </div>
+            )}
+            <button onClick={onAdd} style={{ flex: 1, height: 44, borderRadius: 10, background: 'var(--gold)', border: 'none', color: '#111', fontSize: 15, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <Plus size={16} /> {qty > 0 ? 'Lägg till en till' : 'Lägg i varukorgen'}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -118,6 +187,7 @@ export default function CrmOrdersPage() {
   // A draft or quote being edited; saving updates it instead of creating a new order.
   const [editingOrder, setEditingOrder]   = useState<{ id: string; order_nr: number; status: string } | null>(null)
   const [historyFilter, setHistoryFilter] = useState<'all' | 'open' | 'orders'>('all')
+  const [openProduct, setOpenProduct]     = useState<Product | null>(null)
   const [assignee, setAssignee]           = useState('')
   const [customerDeals, setCustomerDeals] = useState<{ id: string; title: string; value: number; stage: string }[]>([])
   const [dealId, setDealId]               = useState('')
@@ -145,7 +215,7 @@ export default function CrmOrdersPage() {
     Promise.all([
       supabase.from('orders').select('*,customers(id,company)').order('created_at', { ascending: false }).limit(50),
       supabase.from('customers').select('id,company,contact_name,price_list_id,city,org_nr,phone,email,account_manager').eq('status', 'active').order('company'),
-      supabase.from('products').select('id,sku,name,brand,unit,list_price,stock_qty,active,image_url,category_id').eq('active', true).order('sort_order'),
+      supabase.from('products').select('id,sku,name,brand,unit,list_price,stock_qty,active,image_url,category_id,description').eq('active', true).order('sort_order'),
       supabase.from('categories').select('id,name,sort_order').order('sort_order'),
     ]).then(([o, c, p, cat]) => {
       if (o.data)   setOrders(o.data as any)
@@ -839,7 +909,7 @@ export default function CrmOrdersPage() {
                     <Star size={11} color="var(--gold)" />
                     <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Senast köpt</span>
                   </div>
-                  {lastBoughtProducts.map((p) => <ProductRow key={p.id} p={p} selectedCustomer={selectedCustomer} getQty={getQty} addToCart={addToCart} updateQty={updateQty} badge="köpt" />)}
+                  {lastBoughtProducts.map((p) => <ProductRow key={p.id} p={p} selectedCustomer={selectedCustomer} getQty={getQty} addToCart={addToCart} updateQty={updateQty} badge="köpt" onOpen={setOpenProduct} />)}
                 </>
               )}
 
@@ -850,7 +920,7 @@ export default function CrmOrdersPage() {
                     <Tag size={11} color="#6AAFF0" />
                     <span style={{ fontSize: 11, fontWeight: 700, color: '#6AAFF0', textTransform: 'uppercase', letterSpacing: '.07em' }}>Rekommenderas</span>
                   </div>
-                  {recommendations.map((p) => <ProductRow key={p.id} p={p} selectedCustomer={selectedCustomer} getQty={getQty} addToCart={addToCart} updateQty={updateQty} badge="rec" />)}
+                  {recommendations.map((p) => <ProductRow key={p.id} p={p} selectedCustomer={selectedCustomer} getQty={getQty} addToCart={addToCart} updateQty={updateQty} badge="rec" onOpen={setOpenProduct} />)}
                 </>
               )}
 
@@ -863,7 +933,7 @@ export default function CrmOrdersPage() {
               {mainProducts.length === 0 && lastBoughtProducts.length === 0 && (
                 <div style={{ padding: 40, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>Inga produkter i denna kategori</div>
               )}
-              {mainProducts.map((p) => <ProductRow key={p.id} p={p} selectedCustomer={selectedCustomer} getQty={getQty} addToCart={addToCart} updateQty={updateQty} />)}
+              {mainProducts.map((p) => <ProductRow key={p.id} p={p} selectedCustomer={selectedCustomer} getQty={getQty} addToCart={addToCart} updateQty={updateQty} onOpen={setOpenProduct} />)}
             </>
           )}
         </div>
@@ -987,7 +1057,14 @@ export default function CrmOrdersPage() {
         )}
       </div>
 
-      {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#fff', padding: '12px 24px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 999 }}>{toast}</div>}
+      {openProduct && (
+        <ProductSheet p={openProduct} selectedCustomer={selectedCustomer} qty={getQty(openProduct.id)}
+          categoryName={categories.find(c => c.id === openProduct.category_id)?.name || ''}
+          onAdd={() => addToCart(openProduct)} onRemove={() => updateQty(openProduct.id, -1)}
+          onClose={() => setOpenProduct(null)} />
+      )}
+
+      {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#fff', padding: '12px 24px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 1001 }}>{toast}</div>}
     </div>
   )
 }
