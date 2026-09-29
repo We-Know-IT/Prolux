@@ -182,16 +182,16 @@ export const DEFAULT_OM_OSS: OmOssContent = {
   brands: [
     {
       name: 'Virtus',
-      tagline: 'Precision utan kompromiss',
-      desc: 'Virtus representerar det absolut bästa inom professionell bilvård — keramiska beläggningar, enzymrengöring och detailingprodukter för de som kräver perfektion i varje detalj.',
-      items: ['Keramisk coating', 'Enzymbaserade tvättmedel', 'Professionella polish & kompositioner', 'Lackskydd & glansmedel'],
+      tagline: 'Italiensk nanoteknologi sedan 1957',
+      desc: 'Virtus tillverkas av italienska Allchem, som sedan 1957 forskar fram och producerar professionella produkter för lackering, detailing och nanoteknologi. Med över 65 år i branschen används Virtus av proffs över hela världen. Nanopartiklarna i polermedlen ger ett hologramfritt resultat — med stor hänsyn till miljön.',
+      items: ['Polering utan hologram', 'Nanoteknologiskt lackskydd', 'Professionell detailing', 'Miljöanpassade formler'],
       img: '',
     },
     {
       name: 'Frescura',
-      tagline: 'Effektivitet i varje droppe',
-      desc: 'Frescura är valet för de som jobbar med höga volymer och kräver konsekvent professionell kvalitet dag efter dag. Kostnadseffektiva lösningar utan att kompromissa med resultatet.',
-      items: ['Alkaliska avfettningsmedel', 'pH-neutrala bilvårdsprodukter', 'Fälg- och däckvård', 'Interiör- & exteriörrengöring'],
+      tagline: 'For car loving people',
+      desc: 'Frescura har skrivit historia inom bilvårdsprodukter i Italien och har i över femtio år varit ledande i branschen. Sortimentet ligger alltid i marknadens topp när det gäller innovation och kvalitet — ofta ett steg före bilvärldens nya krav. Framgångsreceptet har exporterats till de viktigaste marknaderna utomlands och gjort Frescura till en självklar referens för proffsen, med fortsatta satsningar på nya produkter och tjänster.',
+      items: ['Tvätt & förtvätt', 'Fälg- och däckvård', 'Vax & glans', 'Glas, interiör & vinter'],
       img: '',
     },
   ],
