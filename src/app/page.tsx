@@ -11,7 +11,7 @@ import { DEFAULT_HOME, DEFAULT_TRUST, HomeContent as SiteHomeContent } from '@/l
 import { useSiteContent, useIsEditingSite, EditableText, EditableImage } from '@/components/site-edit/SiteEdit'
 import {
   ArrowRight, ChevronRight, Package,
-  ShoppingCart, ShoppingBag, ExternalLink, User, Lock, Save, Check, ClipboardList, RefreshCw, Sparkles
+  ShoppingCart, ShoppingBag, ExternalLink, User, Lock, Save, Check, ClipboardList, RefreshCw
 } from 'lucide-react'
 import type { User as SupaUser } from '@supabase/supabase-js'
 import OrderTracking from '@/components/portal/OrderTracking'
@@ -850,6 +850,7 @@ const BRAND_LOGOS = ['Virtus', 'Frescura', 'Virtus Pro', 'Frescura+', 'ProLux', 
 
 function MarketingHome({ products, allImages, openLogin, authUser, customer, onProductCreated }: { products: any[]; allImages: string[]; openLogin: () => void; authUser?: any; customer?: any; onProductCreated?: (p: any) => void }) {
   const cart = usePublicCart()
+  const [storyBrand, setStoryBrand] = useState<'frescura' | 'virtus'>('frescura')
   const priceList = customer?.price_list_id || 'Standard'
   const heroImg = products.find(p => p.image_url)?.image_url || null
   const siteHome = useSiteContent<SiteHomeContent>('home', DEFAULT_HOME)
@@ -963,12 +964,10 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', display: 'grid', gridTemplateColumns: '420px 1fr', alignItems: 'center', minHeight: 360 }} className="b2b-grid">
           {/* Left — image placeholder with product */}
           <div className="b2b-img" style={{ height: '100%', position: 'relative', overflow: 'hidden', minHeight: 320 }}>
-            {products.find(p => p.image_url) ? (
-              <img src={products.find(p => p.image_url)?.image_url} alt="Pro Center" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.4 }} />
-            ) : (
-              <div style={{ position: 'absolute', inset: 0, background: 'rgba(201,151,26,.05)' }} />
-            )}
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, transparent 60%, #0D0F13 100%)' }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 40% 45%, rgba(255,255,255,.07) 0%, transparent 65%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 34, paddingBottom: 40 }}>
+              <Image src="/brands/frescura.svg" alt="Frescura" width={260} height={24} style={{ width: '62%', height: 'auto', maxWidth: 260 }} />
+              <Image src="/brands/virtus.svg" alt="Virtus" width={110} height={114} style={{ width: 'auto', height: 110 }} />
+            </div>
             {/* PRO CENTER badge overlay */}
             <div style={{ position: 'absolute', bottom: 24, left: 24, background: '#C9971A', color: '#111', fontSize: 11, fontWeight: 800, padding: '6px 14px', borderRadius: 6, textTransform: 'uppercase', letterSpacing: '.1em' }}>
               <EditableText doc="home" path={'proCenter.badge'} value={siteHome.proCenter.badge} />
@@ -1010,16 +1009,13 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
       <section style={{ background: 'transparent', padding: '72px 24px' }}>
         <div style={{ maxWidth: 1160, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 60, alignItems: 'center' }} className="brand-story-grid">
           <Reveal>
-            <div style={{ borderRadius: 12, overflow: 'hidden', aspectRatio: '4/3', background: 'linear-gradient(135deg, #0a0c10 0%, #1a1400 60%, #0d0f13 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {allImages[0] ? (
-                <img
-                  src={allImages[0]}
-                  alt="ProLuxShine produkter"
-                  style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 24 }}
-                />
-              ) : (
-                <Sparkles size={72} strokeWidth={1} color="#bbb" />
-              )}
+            <div style={{ borderRadius: 12, overflow: 'hidden', aspectRatio: '4/3', background: 'linear-gradient(135deg, #0a0c10 0%, #1a1400 60%, #0d0f13 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 22, padding: 32, boxSizing: 'border-box' }}>
+              {storyBrand === 'virtus'
+                ? <Image key="virtus" src="/brands/virtus.svg" alt="Virtus" width={200} height={207} style={{ width: 'auto', height: '52%', animation: 'fadeIn .3s ease' }} />
+                : <Image key="frescura" src="/brands/frescura.svg" alt="Frescura" width={420} height={38} style={{ width: '72%', height: 'auto', animation: 'fadeIn .3s ease' }} />}
+              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(240,237,232,.7)' }}>
+                {storyBrand === 'virtus' ? 'Italiensk nanoteknologi sedan 1957' : 'For car loving people'}
+              </span>
             </div>
           </Reveal>
           <Reveal delay={100}>
@@ -1034,12 +1030,16 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
                 </p>
               ))}
               <div style={{ display: 'flex', gap: 24 }}>
-                <div style={{ paddingBottom: 8, borderBottom: '2px solid #111', cursor: 'pointer' }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#111' }}><EditableText doc="home" path={'brandStory.brand1'} value={siteHome.brandStory.brand1} /></span>
-                </div>
-                <div style={{ paddingBottom: 8, borderBottom: '2px solid transparent', cursor: 'pointer' }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#aaa' }}><EditableText doc="home" path={'brandStory.brand2'} value={siteHome.brandStory.brand2} /></span>
-                </div>
+                {([['brand1', siteHome.brandStory.brand1], ['brand2', siteHome.brandStory.brand2]] as const).map(([key, label]) => {
+                  const brand = /virtus/i.test(label) ? 'virtus' : 'frescura'
+                  const on = storyBrand === brand
+                  return (
+                    <div key={key} role="button" tabIndex={0} aria-pressed={on} onClick={() => setStoryBrand(brand)} onKeyDown={e => { if (e.key === 'Enter') setStoryBrand(brand) }}
+                      style={{ paddingBottom: 8, borderBottom: `2px solid ${on ? '#111' : 'transparent'}`, cursor: 'pointer' }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: on ? '#111' : '#777' }}><EditableText doc="home" path={`brandStory.${key}`} value={label} /></span>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </Reveal>
