@@ -6,6 +6,8 @@ import Link from 'next/link'
 import Image from 'next/image'
 import WebshopLink from '@/components/layout/WebshopLink'
 import LeadToast from '@/components/crm/LeadToast'
+import GuideTour, { GuideButton } from '@/components/onboarding/GuideTour'
+import { ADMIN_GUIDE } from '@/components/onboarding/guides'
 import { createClient } from '@/lib/supabase/client'
 import { LayoutDashboard, ShoppingBag, Users, Tag, Megaphone, Zap, LogOut, UserCog, Menu, X, GitBranch, CalendarDays, StickyNote, Bell, FileText } from 'lucide-react'
 
@@ -140,7 +142,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
 
         {/* Right side */}
         <div className="admin-desktop-right" style={{ display: 'none', alignItems: 'center', gap: 10, marginLeft: 'auto', flexShrink: 0 }}>
-          <Link href="/admin/orders" onClick={() => setNewOrderCount(0)} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 8, background: newOrderCount > 0 ? 'rgba(232,184,75,.12)' : 'rgba(255,255,255,.04)', border: `1px solid ${newOrderCount > 0 ? 'rgba(232,184,75,.3)' : 'var(--line)'}`, textDecoration: 'none', transition: 'all .2s' }}>
+          <Link href="/admin/orders" data-tour="bell" onClick={() => setNewOrderCount(0)} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 8, background: newOrderCount > 0 ? 'rgba(232,184,75,.12)' : 'rgba(255,255,255,.04)', border: `1px solid ${newOrderCount > 0 ? 'rgba(232,184,75,.3)' : 'var(--line)'}`, textDecoration: 'none', transition: 'all .2s' }}>
             <Bell size={15} color={newOrderCount > 0 ? 'var(--gold)' : 'var(--text3)'} />
             {newOrderCount > 0 && (
               <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8, background: 'var(--gold)', color: '#111', fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingInline: 3 }}>
@@ -166,6 +168,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
             </div>
             <span style={{ fontSize: 12, color: 'var(--text2)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</span>
           </div>
+          <GuideButton />
           <WebshopLink variant="bar" />
           <button onClick={logout} style={{
             display: 'flex', alignItems: 'center', gap: 6,
@@ -246,6 +249,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
             <div style={{ fontSize: 13, color: 'var(--text2)', fontWeight: 500 }}>{email}</div>
             <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Administratör</div>
           </div>
+          <GuideButton variant="menu" />
           <WebshopLink variant="menu" />
           <button onClick={logout} style={{
             display: 'flex', alignItems: 'center', gap: 12,
@@ -260,6 +264,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
 
       <ServiceWorkerRegister />
       <LeadToast href="/admin/crm/pipeline" />
+      <GuideTour steps={ADMIN_GUIDE} storageKey="prolux-guide-admin-v1" />
       <main style={{ flex: 1 }}>
         {children}
       </main>

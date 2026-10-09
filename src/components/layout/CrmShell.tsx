@@ -6,6 +6,8 @@ import Link from 'next/link'
 import Image from 'next/image'
 import WebshopLink from '@/components/layout/WebshopLink'
 import LeadToast from '@/components/crm/LeadToast'
+import GuideTour, { GuideButton } from '@/components/onboarding/GuideTour'
+import { CRM_GUIDE } from '@/components/onboarding/guides'
 import { createClient } from '@/lib/supabase/client'
 import { currentStaff } from '@/lib/team'
 import { LayoutDashboard, GitBranch, Users, ShoppingCart, LogOut, Menu, X, CalendarDays, StickyNote } from 'lucide-react'
@@ -94,6 +96,7 @@ export default function CrmShell({ children }: { children: ReactNode }) {
 
         {/* Right side */}
         <div className="crm-desktop-right" style={{ display: 'none', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
+          <GuideButton />
           <WebshopLink variant="bar" />
           <button onClick={logout} style={{
             display: 'flex', alignItems: 'center', gap: 6,
@@ -152,6 +155,7 @@ export default function CrmShell({ children }: { children: ReactNode }) {
             )
           })}
           <div style={{ flex: 1 }} />
+          <GuideButton variant="menu" />
           <WebshopLink variant="menu" />
           <button onClick={logout} style={{
             display: 'flex', alignItems: 'center', gap: 12,
@@ -166,6 +170,7 @@ export default function CrmShell({ children }: { children: ReactNode }) {
 
       <ServiceWorkerRegister />
       <LeadToast href="/crm/pipeline" />
+      <GuideTour steps={CRM_GUIDE} storageKey="prolux-guide-crm-v1" />
       {orderToast && (
         <Link href="/crm/dashboard" onClick={() => setOrderToast(null)} style={{ position: 'fixed', top: 72, right: 16, left: 'auto', zIndex: 999, maxWidth: 'calc(100vw - 32px)', background: 'var(--bg2)', border: '1px solid var(--gold)', borderRadius: 12, padding: '14px 18px', boxShadow: '0 8px 32px rgba(0,0,0,.4)', textDecoration: 'none', display: 'block' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Ny order till dig: #{orderToast.nr}</div>
