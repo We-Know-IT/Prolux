@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
 import { userRole } from '@/lib/roles'
+import { loginErrorMessage } from '@/lib/auth-errors'
 
 export default function LoginPage() {
   const [email, setEmail]       = useState('')
@@ -34,8 +35,14 @@ export default function LoginPage() {
     setError('')
     const supabase = createClient()
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { setError('Fel lösenord eller e-post. Försök igen.'); setLoading(false); return }
+    if (error) { setError(loginErrorMessage(error)); setLoading(false); return }
     const role = userRole(data.user)
+    // On the CRM host a customer account would be sent to the webshop; say why instead.
+    if (role === 'portal' && window.location.hostname.startsWith('crm.')) {
+      await supabase.auth.signOut()
+      setError(`Inloggningen lyckades, men ${data.user.email} har ingen behörighet till CRM/admin. En administratör lägger till e-postadressen under Team (staff_members) — logga sedan in igen.`)
+      setLoading(false); return
+    }
     const path = role === 'admin' ? '/admin/dashboard' : role === 'crm' ? '/crm/dashboard' : '/portal/dashboard'
     const targetHost = role === 'admin' || role === 'crm' ? 'crm.proluxshine.com' : 'www.proluxshine.com'
     const currentHost = window.location.hostname

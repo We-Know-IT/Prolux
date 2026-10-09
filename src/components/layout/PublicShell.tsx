@@ -10,6 +10,7 @@ import { DEFAULT_CONTACT, ContactContent } from '@/lib/site-content'
 import { SiteEditProvider, useSiteContent, EditableText } from '@/components/site-edit/SiteEdit'
 import type { User as SupaUser } from '@supabase/supabase-js'
 import { userRole } from '@/lib/roles'
+import { loginErrorMessage } from '@/lib/auth-errors'
 import { DISCOUNT, VAT_RATE, withVat, customerTypeOf, VISITOR_TYPE_KEY, type CustomerType } from '@/lib/pricing'
 import VisitorTypeModal from '@/components/shop/VisitorTypeModal'
 
@@ -169,7 +170,7 @@ function PublicShellInner({ children }: { children: ReactNode }) {
     setLoading(true); setError('')
     const sb = createClient()
     const { data, error } = await sb.auth.signInWithPassword({ email, password })
-    if (error) { setError('Fel lösenord eller e-post. Försök igen.'); setLoading(false); return }
+    if (error) { setError(loginErrorMessage(error)); setLoading(false); return }
     setAuthUser(data.user)
     closeLogin()
     setLoading(false)

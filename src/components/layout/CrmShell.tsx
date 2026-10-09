@@ -98,9 +98,9 @@ export default function CrmShell({ children }: { children: ReactNode }) {
         <div className="crm-desktop-right" style={{ display: 'none', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
           <GuideButton />
           <WebshopLink variant="bar" />
-          <button onClick={logout} style={{
+          <button onClick={logout} title="Logga ut" aria-label="Logga ut" style={{
             display: 'flex', alignItems: 'center', gap: 6,
-            padding: '6px 12px',
+            padding: '6px 10px', height: 34, boxSizing: 'border-box',
             background: 'transparent',
             border: '1px solid var(--line)',
             borderRadius: 8,
@@ -110,7 +110,7 @@ export default function CrmShell({ children }: { children: ReactNode }) {
           }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--line-hi)' }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text3)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--line)' }}>
-            <LogOut size={13} /> Logga ut
+            <LogOut size={13} /> <span className="crm-logout-label">Logga ut</span>
           </button>
         </div>
 
@@ -185,7 +185,10 @@ export default function CrmShell({ children }: { children: ReactNode }) {
         .crm-desktop-nav   { display: none !important; }
         .crm-desktop-right { display: none !important; }
         .crm-mobile-btn    { display: flex !important; }
-        @media (min-width: 900px) {
+        @media (max-width: 1299px) {
+          .crm-logout-label, .crm-desktop-right .wsl-label { display: none; }
+        }
+        @media (min-width: 1020px) {
           .crm-desktop-nav   { display: flex !important; }
           .crm-desktop-right { display: flex !important; }
           .crm-mobile-btn    { display: none !important; }

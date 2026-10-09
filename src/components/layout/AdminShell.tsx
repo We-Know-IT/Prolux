@@ -166,13 +166,13 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
             }}>
               {email.charAt(0).toUpperCase()}
             </div>
-            <span style={{ fontSize: 12, color: 'var(--text2)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</span>
+            <span className="admin-email" style={{ fontSize: 12, color: 'var(--text2)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</span>
           </div>
           <GuideButton />
           <WebshopLink variant="bar" />
-          <button onClick={logout} style={{
+          <button onClick={logout} title="Logga ut" aria-label="Logga ut" style={{
             display: 'flex', alignItems: 'center', gap: 6,
-            padding: '6px 12px',
+            padding: '6px 10px', height: 34, boxSizing: 'border-box',
             background: 'transparent',
             border: '1px solid var(--line)',
             borderRadius: 8,
@@ -181,7 +181,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
             transition: 'all .15s',
           }} onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--line-hi)' }}
              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text3)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--line)' }}>
-            <LogOut size={13} /> Logga ut
+            <LogOut size={13} /> <span className="admin-logout-label">Logga ut</span>
           </button>
         </div>
 
@@ -273,7 +273,11 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
         .admin-desktop-nav   { display: none !important; }
         .admin-desktop-right { display: none !important; }
         .admin-mobile-btn    { display: flex !important; }
-        @media (min-width: 900px) {
+        /* Compact top bar (icons only on the right) until there is room for the labels. */
+        @media (max-width: 1599px) {
+          .admin-email, .admin-logout-label, .admin-desktop-right .wsl-label { display: none; }
+        }
+        @media (min-width: 1200px) {
           .admin-desktop-nav   { display: flex !important; }
           .admin-desktop-right { display: flex !important; }
           .admin-mobile-btn    { display: none !important; }

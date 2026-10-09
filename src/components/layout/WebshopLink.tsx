@@ -19,7 +19,7 @@ export default function WebshopLink({ variant }: { variant: 'bar' | 'menu' }) {
 
   return (
     <a href={href} style={style} title="Öppna webbshoppen" data-tour={variant === 'bar' ? 'webshop' : undefined}>
-      <Store size={variant === 'bar' ? 14 : 18} /> Webbshoppen
+      <Store size={variant === 'bar' ? 14 : 18} /> <span className="wsl-label">Webbshoppen</span>
     </a>
   )
 }
