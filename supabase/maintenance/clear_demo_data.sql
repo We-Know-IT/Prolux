@@ -3,12 +3,12 @@
 -- so take a backup first if you want one (Database → Backups).
 --
 -- Removes: customers, orders and order lines, deals (pipeline), activities and
--- notes, reminders (calendar), product views, automation runs and logs, and
--- the spam-protection logs. Order numbers start again from 1.
+-- notes, reminders (calendar), product views, sales budgets, automation runs
+-- and logs, and the spam-protection logs. Order numbers start again from 1.
 --
 -- Keeps: products, categories, price lists, site texts and images
 -- (site_content), staff (staff_members), logins (auth.users), automations,
--- e-mail settings, campaign codes and sales budgets.
+-- e-mail settings and campaign codes.
 --
 -- If any table is referenced by another table that is not in the list, the
 -- whole run stops with an error and nothing is removed.
@@ -21,6 +21,7 @@ declare
   v_tables text[] := array[
     'order_items', 'orders',
     'deals', 'activities', 'customer_activities', 'customer_product_views', 'reminders',
+    'sales_budgets',
     'automation_runs', 'integration_log', 'order_guard_log', 'lead_guard_log',
     'customers'
   ];
@@ -50,4 +51,5 @@ commit;
 select 'customers' as tabell, count(*) from customers
 union all select 'orders', count(*) from orders
 union all select 'deals', count(*) from deals
-union all select 'activities', count(*) from activities;
+union all select 'activities', count(*) from activities
+union all select 'sales_budgets', count(*) from sales_budgets;
