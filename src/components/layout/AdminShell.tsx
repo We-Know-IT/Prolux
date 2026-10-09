@@ -56,6 +56,11 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
     return () => { supabase.removeChannel(channel) }
   }, [])
 
+  // Keep the current page's menu item in view when the menu is scrolled sideways.
+  useEffect(() => {
+    document.querySelector('.swipe-nav [aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [pathname])
+
   async function logout() {
     await supabase.auth.signOut()
     window.location.href = '/'
@@ -82,11 +87,11 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
         </Link>
 
         {/* Desktop nav pills */}
-        <nav className="admin-desktop-nav" style={{ display: 'none', gap: 1, alignItems: 'center', flex: 1, overflow: 'hidden' }}>
+        <nav className="admin-desktop-nav swipe-nav" style={{ display: 'none', gap: 1, alignItems: 'center', flex: 1, minWidth: 0 }}>
           {ADMIN_NAV.map(({ href, label, icon: Icon }) => {
             const active = pathname.startsWith(href)
             return (
-              <Link key={href} href={href} style={{
+              <Link key={href} href={href} aria-current={active ? 'page' : undefined} style={{
                 display: 'flex', alignItems: 'center', gap: 5,
                 padding: '6px 9px', borderRadius: 7,
                 background: active ? 'rgba(232,184,75,.09)' : 'transparent',

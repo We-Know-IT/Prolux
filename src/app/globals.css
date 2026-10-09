@@ -275,3 +275,13 @@ input, select, textarea, button { font-family: inherit; }
 @media (max-width: 600px) {
   .grid-2, .grid-3 { grid-template-columns: 1fr !important; }
 }
+
+/* Admin/CRM top menu: swipe or scroll sideways when it does not fit. */
+.swipe-nav {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.swipe-nav::-webkit-scrollbar { display: none; }
+.swipe-nav > * { flex-shrink: 0; white-space: nowrap; }

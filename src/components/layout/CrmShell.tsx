@@ -47,6 +47,11 @@ export default function CrmShell({ children }: { children: ReactNode }) {
     return () => { clearTimeout(timer); if (channel) supabase.removeChannel(channel) }
   }, [])
 
+  // Keep the current page's menu item in view when the menu is scrolled sideways.
+  useEffect(() => {
+    document.querySelector('.swipe-nav [aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [pathname])
+
   async function logout() {
     await supabase.auth.signOut()
     window.location.href = '/'
@@ -73,11 +78,11 @@ export default function CrmShell({ children }: { children: ReactNode }) {
         </Link>
 
         {/* Desktop nav pills */}
-        <nav className="crm-desktop-nav" style={{ display: 'none', gap: 2, flex: 1, alignItems: 'center' }}>
+        <nav className="crm-desktop-nav swipe-nav" style={{ display: 'none', gap: 2, flex: 1, alignItems: 'center', minWidth: 0 }}>
           {NAV.map(({ href, label, icon: Icon }) => {
             const active = pathname.startsWith(href)
             return (
-              <Link key={href} href={href} style={{
+              <Link key={href} href={href} aria-current={active ? 'page' : undefined} style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '6px 13px', borderRadius: 7,
                 background: active ? 'rgba(232,184,75,.09)' : 'transparent',
