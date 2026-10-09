@@ -4,8 +4,8 @@ import { userRole, type AppRole } from '@/lib/roles'
 // Salespeople are identified by first name everywhere they are stored:
 // sales_budgets.salesperson, deals.assigned_to, customers.account_manager
 // and orders.assigned_to.
-// Used only until Personal can be read (migration 0014); see useTeam().
-export const SALESPEOPLE_FALLBACK = ['Bashar', 'Stefan', 'Anna', 'Erik'] as const
+// Only used if the staff list (Personal) cannot be read.
+export const SALESPEOPLE_FALLBACK = ['Bashar'] as const
 
 // First name from the account itself. Prefer currentStaff(), which also
 // reads the name admin entered under Personal.
