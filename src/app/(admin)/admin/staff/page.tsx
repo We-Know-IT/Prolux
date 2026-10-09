@@ -18,7 +18,12 @@ const ROLE_LABEL: Record<Role, string>            = { admin: 'Administratör', c
 const ROLE_COLOR: Record<Role, string>            = { admin: '#E8B84B', crm: '#4A8FD4', portal: '#4CAF7D' }
 const ROLE_ICON:  Record<Role, React.ElementType> = { admin: Shield, crm: Briefcase, portal: User }
 
-const DEFAULT_PASSWORD = 'prolux2024'
+// A new random start password per account (no shared, guessable password).
+function startPassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+  const bytes = crypto.getRandomValues(new Uint8Array(14))
+  return Array.from(bytes, b => chars[b % chars.length]).join('')
+}
 
 const supabase = createClient()
 
@@ -33,6 +38,7 @@ export default function StaffPage() {
   const [inviteDone, setInviteDone]     = useState(false)
   const [inviteError, setInviteError]   = useState('')
   const [copied, setCopied]             = useState(false)
+  const [password, setPassword]         = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [deleting, setDeleting]         = useState<string | null>(null)
 
@@ -49,6 +55,7 @@ export default function StaffPage() {
     if (!inviteEmail || !inviteName) return
     setInviting(true)
     setInviteError('')
+    const pw = startPassword()
 
     const { data: { session } } = await supabase.auth.getSession()
     const token = session?.access_token
@@ -57,13 +64,14 @@ export default function StaffPage() {
     const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-staff-user`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ email: inviteEmail, full_name: inviteName, role: inviteRole, password: DEFAULT_PASSWORD }),
+      body: JSON.stringify({ email: inviteEmail, full_name: inviteName, role: inviteRole, password: pw }),
     })
 
     const json = await res.json()
     if (!res.ok) {
       setInviteError(json.error || 'Något gick fel.')
     } else {
+      setPassword(pw)
       setInviteDone(true)
       await loadStaff()
     }
@@ -86,10 +94,11 @@ export default function StaffPage() {
     setInviteRole('crm')
     setInviteDone(false)
     setInviteError('')
+    setPassword('')
   }
 
   function copyPassword() {
-    navigator.clipboard.writeText(DEFAULT_PASSWORD)
+    navigator.clipboard.writeText(password)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -171,7 +180,7 @@ export default function StaffPage() {
               Lägg till medarbetare
             </div>
             <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '24px' }}>
-              Kontot skapas direkt med startlösenordet <strong style={{ color: 'var(--text2)' }}>{DEFAULT_PASSWORD}</strong>.
+              Kontot skapas direkt med ett slumpat startlösenord som visas en gång. Be personen byta lösenord efter första inloggningen.
             </div>
 
             {!inviteDone ? (
@@ -227,11 +236,11 @@ export default function StaffPage() {
                 <div style={{ padding: '16px', background: 'rgba(76,175,125,.08)', border: '1px solid rgba(76,175,125,.25)', borderRadius: '10px', marginBottom: '20px' }}>
                   <div style={{ fontSize: '14px', fontWeight: 700, color: '#4CAF7D', marginBottom: '8px' }}>✓ Konto skapat!</div>
                   <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '12px' }}>
-                    <strong style={{ color: 'var(--text)' }}>{inviteName}</strong> ({inviteEmail}) kan nu logga in med startlösenordet:
+                    <strong style={{ color: 'var(--text)' }}>{inviteName}</strong> ({inviteEmail}) kan nu logga in med startlösenordet nedan. Det visas bara nu — kopiera och skicka det säkert:
                   </div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <div style={{ flex: 1, padding: '10px 14px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '16px', fontFamily: 'monospace', color: 'var(--text)', letterSpacing: '.08em' }}>
-                      {DEFAULT_PASSWORD}
+                      {password}
                     </div>
                     <button onClick={copyPassword}
                       style={{ padding: '10px 14px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', color: copied ? '#4CAF7D' : 'var(--text2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', whiteSpace: 'nowrap' }}>

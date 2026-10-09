@@ -673,19 +673,6 @@ function PublicShellInner({ children }: { children: ReactNode }) {
 
             {!regMode ? (
               <>
-                <div style={{ marginBottom: 16, padding: '12px 14px', background: '#F5F3EE', border: '1px solid rgba(0,0,0,.06)', borderRadius: 10, fontSize: 12, color: '#888', lineHeight: 1.8 }}>
-                  <div style={{ fontWeight: 600, color: '#555', marginBottom: 6 }}>Demo-konton · lösenord: <span style={{ color: '#C9971A' }}>prolux2024</span></div>
-                  {[
-                    { label: 'bashar@proluxshine.se',     role: 'Admin',   color: '#B8860B', em: 'bashar@proluxshine.se' },
-                    { label: 'stefan@detailingproffs.se', role: 'Säljare', color: '#2563EB', em: 'stefan@detailingproffs.se' },
-                    { label: 'demo@proluxshine.se',       role: 'Kund',    color: '#16A34A', em: 'demo@proluxshine.se' },
-                  ].map(({ label, role, color, em }) => (
-                    <div key={em} onClick={() => { setEmail(em); setPassword('prolux2024') }} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, cursor: 'pointer', borderRadius: 6, padding: '2px 4px' }}>
-                      <span style={{ color: '#333' }}>{label}</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: `${color}18`, color }}>{role}</span>
-                    </div>
-                  ))}
-                </div>
                 <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.08em' }}>E-post</label>

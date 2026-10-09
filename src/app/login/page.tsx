@@ -173,20 +173,6 @@ export default function LoginPage() {
           )}
         </div>
 
-        {/* Demo hint */}
-        <div style={{ marginTop: 16, padding: '14px 16px', background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', borderRadius: 10, fontSize: 12, color: 'var(--text3)', lineHeight: 1.7 }}>
-          <div style={{ fontWeight: 600, color: 'var(--text2)', marginBottom: 8 }}>Demo-konton · lösenord: <span style={{ color: 'var(--gold)' }}>prolux2024</span></div>
-          {[
-            { email: 'bashar@proluxshine.se',    role: 'Admin',   color: '#E8B84B' },
-            { email: 'stefan@detailingproffs.se', role: 'Säljare', color: '#4A8FD4' },
-            { email: 'demo@proluxshine.se',       role: 'Kund',    color: '#4CAF7D' },
-          ].map(({ email, role, color }) => (
-            <div key={email} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-              <span style={{ color: 'var(--text2)' }}>{email}</span>
-              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: `${color}18`, color }}>{role}</span>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   )
