@@ -11,7 +11,7 @@ import { configFromEnv, Visma, VismaError, type Repo } from './lib.ts'
 //   VISMA_CLIENT_ID, VISMA_CLIENT_SECRET   from ProLuxShine's app at Visma Developer
 //   APP_URL        where to return after connecting (default https://crm.proluxshine.com)
 //   CRON_SECRET    optional: lets a scheduled job run the payment check
-//   VISMA_ENV      "sandbox" to use Visma's test environment (default production)
+//   (Sandbox vs live is decided by which client id/secret you put here.)
 //   VISMA_REDIRECT_URI  default <SUPABASE_URL>/functions/v1/visma — must be registered at Visma
 //   VISMA_IDENTITY_URL / VISMA_API_URL  override the Visma hosts if Visma's docs give others
 //

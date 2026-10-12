@@ -95,14 +95,15 @@ export interface Config {
 }
 
 export function configFromEnv(env: (k: string) => string | undefined): Config {
-  const sandbox = (env('VISMA_ENV') || 'production') === 'sandbox'
+  // Visma's sandbox is a test company on the normal Visma servers; it is the
+  // sandbox client id/secret that make the difference, not the hosts.
   return {
     clientId: env('VISMA_CLIENT_ID') || '',
     clientSecret: env('VISMA_CLIENT_SECRET') || '',
     redirectUri: env('VISMA_REDIRECT_URI') || `${env('SUPABASE_URL')}/functions/v1/visma`,
     scopes: env('VISMA_SCOPES') || 'ea:api ea:sales ea:accounting offline_access',   // as granted by Visma
-    identityUrl: env('VISMA_IDENTITY_URL') || (sandbox ? 'https://identity-sandbox.test.vismaonline.com' : 'https://identity.vismaonline.com'),
-    apiUrl: env('VISMA_API_URL') || (sandbox ? 'https://eaccountingapi-sandbox.test.vismaonline.com/v2' : 'https://eaccountingapi.vismaonline.com/v2'),
+    identityUrl: env('VISMA_IDENTITY_URL') || 'https://identity.vismaonline.com',
+    apiUrl: env('VISMA_API_URL') || 'https://eaccountingapi.vismaonline.com/v2',
   }
 }
 
@@ -419,7 +420,7 @@ export class Visma {
 //   VISMA_CLIENT_ID, VISMA_CLIENT_SECRET   from ProLuxShine's app at Visma Developer
 //   APP_URL        where to return after connecting (default https://crm.proluxshine.com)
 //   CRON_SECRET    optional: lets a scheduled job run the payment check
-//   VISMA_ENV      "sandbox" to use Visma's test environment (default production)
+//   (Sandbox vs live is decided by which client id/secret you put here.)
 //   VISMA_REDIRECT_URI  default <SUPABASE_URL>/functions/v1/visma — must be registered at Visma
 //   VISMA_IDENTITY_URL / VISMA_API_URL  override the Visma hosts if Visma's docs give others
 //
