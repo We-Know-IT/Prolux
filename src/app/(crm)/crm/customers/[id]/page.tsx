@@ -154,7 +154,7 @@ export default function CustomerDetailPage() {
 
   function startEdit() {
     if (!customer) return
-    setEditForm({ company: customer.company, contact_name: customer.contact_name, email: customer.email, phone: customer.phone || '', city: customer.city || '', org_nr: customer.org_nr || '', price_list_id: customer.price_list_id, status: customer.status, account_manager: customer.account_manager || '', birthday: customer.birthday || '', customer_type: customer.customer_type === 'private' ? 'private' : 'business' })
+    setEditForm({ company: customer.company, contact_name: customer.contact_name, email: customer.email, phone: customer.phone || '', address: customer.address || '', postal_code: customer.postal_code || '', city: customer.city || '', org_nr: customer.org_nr || '', price_list_id: customer.price_list_id, status: customer.status, account_manager: customer.account_manager || '', birthday: customer.birthday || '', customer_type: customer.customer_type === 'private' ? 'private' : 'business' })
     setEditMode(true)
   }
 
@@ -330,7 +330,7 @@ export default function CustomerDetailPage() {
           {/* Contact details */}
           <div style={{ ...card, padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px 24px' }}>
             {[
-              ['E-post', customer.email], ['Telefon', customer.phone || '—'], ['Stad', customer.city || '—'],
+              ['E-post', customer.email], ['Telefon', customer.phone || '—'], ['Adress', [customer.address, [customer.postal_code, customer.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—'],
               ['Org.nr', customer.org_nr || '—'], ['Status', ({ active: 'Aktiv', inactive: 'Inaktiv', prospect: 'Prospekt' } as Record<string, string>)[customer.status] || customer.status], ['Prislista', customer.price_list_id],
               ['Kontaktperson', customer.contact_name || '—'],
               ['Födelsedag', customer.birthday ? (() => {
@@ -625,6 +625,8 @@ export default function CustomerDetailPage() {
               { label: 'Kontaktperson', key: 'contact_name', type: 'text' },
               { label: 'E-post', key: 'email', type: 'email' },
               { label: 'Telefon', key: 'phone', type: 'tel' },
+              { label: 'Adress', key: 'address', type: 'text' },
+              { label: 'Postnummer', key: 'postal_code', type: 'text' },
               { label: 'Stad', key: 'city', type: 'text' },
               { label: 'Org.nr', key: 'org_nr', type: 'text' },
               { label: 'Kontaktpersonens födelsedag', key: 'birthday', type: 'date' },

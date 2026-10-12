@@ -28,7 +28,7 @@ const ACT_ICONS: Record<string, string> = {
 
 const EMPTY_FORM = {
   company: '', contact_name: '', contact_role: '', email: '', phone: '',
-  city: '', org_nr: '', price_list_id: 'B', status: 'active', birthday: '',
+  address: '', postal_code: '', city: '', org_nr: '', price_list_id: 'B', status: 'active', birthday: '',
 }
 
 export default function AdminCustomers() {
@@ -117,7 +117,7 @@ export default function AdminCustomers() {
     setForm({
       company: c.company || '', contact_name: c.contact_name || '',
       contact_role: c.contact_role || '', email: c.email || '',
-      phone: c.phone || '', city: c.city || '', org_nr: c.org_nr || '',
+      phone: c.phone || '', address: c.address || '', postal_code: c.postal_code || '', city: c.city || '', org_nr: c.org_nr || '',
       price_list_id: c.price_list_id || 'B', status: c.status || 'active',
       birthday: c.birthday || '',
     })
@@ -238,7 +238,7 @@ export default function AdminCustomers() {
                   ['Roll',      selectedCust.contact_role || '—'],
                   ['E-post',    selectedCust.email],
                   ['Telefon',   selectedCust.phone || '—'],
-                  ['Stad',      selectedCust.city || '—'],
+                  ['Adress',    [selectedCust.address, [selectedCust.postal_code, selectedCust.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—'],
                   ['Org.nr',    selectedCust.org_nr || '—'],
                   ['Prislista', selectedCust.price_list_id],
                   ['Status',    STATUS_LABELS[selectedCust.status] || selectedCust.status],
@@ -350,6 +350,8 @@ export default function AdminCustomers() {
                 { label: 'Roll',            key: 'contact_role', placeholder: 'Inköpschef' },
                 { label: 'E-post *',        key: 'email',        placeholder: 'anna@bolaget.se', type: 'email' },
                 { label: 'Telefon',         key: 'phone',        placeholder: '+46 70 …' },
+                { label: 'Adress',          key: 'address',      placeholder: 'Storgatan 1' },
+                { label: 'Postnummer',      key: 'postal_code',  placeholder: '123 45' },
                 { label: 'Stad',            key: 'city',         placeholder: 'Stockholm' },
                 { label: 'Org.nr',          key: 'org_nr',       placeholder: '556123-4567' },
               ].map(f => (

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import IncVat from '@/components/orders/IncVat'
 import { withVat, VAT_RATE } from '@/lib/pricing'
+import { callVisma, invoiceInVismaInBackground, VISMA_STATUS } from '@/lib/visma'
 import { fmt, formatDateTime } from '@/lib/utils'
 import { X } from 'lucide-react'
 import ShipOrderForm from '@/components/orders/ShipOrderForm'
@@ -29,6 +30,7 @@ const STATUS_CSS: Record<string, { bg: string; color: string }> = {
 export default function AdminOrders() {
   const SALESPEOPLE = useTeam()
   const [orders, setOrders]           = useState<any[]>([])
+  const [vismaBusy, setVismaBusy]     = useState(false)
   const [filtered, setFiltered]       = useState<any[]>([])
   const [search, setSearch]           = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -88,9 +90,22 @@ export default function AdminOrders() {
     showToast(assigned_to ? `Säljare: ${assigned_to}` : 'Säljare borttagen')
   }
 
+  async function sendToVisma(id: string) {
+    setVismaBusy(true)
+    try {
+      const r = await callVisma<{ draft_id?: string; invoice_number?: number; warning?: string; already?: boolean }>('sync-order', { order_id: id })
+      showToast(r.already ? 'Ordern finns redan i Visma' : r.invoice_number ? `Faktura ${r.invoice_number} skapad i Visma` : 'Fakturautkast skapat i Visma')
+    } catch (e) { showToast((e as Error).message) }
+    const { data } = await createClient().from('orders').select('*,customers(company,contact_name,email)').eq('id', id).single()
+    if (data) { setSelectedOrder((prev: any) => prev?.id === id ? { ...prev, ...data } : prev); setOrders(prev => prev.map(o => o.id === id ? { ...o, ...data } : o)) }
+    setVismaBusy(false)
+  }
+
   async function updateStatus(id: string, status: string) {
     const sb = createClient()
     await sb.from('orders').update({ status }).eq('id', id)
+    // Placed orders get their Visma invoice (when automatic invoicing is on).
+    if (['confirmed', 'packed', 'shipped', 'delivered'].includes(status)) invoiceInVismaInBackground(id)
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o))
     if (selectedOrder?.id === id) setSelectedOrder((prev: any) => ({ ...prev, status }))
     showToast(`Status uppdaterad → ${STATUS_LABELS[status]}`)
@@ -287,6 +302,25 @@ export default function AdminOrders() {
                   <strong style={{ color: 'var(--gold)', fontSize: 18, fontWeight: 400 }}>{fmt(selectedOrder.total ?? withVat(selectedOrder.subtotal))} kr</strong>
                 </div>
               </div>
+
+              {/* Visma */}
+              {!['draft', 'quote', 'cancelled'].includes(selectedOrder.status) && (
+                <div style={{ marginBottom: 24 }}>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10, display: 'block' }}>Visma</span>
+                  {selectedOrder.visma_status && VISMA_STATUS[selectedOrder.visma_status] && (
+                    <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 4, marginBottom: 8, background: VISMA_STATUS[selectedOrder.visma_status].bg, color: VISMA_STATUS[selectedOrder.visma_status].color }}>
+                      {VISMA_STATUS[selectedOrder.visma_status].label}{selectedOrder.visma_invoice_number ? ` · nr ${selectedOrder.visma_invoice_number}` : ''}
+                    </span>
+                  )}
+                  {selectedOrder.visma_status === 'error' && <p style={{ fontSize: 12, color: 'var(--red)', margin: '0 0 8px' }}>{selectedOrder.visma_error}</p>}
+                  {(!selectedOrder.visma_status || selectedOrder.visma_status === 'error') && (
+                    <button onClick={() => sendToVisma(selectedOrder.id)} disabled={vismaBusy}
+                      style={{ display: 'block', padding: '9px 14px', borderRadius: 8, background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: vismaBusy ? 'wait' : 'pointer' }}>
+                      {vismaBusy ? 'Skickar till Visma…' : selectedOrder.visma_status === 'error' ? 'Försök igen' : 'Skapa faktura i Visma'}
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Status update */}
               <div style={{ marginBottom: 16 }}>

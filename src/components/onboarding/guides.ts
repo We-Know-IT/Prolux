@@ -9,6 +9,7 @@ export const ADMIN_GUIDE: GuideStep[] = [
   { target: '.admin-desktop-nav a[href="/admin/content"]', title: 'Innehåll', body: 'Texter och bilder på webbplatsen. Snabbast är att öppna webbshoppen och klicka på "Redigera sida".' },
   { target: '.admin-desktop-nav a[href="/admin/campaigns"]', title: 'Kampanjer', body: 'Rabattkoder som kunderna kan använda i kassan, med giltighetstid och max antal användningar.' },
   { target: '.admin-desktop-nav a[href="/admin/staff"]', title: 'Team', body: 'Lägg till säljare och administratörer. Varje ny person får ett eget startlösenord som visas en gång.' },
+  { target: '.admin-desktop-nav a[href="/admin/integrations"]', title: 'Integrationer', body: 'Kopplingen till Visma: fakturor skapas när ordrar bekräftas, och betalningar syns på ordern.' },
   { target: '.admin-desktop-nav a[href="/crm/dashboard"]', title: 'CRM', body: 'Säljverktyget: pipeline med affärer, kundkort, lägga order hos kunden (från bilen eller med frakt), offerter och kalender.' },
   { target: '[data-tour="bell"]', title: 'Nya ordrar', body: 'Klockan lyser och räknar upp när en ny order kommer in. Förfrågningar från webben visas som en notis.' },
   { target: '[data-tour="webshop"]', title: 'Webbshoppen', body: 'Öppnar webbshoppen inloggad. Där kan du redigera texter och bilder direkt på sidan.' },

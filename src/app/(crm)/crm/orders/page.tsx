@@ -6,6 +6,7 @@ import { Product, Customer, Category, CartItem, Order, OrderItem, OrderStatus, O
 import { custPrice, fmt, formatDateTime } from '@/lib/utils'
 import IncVat from '@/components/orders/IncVat'
 import { withVat } from '@/lib/pricing'
+import { invoiceInVismaInBackground } from '@/lib/visma'
 import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star, X } from 'lucide-react'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { currentStaff, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
@@ -419,6 +420,7 @@ export default function CrmOrdersPage() {
     setOrders(os => editingOrder ? os.map(o => o.id === order.id ? saved : o) : [saved, ...os])
     resetOrderForm()
     setPlacing(false); setView('history')
+    if (handedOver) invoiceInVismaInBackground(order.id)   // delivered at once: invoice now
     showToast(status === 'draft' ? `Utkast #${order.order_nr} sparat`
       : status === 'quote' ? `Offert #${order.order_nr} skapad`
       : handedOver ? `Order #${order.order_nr} levererad från bilen`
@@ -496,6 +498,7 @@ export default function CrmOrdersPage() {
     setConfirmingId(null)
     if (error || !ok) { showToast('Kunde inte bekräfta ordern'); return }
     setOrders(os => os.map(o => o.id === id ? { ...o, status: 'confirmed' as OrderStatus } : o))
+    invoiceInVismaInBackground(id)
     showToast('Order bekräftad')
   }
 

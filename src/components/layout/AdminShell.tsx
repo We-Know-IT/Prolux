@@ -9,7 +9,7 @@ import LeadToast from '@/components/crm/LeadToast'
 import GuideTour, { GuideButton } from '@/components/onboarding/GuideTour'
 import { ADMIN_GUIDE } from '@/components/onboarding/guides'
 import { createClient } from '@/lib/supabase/client'
-import { LayoutDashboard, ShoppingBag, Users, Tag, Megaphone, Zap, LogOut, UserCog, Menu, X, GitBranch, CalendarDays, StickyNote, Bell, FileText } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, Users, Tag, Megaphone, Zap, LogOut, UserCog, Menu, X, GitBranch, CalendarDays, StickyNote, Bell, FileText, Plug } from 'lucide-react'
 
 const ADMIN_NAV = [
   { href: '/admin/dashboard',  label: 'Översikt',  icon: LayoutDashboard },
@@ -19,6 +19,7 @@ const ADMIN_NAV = [
   { href: '/admin/content',    label: 'Innehåll',  icon: FileText },
   { href: '/admin/campaigns',  label: 'Kampanjer', icon: Megaphone },
   { href: '/admin/staff',      label: 'Team',      icon: UserCog },
+  { href: '/admin/integrations', label: 'Integrationer', icon: Plug },
 ]
 
 const ADMIN_NAV_ALL = [

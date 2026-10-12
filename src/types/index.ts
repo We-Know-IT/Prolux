@@ -29,6 +29,8 @@ export interface Customer {
   contact_role: string | null
   phone: string | null
   city: string | null
+  address?: string | null
+  postal_code?: string | null
   org_nr: string | null
   price_list_id: PriceList
   status: 'active' | 'inactive' | 'prospect'
