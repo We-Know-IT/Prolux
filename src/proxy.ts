@@ -22,10 +22,7 @@ export async function proxy(request: NextRequest) {
   const isWwwHost = WWW_HOSTS.includes(host)
 
   if (isCrmHost) {
-    if (pathname === '/') {
-      return NextResponse.redirect(new URL('/crm/dashboard', request.url))
-    }
-    const allowed = CRM_ALLOWED_PREFIXES.some(p => pathname.startsWith(p))
+    const allowed = pathname === '/' || CRM_ALLOWED_PREFIXES.some(p => pathname.startsWith(p))
     if (!allowed) {
       return NextResponse.redirect(new URL(`https://www.proluxshine.com${pathname}${search}`))
     }
@@ -57,6 +54,12 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   const role: string | undefined = userRole(user)
+
+  // crm.proluxshine.com/ → each role's own start page (admins: admin Översikt).
+  if (isCrmHost && pathname === '/') {
+    const start = !user ? '/login' : role === 'admin' ? '/admin/dashboard' : role === 'crm' ? '/crm/dashboard' : '/login'
+    return NextResponse.redirect(new URL(start, request.url))
+  }
 
   // Redirect logged-in users away from login
   if (pathname === '/login' && user) {
