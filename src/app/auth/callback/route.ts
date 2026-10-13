@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     }
 
     const role = userRole(user)
-    const path = role === 'admin' ? '/admin/dashboard' : role === 'crm' ? '/crm/dashboard' : '/portal/dashboard'
+    const path = role === 'admin' ? '/admin/dashboard' : role === 'crm' ? '/crm/dashboard' : '/portal'
     const targetHost = role === 'admin' || role === 'crm' ? 'crm.proluxshine.com' : 'www.proluxshine.com'
     const currentHost = new URL(origin).hostname
     const PROD_HOSTS = ['proluxshine.com', 'www.proluxshine.com', 'crm.proluxshine.com']

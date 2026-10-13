@@ -95,7 +95,7 @@ export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number 
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               {quoteByDeal[l.id] && (
                 <Link href={orderHref(quoteByDeal[l.id].id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 7, background: 'var(--gold)', color: '#111', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
-                  <FileText size={12} /> Öppna {quoteByDeal[l.id].status === 'quote' ? 'offert' : 'utkast'} #{quoteByDeal[l.id].order_nr}
+                  <FileText size={12} /> Öppna {quoteByDeal[l.id].status === 'quote' ? 'offert' : 'varukorg'} #{quoteByDeal[l.id].order_nr}
                 </Link>
               )}
               {l.customers?.id && (
@@ -222,24 +222,47 @@ export function DraftsPanel({ limit = 10 }: { limit?: number }) {
 
 // Quotes and saved carts left untouched for a few days: a nudge to follow up.
 // Shown only when there is something to follow up.
-export function FollowUpPanel({ days = 3 }: { days?: number }) {
+// bare: just the rows, for use inside another box (the overview's "Att göra");
+// onCount tells that box how many there are.
+export function FollowUpPanel({ days = 3, bare = false, onCount }: { days?: number; bare?: boolean; onCount?: (n: number) => void }) {
   const orderHref = useOrderHref()
   const [rows, setRows] = useState<any[]>([])
   function load() {
     const before = new Date(Date.now() - days * 86_400_000).toISOString()
     createClient().from('orders').select('id,order_nr,status,subtotal,created_at,customers(company,email)')
       .in('status', ['quote', 'draft']).lt('created_at', before).order('created_at', { ascending: true }).limit(8)
-      .then(({ data }) => setRows(data ?? []))
+      .then(({ data }) => { setRows(data ?? []); onCount?.((data ?? []).length) })
   }
   useEffect(load, []) // eslint-disable-line react-hooks/exhaustive-deps
   useLiveRefresh(['orders'], load)
   if (rows.length === 0) return null
   const age = (d: string) => Math.floor((Date.now() - new Date(d).getTime()) / 86_400_000)
+  const list = (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {rows.map(o => (
+          <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '8px 10px', background: 'rgba(255,255,255,.03)', borderRadius: 8 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: o.status === 'quote' ? 'rgba(155,110,232,.15)' : 'rgba(155,163,176,.12)', color: o.status === 'quote' ? '#B593F0' : 'var(--text2)' }}>
+              {o.status === 'quote' ? 'Offert' : 'Varukorg'}
+            </span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{o.customers?.company || 'Utan kund'} <span style={{ color: 'var(--text2)', fontWeight: 400 }}>#{o.order_nr}</span></span>
+            <span style={{ fontSize: 12, color: '#E0A85A' }}>{Math.floor((Date.now() - new Date(o.created_at).getTime()) / 86_400_000)} dagar</span>
+            <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--gold)' }}>{fmt(o.subtotal)} kr</span>
+            <Link href={orderHref(o.id)} style={{ padding: '5px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>Öppna</Link>
+          </div>
+        ))}
+      </div>
+  )
+  if (bare) return (
+    <div style={{ marginTop: 4 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', margin: '10px 0 8px' }}>Följ upp – legat orörda i {days}+ dagar</div>
+      {list}
+    </div>
+  )
   return (
     <div style={{ ...panel, border: '1px solid rgba(232,184,75,.3)', padding: '14px 16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <BellRing size={15} color="var(--gold)" />
-        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Följ upp</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Att göra – följ upp</span>
         <span style={{ fontSize: 12, color: 'var(--text2)' }}>Offerter och varukorgar som legat orörda i {days} dagar eller mer</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

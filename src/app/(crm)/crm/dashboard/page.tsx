@@ -10,7 +10,7 @@ import { useTeam } from '@/hooks/useTeam'
 import { useBudgetHistory } from '@/hooks/useBudgetHistory'
 import BudgetHistoryChart from '@/components/BudgetHistoryChart'
 import ReminderModal, { type Reminder } from '@/components/crm/ReminderModal'
-import { LeadsPanel, DraftsPanel, FollowUpPanel } from '@/components/crm/LeadsAndQuotes'
+import { LeadsPanel, DraftsPanel, FollowUpPanel, QuotesPanel } from '@/components/crm/LeadsAndQuotes'
 import { nextBirthday, formatBirthday } from '@/lib/birthdays'
 
 const supabase = createClient()
@@ -74,6 +74,7 @@ export default function CrmDashboardPage() {
   const [meLoaded, setMeLoaded]           = useState(false)
   const [pendingOrders, setPendingOrders] = useState<any[]>([])
   const [confirmingId, setConfirmingId]   = useState<string | null>(null)
+  const [followCount, setFollowCount]     = useState(0)
 
   useEffect(() => {
     currentStaff(supabase).then(me => {
@@ -223,7 +224,7 @@ export default function CrmDashboardPage() {
       {/* Quick grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 24 }}>
         {[
-          { label: 'Pipeline',  sub: 'Deals & offerter',    href: '/crm/pipeline',  icon: GitBranch },
+          { label: 'Pipeline',  sub: 'Affärer & offerter',    href: '/crm/pipeline',  icon: GitBranch },
           { label: 'Kunder',    sub: 'Kundkort & historik', href: '/crm/customers', icon: Users },
           { label: 'Ordrar',    sub: 'Orderhistorik',       href: '/crm/orders?view=history', icon: ShoppingBag },
           { label: 'Produkter', sub: 'Katalog & priser',    href: '/crm/orders',    icon: Package },
@@ -243,14 +244,15 @@ export default function CrmDashboardPage() {
       {/* Orders this user placed or received (admins also see unassigned ones) */}
       {(() => {
         const mine = meLoaded ? pendingOrders.filter(o => canConfirmOrder(o, firstName, isAdmin)) : []
-        if (mine.length === 0) return null
+        // "Att göra": orders to confirm and quotes/carts to follow up, in one box.
         return (
-          <div style={{ ...glass, padding: '18px 22px', marginBottom: 24, border: '1px solid rgba(232,184,75,.25)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <div style={{ ...glass, padding: '18px 22px', marginBottom: 24, border: '1px solid rgba(232,184,75,.25)', display: mine.length || followCount ? 'block' : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
               <ShoppingBag size={15} color="var(--gold)" />
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Ordrar att hantera</span>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '1px 8px', borderRadius: 10, background: 'rgba(232,184,75,.15)', color: 'var(--gold)' }}>{mine.length}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Att göra</span>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '1px 8px', borderRadius: 10, background: 'rgba(232,184,75,.15)', color: 'var(--gold)' }}>{mine.length + followCount}</span>
             </div>
+            {mine.length > 0 && <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', margin: '6px 0 2px' }}>Ordrar att bekräfta</div>}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {mine.map((o, i) => (
                 <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderTop: i > 0 ? '1px solid rgba(255,255,255,.05)' : 'none', flexWrap: 'wrap' }}>
@@ -271,15 +273,16 @@ export default function CrmDashboardPage() {
                 </div>
               ))}
             </div>
+            <FollowUpPanel bare onCount={setFollowCount} />
           </div>
         )
       })()}
 
-      <div style={{ marginBottom: 16 }}><FollowUpPanel /></div>
-
-      {/* Leads with notes */}
-      <div style={{ marginBottom: 24 }}><LeadsPanel /></div>
-      <div style={{ marginBottom: 24 }}><DraftsPanel /></div>
+      {/* Leads with notes, saved carts */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 24, alignItems: 'start' }}>
+        <LeadsPanel />
+        <DraftsPanel limit={6} />
+      </div>
 
       {/* Upcoming birthdays — for greetings and offers */}
       {birthdays.length > 0 && (
@@ -514,35 +517,8 @@ export default function CrmDashboardPage() {
           </div>
         </div>
 
-        {/* Skickade offerter */}
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 7 }}>
-            <FileText size={12} /> Skickade offerter
-          </div>
-          <div style={{ ...glass, overflow: 'hidden' }}>
-            {deals.length === 0 && (
-              <div style={{ padding: '18px 14px', fontSize: 12, color: 'var(--text3)' }}>Inga öppna offerter just nu.</div>
-            )}
-            {deals.map((d: any, i: number, arr: any[]) => (
-              <Link key={d.id} href={`/crm/orders?edit=${d.id}`} title="Öppna offerten — mejla den eller gör om den till order"
-                style={{ display: 'flex', flexDirection: 'column', padding: '11px 14px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.04)' : 'none', textDecoration: 'none' }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.03)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 3 }}>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{d.customers?.company || 'Kund saknas'}</span>
-                  <span style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--font-mono)' }}>#{d.order_nr}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 11, color: 'var(--text3)' }}>{formatDate(d.created_at)}</span>
-                  <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--gold)' }}>{fmt(d.subtotal)} kr</span>
-                </div>
-              </Link>
-            ))}
-            <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,.04)' }}>
-              <Link href="/crm/pipeline" style={{ flex: 1, textAlign: 'center', padding: '10px', fontSize: 11, fontWeight: 600, color: 'var(--gold)', textDecoration: 'none', background: 'rgba(232,184,75,.06)', borderRight: '1px solid rgba(255,255,255,.04)' }}>Följ upp i pipeline</Link>
-              <Link href="/crm/orders?view=history" style={{ flex: 1, textAlign: 'center', padding: '10px', fontSize: 11, color: 'var(--text3)', textDecoration: 'none' }}>Se alla</Link>
-            </div>
-          </div>
-        </div>
+        {/* Open quotes */}
+        <QuotesPanel limit={5} />
       </div>
 
       {/* Senaste kunder */}

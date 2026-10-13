@@ -14,7 +14,7 @@ import { LeadsPanel, QuotesPanel, DraftsPanel, FollowUpPanel } from '@/component
 import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, Trophy, ArrowRight, Calendar, ChevronLeft, ChevronRight, Activity } from 'lucide-react'
 
 const STATUS_LABELS: Record<string, string> = {
-  draft: 'Utkast', quote: 'Offert', pending: 'Väntande', confirmed: 'Bekräftad',
+  draft: 'Varukorg', quote: 'Offert', pending: 'Väntande', confirmed: 'Bekräftad',
   packed: 'Packad', shipped: 'Skickad', delivered: 'Levererad', cancelled: 'Avbruten',
 }
 const STATUS_CSS: Record<string, { bg: string; color: string }> = {
@@ -309,6 +309,7 @@ export default function AdminDashboard() {
         })}
       </div>
 
+      {/* Att göra: quotes and carts to follow up (shown only when there are any) */}
       <div style={{ marginBottom: 16 }}><FollowUpPanel /></div>
 
       {/* Leads with notes, open quotes and saved carts */}
@@ -425,7 +426,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Bottom grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 16, alignItems: 'start' }}>
 
         {/* Recent orders */}
         <div style={{ ...card, padding: '22px 24px' }}>
@@ -459,35 +460,6 @@ export default function AdminDashboard() {
               {orders.length === 0 && <tr><td colSpan={4} style={{ padding: '24px 0', fontSize: 12, color: 'var(--text3)' }}>Inga ordrar ännu</td></tr>}
             </tbody>
           </table>
-        </div>
-
-        {/* Pipeline aktiva deals */}
-        <div style={{ ...card, padding: '22px 24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.09em' }}>Aktiv pipeline</span>
-            <Link href="/crm/pipeline" style={{ fontSize: 11, color: '#6AAFF0', textDecoration: 'none', fontWeight: 600 }}>Se pipeline →</Link>
-          </div>
-          {deals.length === 0 ? (
-            <div style={{ padding: '32px 0', textAlign: 'center' }}>
-              <GitBranch size={28} color="rgba(74,143,212,.25)" style={{ margin: '0 auto 10px', display: 'block' }} />
-              <div style={{ fontSize: 13, color: 'var(--text3)' }}>Inga aktiva deals</div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {deals.slice(0, 6).map((d, i) => (
-                <div key={d.id} onClick={() => router.push(`/crm/pipeline?deal=${d.id}`)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: i < Math.min(deals.length, 6) - 1 ? '1px solid rgba(255,255,255,.04)' : 'none', cursor: 'pointer' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.title}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>{d.stage} · {d.assigned_to || '—'}</div>
-                  </div>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#6AAFF0', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>{fmt(d.value)} kr</span>
-                </div>
-              ))}
-              {deals.length > 6 && (
-                <div style={{ paddingTop: 8, fontSize: 11, color: 'var(--text3)' }}>+{deals.length - 6} fler deals</div>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Calendar */}
@@ -583,10 +555,7 @@ export default function AdminDashboard() {
             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.09em' }}>Senaste aktivitet</span>
           </div>
           {activities.length === 0 ? (
-            <div style={{ padding: '32px 0', textAlign: 'center' }}>
-              <Activity size={28} color="rgba(255,255,255,.1)" style={{ margin: '0 auto 10px', display: 'block' }} />
-              <div style={{ fontSize: 13, color: 'var(--text3)' }}>Ingen aktivitet registrerad</div>
-            </div>
+            <div style={{ fontSize: 13, color: 'var(--text2)' }}>Inga anteckningar eller samtal loggade ännu.</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', position: 'relative' }}>
               {/* Timeline line */}
@@ -623,11 +592,7 @@ export default function AdminDashboard() {
             )}
           </div>
           {lowStock.length === 0 ? (
-            <div style={{ padding: '32px 0', textAlign: 'center' }}>
-              <div style={{ fontSize: 28, marginBottom: 8 }}>✓</div>
-              <div style={{ fontSize: 13, color: 'var(--green)', fontWeight: 600 }}>Allt lager OK</div>
-              <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>Inga produkter under gränsvärde</div>
-            </div>
+            <div style={{ fontSize: 13, color: 'var(--green)', fontWeight: 600 }}>✓ Allt lager OK</div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>

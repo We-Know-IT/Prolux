@@ -173,12 +173,7 @@ export default function CustomerDetailPage() {
     setReminders(rs => rs.filter(r => r.id !== id))
   }
 
-  function sendOffer() {
-    if (!customer) return
-    const sub  = `Offert från ProLuxShine — ${customer.company}`
-    const body = `Hej ${customer.contact_name},\n\nTack för visat intresse! Jag bifogar en offert anpassad efter er prislista ${customer.price_list_id}.\n\nVänliga hälsningar,\nBashar\nProLuxShine`
-    window.open(`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(customer.email)}&su=${encodeURIComponent(sub)}&body=${encodeURIComponent(body)}`, '_blank')
-  }
+
 
 
   function startEdit() {
@@ -362,15 +357,12 @@ export default function CustomerDetailPage() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button onClick={startEdit} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 7, color: 'var(--text2)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-              ✏️ Redigera
+            <button onClick={startEdit} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 7, color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+              <Pencil size={13} /> Redigera
             </button>
-            <a href={`mailto:${customer.email}`} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'rgba(74,143,212,.1)', border: '1px solid rgba(74,143,212,.2)', borderRadius: 7, color: 'var(--blue)', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
+            <a href={`mailto:${customer.email}`} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 7, color: 'var(--text)', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
               <Mail size={13} /> Mail
             </a>
-            <button onClick={sendOffer} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'rgba(232,184,75,.1)', border: '1px solid rgba(232,184,75,.2)', borderRadius: 7, color: 'var(--gold)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-              <FileText size={13} /> Skicka offert
-            </button>
             {lastSold && (
               <button onClick={() => router.push(`/crm/orders?reorder=${lastSold.id}`)} title={`Samma produkter som order #${lastSold.order_nr}, med dagens priser`}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 7, color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>

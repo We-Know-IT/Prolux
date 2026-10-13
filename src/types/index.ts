@@ -142,7 +142,7 @@ export const PRICE_LIST_LABEL: Record<PriceList, string> = {
 }
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
-  draft: 'Utkast',
+  draft: 'Varukorg',
   quote: 'Offert',
   pending: 'Väntande',
   confirmed: 'Bekräftad',

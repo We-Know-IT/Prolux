@@ -131,7 +131,7 @@ export default function CrmPipelinePage() {
     if (error) { showToast('Fel: ' + error.message); return }
     if (data) {
       setDeals(ds => editingId ? ds.map(d => d.id === editingId ? data : d) : [data, ...ds])
-      showToast(editingId ? 'Deal uppdaterad' : 'Deal skapad!')
+      showToast(editingId ? 'Affär uppdaterad' : 'Affär skapad')
       closeModal()
       setForm(EMPTY_FORM)
     }
@@ -148,7 +148,7 @@ export default function CrmPipelinePage() {
     await supabase.from('deals').delete().eq('id', id)
     setDeals(ds => ds.filter(d => d.id !== id))
     if (editingId === id) closeModal()
-    showToast('Deal raderad')
+    showToast('Affär raderad')
   }
 
   const stageDeals = (stage: DealStage) => deals.filter(d => d.stage === stage)
@@ -162,7 +162,7 @@ export default function CrmPipelinePage() {
         <div>
           <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 400, color: 'var(--text)', margin: 0 }}>Pipeline</h1>
           <p style={{ color: 'var(--text2)', fontSize: 13, margin: '4px 0 0' }}>
-            {deals.filter(d => d.stage !== 'Vunnen' && d.stage !== 'Förlorad').length} aktiva deals · {fmt(deals.filter(d => d.stage !== 'Vunnen' && d.stage !== 'Förlorad').reduce((s,d) => s+d.value,0))} kr i pipeline
+            {deals.filter(d => d.stage !== 'Vunnen' && d.stage !== 'Förlorad').length} aktiva affärer · {fmt(deals.filter(d => d.stage !== 'Vunnen' && d.stage !== 'Förlorad').reduce((s,d) => s+d.value,0))} kr i pipeline
           </p>
         </div>
         <button onClick={openNew} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px', background: 'var(--gold)', border: 'none', borderRadius: 8, color: '#111', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
@@ -205,7 +205,7 @@ export default function CrmPipelinePage() {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4 }}>{d.title}</span>
-                      <button onClick={e => { e.stopPropagation(); deleteDeal(d.id, d.title) }} aria-label="Radera deal" style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 2, flexShrink: 0 }}><X size={12} /></button>
+                      <button onClick={e => { e.stopPropagation(); deleteDeal(d.id, d.title) }} aria-label="Radera affär" style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 2, flexShrink: 0 }}><X size={12} /></button>
                     </div>
                     {(d as any).customers && <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 3 }}>{(d as any).customers.company}</div>}
                     {(d as any).source === 'web' && <span className="badge badge-blue" style={{ display: 'inline-block', marginTop: 6, fontSize: 10 }}>Från webben</span>}
@@ -226,7 +226,7 @@ export default function CrmPipelinePage() {
                     {quoteByDeal[d.id] && (
                       <Link href={`/crm/orders?edit=${quoteByDeal[d.id].id}`} onClick={e => e.stopPropagation()}
                         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'var(--gold)', color: '#111', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
-                        <FileText size={13} /> Öppna {quoteByDeal[d.id].status === 'quote' ? 'offert' : 'utkast'} #{quoteByDeal[d.id].order_nr}
+                        <FileText size={13} /> Öppna {quoteByDeal[d.id].status === 'quote' ? 'offert' : 'varukorg'} #{quoteByDeal[d.id].order_nr}
                       </Link>
                     )}
                     {/* Move buttons */}
@@ -248,7 +248,7 @@ export default function CrmPipelinePage() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 16, width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: 'var(--bg2)', zIndex: 1 }}>
-              <h2 style={{ margin: 0, fontFamily: 'var(--font-serif)', fontSize: 18, fontWeight: 400, color: 'var(--text)' }}>{editingId ? 'Redigera deal' : 'Ny deal'}</h2>
+              <h2 style={{ margin: 0, fontFamily: 'var(--font-serif)', fontSize: 18, fontWeight: 400, color: 'var(--text)' }}>{editingId ? 'Redigera affär' : 'Ny affär'}</h2>
               <button onClick={closeModal} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
             </div>
 
@@ -356,7 +356,7 @@ export default function CrmPipelinePage() {
               {editingId && (
                 <button onClick={() => deleteDeal(editingId, form.title)} style={{ marginRight: 'auto', padding: '9px 14px', background: 'transparent', border: '1px solid rgba(224,82,82,.3)', borderRadius: 6, color: 'var(--red)', fontSize: 13, cursor: 'pointer' }}>Radera</button>
               )}
-              <button onClick={saveDeal} style={{ padding: '9px 22px', background: 'var(--gold)', border: 'none', borderRadius: 6, color: '#111', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{editingId ? 'Spara ändringar' : 'Skapa deal'}</button>
+              <button onClick={saveDeal} style={{ padding: '9px 22px', background: 'var(--gold)', border: 'none', borderRadius: 6, color: '#111', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{editingId ? 'Spara ändringar' : 'Skapa affär'}</button>
             </div>
           </div>
         </div>

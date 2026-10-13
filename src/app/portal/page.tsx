@@ -26,6 +26,11 @@ function PortalContent({ user }: { user: SupaUser }) {
   const [products, setProducts]     = useState<any[]>([])
   const [loaded, setLoaded]         = useState(false)
   const [tab, setTab]               = useState<'overview'|'orders'|'account'>('overview')
+  // ?tab=orders (e.g. from the old portal's links) opens that tab.
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('tab')
+    if (t === 'orders' || t === 'account') setTab(t)
+  }, [])
   const [form, setForm]             = useState({ contact_name: '', phone: '', address: '' })
   const [saving, setSaving]         = useState(false)
   const [saved, setSaved]           = useState(false)

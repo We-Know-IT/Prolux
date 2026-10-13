@@ -79,7 +79,7 @@ export async function proxy(request: NextRequest) {
   if (pathname === '/login' && user) {
     if (role === 'admin') return NextResponse.redirect(new URL('/admin/dashboard', request.url))
     if (role === 'crm')   return NextResponse.redirect(new URL('/crm/dashboard', request.url))
-    return NextResponse.redirect(new URL('/portal/dashboard', request.url))
+    return NextResponse.redirect(new URL('/portal', request.url))
   }
 
   // Protect all app routes

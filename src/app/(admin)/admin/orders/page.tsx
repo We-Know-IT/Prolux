@@ -13,7 +13,7 @@ import { useTeam, teamOptions } from '@/hooks/useTeam'
 
 
 const STATUS_LABELS: Record<string, string> = {
-  draft: 'Utkast', quote: 'Offert', pending: 'Väntande', confirmed: 'Bekräftad',
+  draft: 'Varukorg', quote: 'Offert', pending: 'Väntande', confirmed: 'Bekräftad',
   packed: 'Packad', shipped: 'Skickad', delivered: 'Levererad', cancelled: 'Avbruten',
 }
 const STATUS_CSS: Record<string, { bg: string; color: string }> = {
@@ -227,7 +227,7 @@ export default function AdminOrders() {
               {(selectedOrder.status === 'draft' || selectedOrder.status === 'quote') && (
                 <div style={{ marginBottom: 24, padding: 16, borderRadius: 10, background: 'rgba(232,184,75,.07)', border: '1px solid rgba(232,184,75,.25)' }}>
                   <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text)' }}>
-                    {selectedOrder.status === 'quote' ? 'Offert' : 'Utkast'} — öppna den i ordern för att ändra, mejla offerten eller lägga ordern.
+                    {selectedOrder.status === 'quote' ? 'Offert' : 'Varukorg'} — öppna den i ordern för att ändra, mejla offerten eller lägga ordern.
                   </p>
                   <Link href={`/admin/crm/orders?edit=${selectedOrder.id}`}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 8, background: 'var(--gold)', color: '#111', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
