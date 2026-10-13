@@ -182,6 +182,8 @@ export default function CrmOrdersPage() {
   const [orderItemsById, setOrderItemsById] = useState<Record<string, OrderItem[]>>({})
   const [discount, setDiscount]           = useState('')
   const [discountEnabled, setDiscountEnabled] = useState(false)
+  // Extra discount in percent per cart line, on top of the price list.
+  const [lineDisc, setLineDisc]           = useState<Record<string, string>>({})
   const [isMobile, setIsMobile]           = useState(false)
   const [showMobileCart, setShowMobileCart] = useState(false)
   const [delivery, setDelivery]           = useState('Standard (2-3 dagar)')
@@ -303,7 +305,7 @@ export default function CrmOrdersPage() {
   function selectCustomerAndLoad(c: Customer) {
     setSelectedCustomer(c)
     setAssignee(c.account_manager || myName)
-    setCart([])
+    setCart([]); setLineDisc({})
     loadLastBought(c)
     loadCustomerDeals(c)
   }
@@ -343,16 +345,21 @@ export default function CrmOrdersPage() {
     return cart.find(i => i.product.id === productId)?.qty || 0
   }
 
+  const pctOf = (v: string | undefined) => Math.min(100, Math.max(0, parseFloat((v || '').replace(',', '.')) || 0))
+  const linePct   = (i: CartItem) => pctOf(lineDisc[i.product.id])
+  const linePrice = (i: CartItem) => Math.round(i.unitPrice * (1 - linePct(i) / 100))
+
   const allFromCar  = cart.length > 0 && cart.every(i => lineFrom[i.product.id] === 'car')
-  const subtotal    = cart.reduce((s, i) => s + i.qty * i.unitPrice, 0)
-  const discountAmt = discountEnabled && discount ? parseInt(discount) || 0 : 0
+  const subtotal    = cart.reduce((s, i) => s + i.qty * linePrice(i), 0)
+  const discountPct = discountEnabled ? pctOf(discount) : 0
+  const discountAmt = Math.round(subtotal * discountPct / 100)
   const afterDiscount = Math.max(0, subtotal - discountAmt)
   const vat   = Math.round(afterDiscount * 0.25)
   const total = afterDiscount + vat
 
   function resetOrderForm() {
     setCart([]); setSelectedCustomer(null); setCustomerSearch(''); setProductSearch('')
-    setDiscount(''); setDiscountEnabled(false); setDelivery('Standard (2-3 dagar)'); setLineFrom({})
+    setDiscount(''); setDiscountEnabled(false); setDelivery('Standard (2-3 dagar)'); setLineFrom({}); setLineDisc({})
     setLastBought([]); setSelectedCategory('all'); setCustomerDeals([]); setDealId(''); setEditingOrder(null)
   }
 
@@ -384,7 +391,7 @@ export default function CrmOrdersPage() {
       // No manager on the customer: the salesperson placing it receives it.
       assigned_to: assignee || (selectedCustomer.account_manager ? null : myName || null),
       ...(dealId ? { deal_id: dealId } : {}),
-      notes: `Leverans: ${deliveryNote}${discountAmt ? ` | Rabatt: ${discountAmt} kr` : ''}`,
+      notes: `Leverans: ${deliveryNote}${discountAmt ? ` | Rabatt: ${String(discountPct).replace('.', ',')} % (${discountAmt} kr)` : ''}`,
     }
 
     let order: any = null
@@ -401,8 +408,8 @@ export default function CrmOrdersPage() {
     const { error: itemsError } = await supabase.from('order_items').insert(cart.map(i => ({
       order_id: order.id, product_id: i.product.id,
       product_name: i.product.name, product_sku: i.product.sku,
-      qty: i.qty, unit_price: i.unitPrice, list_price: i.product.list_price,
-      total_price: i.qty * i.unitPrice,
+      qty: i.qty, unit_price: linePrice(i), list_price: i.product.list_price,
+      total_price: i.qty * linePrice(i),
       delivery: lineFrom[i.product.id] === 'car' ? 'car' : 'ship',
     })))
     if (itemsError) {
@@ -438,11 +445,18 @@ export default function CrmOrdersPage() {
     const { data: items } = await supabase.from('order_items').select('*').eq('order_id', o.id)
     const lines: CartItem[] = []
     const from: Record<string, 'car' | 'ship'> = {}
+    const disc: Record<string, string> = {}
+    const pl = customer.price_list_id || 'Standard'
     for (const it of items || []) {
       const product = products.find(p => p.id === it.product_id)
       if (!product) continue
       if (copy && product.active === false) continue
-      const unitPrice = copy ? custPrice(product.list_price, customer.price_list_id || 'Standard') : Number(it.unit_price)
+      // Price list price as base; anything below it was a line discount.
+      const base = custPrice(product.list_price, pl)
+      const paid = Number(it.unit_price)
+      const pct = base > 0 && paid < base ? Math.round((1 - paid / base) * 1000) / 10 : 0
+      if (pct > 0) disc[product.id] = String(pct).replace('.', ',')
+      const unitPrice = copy || pct > 0 ? base : paid
       const same = lines.find(l => l.product.id === product.id)
       if (same) same.qty += it.qty
       else lines.push({ product, qty: it.qty, unitPrice })
@@ -450,11 +464,14 @@ export default function CrmOrdersPage() {
     }
     if (copy && lines.length === 0) { showToast('Produkterna i ordern finns inte längre'); return }
     setSelectedCustomer(customer)
-    setCart(lines); setLineFrom(from)
+    setCart(lines); setLineFrom(from); setLineDisc(disc)
     setAssignee(o.assigned_to || '')
     loadLastBought(customer)
+    // Order discount in percent of the lines after their own discounts.
+    const linesTotal = lines.reduce((sum, l) => sum + l.qty * Math.round(l.unitPrice * (1 - pctOf(disc[l.product.id]) / 100)), 0)
+    const orderPct = linesTotal > 0 ? Math.round((linesTotal - (o.subtotal || 0)) / linesTotal * 1000) / 10 : 0
+    setDiscountEnabled(orderPct > 0); setDiscount(orderPct > 0 ? String(orderPct).replace('.', ',') : '')
     if (copy) {
-      setDiscountEnabled(false); setDiscount('')
       setEditingOrder(null)
       await loadCustomerDeals(customer)
       setView('confirm')
@@ -462,9 +479,6 @@ export default function CrmOrdersPage() {
       showToast(`Kopierat från #${o.order_nr} med dagens priser${skipped > 0 ? ` · ${skipped} rad${skipped > 1 ? 'er' : ''} utgått` : ''}`)
       return
     }
-    const linesTotal = lines.reduce((sum, l) => sum + l.qty * l.unitPrice, 0)
-    const disc = Math.round(linesTotal - (o.subtotal || 0))
-    setDiscountEnabled(disc > 0); setDiscount(disc > 0 ? String(disc) : '')
     await loadCustomerDeals(customer)
     if (o.deal_id) setDealId(o.deal_id)
     setEditingOrder({ id: o.id, order_nr: o.order_nr, status: o.status })
@@ -705,17 +719,18 @@ export default function CrmOrdersPage() {
       <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: discountEnabled ? 16 : 0 }}>
           <input type="checkbox" checked={discountEnabled} onChange={e => setDiscountEnabled(e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--gold)', cursor: 'pointer' }} />
-          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Lägg till rabatt</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Rabatt på hela ordern</span>
         </label>
         {discountEnabled && (
           <div style={{ display: 'flex', gap: 10 }}>
             <div style={{ flex: 1, position: 'relative' }}>
-              <input type="number" placeholder="Ange belopp" value={discount} onChange={e => setDiscount(e.target.value)}
-                style={{ width: '100%', padding: '11px 14px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 14, outline: 'none' }} />
-              <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', fontSize: 13 }}>kr</span>
+              <input type="text" inputMode="decimal" placeholder="Ange procent, t.ex. 10" value={discount} onChange={e => setDiscount(e.target.value.replace(/[^\d,.]/g, ''))}
+                style={{ width: '100%', padding: '11px 36px 11px 14px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+              <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text2)', fontSize: 14 }}>%</span>
             </div>
           </div>
         )}
+        {discountEnabled && discountAmt > 0 && <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text2)' }}>−{fmt(discountAmt)} kr exkl. moms. Rabatt per artikel sätter du i kassan nedan.</p>}
       </div>
       <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
         <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: '0 0 4px' }}>Säljare</h3>
@@ -772,17 +787,18 @@ export default function CrmOrdersPage() {
           <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: 0 }}>Kassan</h3>
         </div>
         <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', minWidth: 560, borderCollapse: 'collapse', fontSize: 13 }}>
+        <table style={{ width: '100%', minWidth: 660, borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)' }}>
-              {['Produkt', 'Leverans', 'Antal', 'À-pris', 'Summa'].map(h => (
+              {['Produkt', 'Leverans', 'Antal', 'Rabatt', 'À-pris', 'Summa'].map(h => (
                 <th key={h} style={{ padding: '10px 14px', textAlign: 'left', color: 'var(--text2)', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {cart.map(i => {
-              const hasDiscount = i.unitPrice < i.product.list_price
+              const price = linePrice(i)
+              const hasDiscount = price < i.product.list_price
               return (
                 <tr key={i.product.id} style={{ borderBottom: '1px solid var(--border2)' }}>
                   <td style={{ padding: '11px 14px' }}>
@@ -810,10 +826,18 @@ export default function CrmOrdersPage() {
                   </td>
                   <td style={{ padding: '11px 14px', color: 'var(--text2)' }}>{i.qty}</td>
                   <td style={{ padding: '11px 14px' }}>
-                    {hasDiscount && <div style={{ fontSize: 11, color: 'var(--text3)', textDecoration: 'line-through' }}>{fmt(i.product.list_price)} kr</div>}
-                    <div style={{ color: hasDiscount ? 'var(--green)' : 'var(--text2)', fontWeight: hasDiscount ? 600 : 400 }}>{fmt(i.unitPrice)} kr</div>
+                    <div style={{ position: 'relative', width: 78 }}>
+                      <input type="text" inputMode="decimal" aria-label={`Rabatt i procent för ${i.product.name}`} placeholder="0"
+                        value={lineDisc[i.product.id] ?? ''} onChange={e => setLineDisc(d => ({ ...d, [i.product.id]: e.target.value.replace(/[^\d,.]/g, '') }))}
+                        style={{ width: '100%', padding: '6px 24px 6px 10px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box', textAlign: 'right' }} />
+                      <span style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--text2)', fontSize: 12 }}>%</span>
+                    </div>
                   </td>
-                  <td style={{ padding: '11px 14px', fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap' }}>{fmt(i.qty * i.unitPrice)} kr<IncVat net={i.qty * i.unitPrice} /></td>
+                  <td style={{ padding: '11px 14px' }}>
+                    {hasDiscount && <div style={{ fontSize: 11, color: 'var(--text3)', textDecoration: 'line-through' }}>{fmt(i.product.list_price)} kr</div>}
+                    <div style={{ color: hasDiscount ? 'var(--green)' : 'var(--text2)', fontWeight: hasDiscount ? 600 : 400 }}>{fmt(price)} kr</div>
+                  </td>
+                  <td style={{ padding: '11px 14px', fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap' }}>{fmt(i.qty * price)} kr<IncVat net={i.qty * price} /></td>
                 </tr>
               )
             })}
@@ -823,7 +847,7 @@ export default function CrmOrdersPage() {
         <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {discountAmt > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--green)' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Tag size={13} /> Rabatt</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Tag size={13} /> Rabatt {String(discountPct).replace('.', ',')} %</span>
               <span>-{fmt(discountAmt)} kr</span>
             </div>
           )}
@@ -1022,14 +1046,14 @@ export default function CrmOrdersPage() {
                   <Thumb p={i.product} size={40} />
                   <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{i.product.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text3)' }}>{i.qty} × {fmt(i.unitPrice)} kr</div>
+                    <div style={{ fontSize: 11, color: 'var(--text3)' }}>{i.qty} × {fmt(linePrice(i))} kr</div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <button onClick={() => updateQty(i.product.id, -1)} style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--bg4)', border: '1px solid var(--line)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Minus size={12} /></button>
                     <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--gold)', minWidth: 20, textAlign: 'center' }}>{i.qty}</span>
                     <button onClick={() => updateQty(i.product.id, 1)} style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--bg4)', border: '1px solid var(--line)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={12} /></button>
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginLeft: 12, minWidth: 60, textAlign: 'right' }}>{fmt(i.qty * i.unitPrice)} kr<IncVat net={i.qty * i.unitPrice} /></div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginLeft: 12, minWidth: 60, textAlign: 'right' }}>{fmt(i.qty * linePrice(i))} kr<IncVat net={i.qty * linePrice(i)} /></div>
                 </div>
               ))}
             </div>
@@ -1076,7 +1100,7 @@ export default function CrmOrdersPage() {
                 </thead>
                 <tbody>
                   {cart.map(i => {
-                    const hasDiscount = i.unitPrice < i.product.list_price
+                    const hasDiscount = linePrice(i) < i.product.list_price
                     return (
                       <tr key={i.product.id} style={{ borderBottom: '1px solid var(--border2)' }}>
                         <td style={{ padding: '10px 12px' }}>
@@ -1084,7 +1108,7 @@ export default function CrmOrdersPage() {
                             <Thumb p={i.product} size={32} />
                             <div style={{ minWidth: 0 }}>
                               <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: 12 }}>{i.product.name}</div>
-                              {hasDiscount && <div style={{ fontSize: 10, color: 'var(--green)' }}>{fmt(i.unitPrice)} kr (ord. {fmt(i.product.list_price)})</div>}
+                              {hasDiscount && <div style={{ fontSize: 10, color: 'var(--green)' }}>{fmt(linePrice(i))} kr (ord. {fmt(i.product.list_price)})</div>}
                             </div>
                           </div>
                         </td>
@@ -1095,7 +1119,7 @@ export default function CrmOrdersPage() {
                             <button onClick={() => addToCart(i.product)} style={{ width: 22, height: 22, borderRadius: 4, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={10} /></button>
                           </div>
                         </td>
-                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text)' }}>{fmt(i.qty * i.unitPrice)} kr<IncVat net={i.qty * i.unitPrice} /></td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text)' }}>{fmt(i.qty * linePrice(i))} kr<IncVat net={i.qty * linePrice(i)} /></td>
                       </tr>
                     )
                   })}
