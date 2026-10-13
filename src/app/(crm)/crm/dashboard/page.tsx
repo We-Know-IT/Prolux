@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt, formatDate, formatDateTime } from '@/lib/utils'
-import { Plus, Users, ShoppingBag, Package, ChevronRight, FileText, GitBranch, Target, Calendar, ChevronLeft, Cake, Pencil, Sparkles } from 'lucide-react'
+import { Plus, Users, ShoppingBag, Package, ChevronRight, FileText, GitBranch, Target, Calendar, ChevronLeft, Cake } from 'lucide-react'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { currentStaff, monthRange, budgetAchieved, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
@@ -10,6 +10,7 @@ import { useTeam } from '@/hooks/useTeam'
 import { useBudgetHistory } from '@/hooks/useBudgetHistory'
 import BudgetHistoryChart from '@/components/BudgetHistoryChart'
 import ReminderModal, { type Reminder } from '@/components/crm/ReminderModal'
+import { LeadsPanel } from '@/components/crm/LeadsAndQuotes'
 import { nextBirthday, formatBirthday } from '@/lib/birthdays'
 
 const supabase = createClient()
@@ -73,9 +74,6 @@ export default function CrmDashboardPage() {
   const [meLoaded, setMeLoaded]           = useState(false)
   const [pendingOrders, setPendingOrders] = useState<any[]>([])
   const [confirmingId, setConfirmingId]   = useState<string | null>(null)
-  const [leads, setLeads]                 = useState<any[]>([])
-  const [leadNoteId, setLeadNoteId]       = useState<string | null>(null)
-  const [leadNote, setLeadNote]           = useState('')
 
   useEffect(() => {
     currentStaff(supabase).then(me => {
@@ -110,10 +108,7 @@ export default function CrmDashboardPage() {
       supabase.from('orders').select('id,order_nr,total,created_at,assigned_to,created_by,customers(id,company)').eq('status', 'pending').order('created_at', { ascending: false }),
       supabase.from('deals').select('id,assigned_to,value').eq('stage', 'Vunnen').gte('updated_at', start).lte('updated_at', end),
       supabase.from('orders').select('deal_id').not('deal_id', 'is', null).not('status', 'in', NOT_LIVE_FILTER),
-      // Open leads: deals not yet won or lost (web enquiries, quotes, own prospects).
-      supabase.from('deals').select('id,title,value,stage,notes,assigned_to,source,created_at,updated_at,customer_id,customers(id,company)').in('stage', ['Prospekt', 'Kontaktad', 'Offert', 'Förhandling']).order('updated_at', { ascending: false }).limit(8),
-    ]).then(([{ data: d }, { data: c }, { data: r }, { data: b }, { data: sold }, { data: ac }, { data: po }, { data: won }, { data: linked }, { data: ld }]) => {
-      if (ld) setLeads(ld)
+    ]).then(([{ data: d }, { data: c }, { data: r }, { data: b }, { data: sold }, { data: ac }, { data: po }, { data: won }, { data: linked }]) => {
       if (d) setDeals(d)
       if (c) setRecentCustomers(c)
       if (r) setReminders(r)
@@ -162,14 +157,6 @@ export default function CrmDashboardPage() {
     setBudgets(newBudgets)
     setSavingBudget(false)
     setEditBudget(false)
-  }
-
-  async function saveLeadNote(id: string) {
-    const notes = leadNote.trim() || null
-    const { error } = await supabase.from('deals').update({ notes, updated_at: new Date().toISOString() }).eq('id', id)
-    if (error) return
-    setLeads(ls => ls.map(l => l.id === id ? { ...l, notes } : l))
-    setLeadNoteId(null)
   }
 
   async function markReminderDone(id: string) {
@@ -289,44 +276,7 @@ export default function CrmDashboardPage() {
       })()}
 
       {/* Leads with notes */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 7 }}>
-          <Sparkles size={12} /> Leads
-          <Link href="/crm/pipeline" style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text2)', textDecoration: 'none', textTransform: 'none', letterSpacing: 0 }}>Pipeline →</Link>
-        </div>
-        <div style={{ ...glass, overflow: 'hidden' }}>
-          {leads.length === 0 && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Inga öppna leads. Förfrågningar från webben och offerter (Spara som lead) hamnar här.</div>}
-          {leads.map((l, i) => (
-            <div key={l.id} style={{ padding: '12px 16px', borderBottom: i < leads.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <Link href={l.customers?.id ? `/crm/customers/${l.customers.id}` : '/crm/pipeline'} style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', textDecoration: 'none' }}>
-                  {l.customers?.company || l.title}
-                </Link>
-                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(74,143,212,.14)', color: '#8DBDF0' }}>{l.stage}</span>
-                {l.source === 'web' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(76,175,125,.14)', color: '#6FCB9C' }}>Från webben</span>}
-                <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--gold)' }}>{l.value ? `${fmt(l.value)} kr` : ''}</span>
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text2)', margin: '3px 0 6px' }}>{l.title}{l.assigned_to ? ` · ${l.assigned_to}` : ''} · {formatDate(l.updated_at || l.created_at)}</div>
-              {leadNoteId === l.id ? (
-                <div>
-                  <textarea autoFocus value={leadNote} onChange={e => setLeadNote(e.target.value)} rows={3}
-                    style={{ width: '100%', padding: '8px 10px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text)', fontSize: 13, outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
-                  <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                    <button onClick={() => saveLeadNote(l.id)} style={{ padding: '5px 14px', background: 'var(--gold)', border: 'none', borderRadius: 6, color: '#111', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Spara</button>
-                    <button onClick={() => setLeadNoteId(null)} style={{ padding: '5px 12px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 12, cursor: 'pointer' }}>Avbryt</button>
-                  </div>
-                </div>
-              ) : (
-                <button onClick={() => { setLeadNoteId(l.id); setLeadNote(l.notes || '') }}
-                  style={{ display: 'flex', alignItems: 'flex-start', gap: 6, width: '100%', textAlign: 'left', background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.05)', borderRadius: 7, padding: '7px 10px', cursor: 'pointer', color: l.notes ? 'var(--text)' : 'var(--text2)', fontSize: 13, lineHeight: 1.5 }}>
-                  <Pencil size={12} style={{ marginTop: 3, flexShrink: 0 }} />
-                  <span style={{ whiteSpace: 'pre-line' }}>{l.notes || 'Lägg till anteckning…'}</span>
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
+      <div style={{ marginBottom: 24 }}><LeadsPanel /></div>
 
       {/* Upcoming birthdays — for greetings and offers */}
       {birthdays.length > 0 && (

@@ -10,6 +10,7 @@ import { useTeam } from '@/hooks/useTeam'
 import { useBudgetHistory } from '@/hooks/useBudgetHistory'
 import BudgetHistoryChart from '@/components/BudgetHistoryChart'
 import ReminderModal, { type Reminder } from '@/components/crm/ReminderModal'
+import { LeadsPanel, QuotesPanel } from '@/components/crm/LeadsAndQuotes'
 import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, Trophy, ArrowRight, Calendar, ChevronLeft, ChevronRight, Activity } from 'lucide-react'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -305,6 +306,12 @@ export default function AdminDashboard() {
             </div>
           )
         })}
+      </div>
+
+      {/* Leads with notes + open quotes */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16, marginBottom: 24 }}>
+        <LeadsPanel />
+        <QuotesPanel />
       </div>
 
       {/* Chart + Budget side by side */}

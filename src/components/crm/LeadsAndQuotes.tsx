@@ -1,0 +1,122 @@
+'use client'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { Pencil, Sparkles, FileText } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { fmt, formatDate } from '@/lib/utils'
+import { useLiveRefresh } from '@/hooks/useLiveRefresh'
+
+// Shared by the CRM and admin overviews.
+
+const panel: React.CSSProperties = {
+  background: 'rgba(13,16,23,.72)', border: '1px solid rgba(255,255,255,.06)', borderRadius: 12,
+  boxShadow: '0 1px 0 rgba(255,255,255,.04) inset, 0 4px 24px rgba(0,0,0,.3)', overflow: 'hidden',
+}
+const heading: React.CSSProperties = {
+  fontSize: 11, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.09em',
+  marginBottom: 10, display: 'flex', alignItems: 'center', gap: 7,
+}
+
+// Open leads (deals not yet won or lost) with notes that can be edited in place.
+export function LeadsPanel({ base = '/crm', limit = 8 }: { base?: string; limit?: number }) {
+  const [leads, setLeads] = useState<any[] | null>(null)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [text, setText] = useState('')
+
+  function load() {
+    createClient().from('deals')
+      .select('id,title,value,stage,notes,assigned_to,source,created_at,updated_at,customers(id,company)')
+      .in('stage', ['Prospekt', 'Kontaktad', 'Offert', 'Förhandling'])
+      .order('updated_at', { ascending: false }).limit(limit)
+      .then(({ data }) => setLeads(data ?? []))
+  }
+  useEffect(load, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useLiveRefresh(['deals'], load)
+
+  async function save(id: string) {
+    const notes = text.trim() || null
+    const { error } = await createClient().from('deals').update({ notes, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) return
+    setLeads(ls => (ls ?? []).map(l => l.id === id ? { ...l, notes } : l))
+    setEditId(null)
+  }
+
+  return (
+    <div>
+      <div style={heading}>
+        <Sparkles size={12} /> Leads
+        <Link href={`${base}/pipeline`} style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text2)', textDecoration: 'none', textTransform: 'none', letterSpacing: 0 }}>Pipeline →</Link>
+      </div>
+      <div style={panel}>
+        {leads && leads.length === 0 && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Inga öppna leads. Förfrågningar från webben och offerter (Spara som lead) hamnar här.</div>}
+        {leads === null && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Laddar…</div>}
+        {(leads ?? []).map((l, i, arr) => (
+          <div key={l.id} style={{ padding: '12px 16px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <Link href={l.customers?.id ? `/crm/customers/${l.customers.id}` : `${base}/pipeline`} style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', textDecoration: 'none' }}>
+                {l.customers?.company || l.title}
+              </Link>
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(74,143,212,.14)', color: '#8DBDF0' }}>{l.stage}</span>
+              {l.source === 'web' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(76,175,125,.14)', color: '#6FCB9C' }}>Från webben</span>}
+              <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--gold)' }}>{l.value ? `${fmt(l.value)} kr` : ''}</span>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text2)', margin: '3px 0 6px' }}>{l.title}{l.assigned_to ? ` · ${l.assigned_to}` : ''} · {formatDate(l.updated_at || l.created_at)}</div>
+            {editId === l.id ? (
+              <div>
+                <textarea autoFocus value={text} onChange={e => setText(e.target.value)} rows={3}
+                  style={{ width: '100%', padding: '8px 10px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text)', fontSize: 13, outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
+                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                  <button onClick={() => save(l.id)} style={{ padding: '5px 14px', background: 'var(--gold)', border: 'none', borderRadius: 6, color: '#111', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Spara</button>
+                  <button onClick={() => setEditId(null)} style={{ padding: '5px 12px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 12, cursor: 'pointer' }}>Avbryt</button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => { setEditId(l.id); setText(l.notes || '') }}
+                style={{ display: 'flex', alignItems: 'flex-start', gap: 6, width: '100%', textAlign: 'left', background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.05)', borderRadius: 7, padding: '7px 10px', cursor: 'pointer', color: l.notes ? 'var(--text)' : 'var(--text2)', fontSize: 13, lineHeight: 1.5 }}>
+                <Pencil size={12} style={{ marginTop: 3, flexShrink: 0 }} />
+                <span style={{ whiteSpace: 'pre-line' }}>{l.notes || 'Lägg till anteckning…'}</span>
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Open quotes; each opens in the order form (mail it or turn it into an order).
+export function QuotesPanel({ limit = 6 }: { limit?: number }) {
+  const [quotes, setQuotes] = useState<any[] | null>(null)
+  function load() {
+    createClient().from('orders').select('id,order_nr,subtotal,created_at,notes,customers(company)')
+      .eq('status', 'quote').order('created_at', { ascending: false }).limit(limit)
+      .then(({ data }) => setQuotes(data ?? []))
+  }
+  useEffect(load, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useLiveRefresh(['orders'], load)
+
+  return (
+    <div>
+      <div style={heading}>
+        <FileText size={12} /> Offerter
+        <Link href="/crm/orders?view=history" style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text2)', textDecoration: 'none', textTransform: 'none', letterSpacing: 0 }}>Alla ordrar →</Link>
+      </div>
+      <div style={panel}>
+        {quotes && quotes.length === 0 && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Inga öppna offerter just nu.</div>}
+        {quotes === null && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Laddar…</div>}
+        {(quotes ?? []).map((q, i, arr) => (
+          <Link key={q.id} href={`/crm/orders?edit=${q.id}`} title="Öppna offerten – mejla den eller gör om den till order"
+            style={{ display: 'block', padding: '12px 16px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none', textDecoration: 'none' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.03)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{q.customers?.company || 'Kund saknas'}</span>
+              <span style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>#{q.order_nr}</span>
+              <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--gold)' }}>{fmt(q.subtotal)} kr</span>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 3 }}>{formatDate(q.created_at)}{q.notes ? ` · ${String(q.notes).split('\n')[0].slice(0, 80)}` : ''}</div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
+}
