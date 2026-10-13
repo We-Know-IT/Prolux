@@ -94,6 +94,7 @@ export default function CustomerDetailPage() {
   const [editForm, setEditForm]           = useState<Partial<Customer>>({})
   const [editSaving, setEditSaving]       = useState(false)
   const [productImages, setProductImages] = useState<Record<string, string | null>>({})
+  const [imageByName, setImageByName]     = useState<Record<string, string | null>>({})
   const [viewOrder, setViewOrder]         = useState<any | null>(null)
   const [editingActId, setEditingActId]   = useState<string | null>(null)
   const [editingActText, setEditingActText] = useState('')
@@ -115,7 +116,7 @@ export default function CustomerDetailPage() {
       if (o) { setOrders(o as any); setOrderItems(o.filter((x: any) => !NOT_SOLD.includes(x.status)).flatMap((x: any) => x.order_items || [])) }
       if (a) setActivities(a as any)
       if (r) setReminders(r)
-      if (p) { setAllProductNames(p.map((x: any) => x.name)); setProductImages(Object.fromEntries(p.map((x: any) => [x.id, x.image_url]))) }
+      if (p) { setAllProductNames(p.map((x: any) => x.name)); setProductImages(Object.fromEntries(p.map((x: any) => [x.id, x.image_url]))); setImageByName(Object.fromEntries(p.map((x: any) => [x.name, x.image_url]))) }
       setLoading(false)
     })
   }
@@ -565,11 +566,13 @@ export default function CustomerDetailPage() {
                   <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <Star size={12} color="var(--gold)" /> Rekommendationer
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10 }}>
                     {recommendations.map(rec => (
-                      <Link key={rec} href={`/crm/orders?customer=${customer.id}&product=${encodeURIComponent(rec)}`}
-                        style={{ fontSize: 12, padding: '4px 10px', background: 'rgba(232,184,75,.08)', border: '1px solid rgba(232,184,75,.18)', borderRadius: 6, color: 'var(--gold)', textDecoration: 'none' }}>
-                        {rec}
+                      <Link key={rec} href={`/crm/orders?customer=${customer.id}&product=${encodeURIComponent(rec)}`} title={`Sälj ${rec}`}
+                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: 10, background: 'rgba(232,184,75,.05)', border: '1px solid rgba(232,184,75,.18)', borderRadius: 12, textDecoration: 'none' }}>
+                        <ProductPic src={imageByName[rec]} size={96} />
+                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', textAlign: 'center', lineHeight: 1.3 }}>{rec}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)' }}>+ Sälj</span>
                       </Link>
                     ))}
                   </div>
@@ -634,9 +637,7 @@ export default function CustomerDetailPage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
                 {recommendations.map(rec => (
                   <div key={rec} style={{ ...card, padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'center' }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(232,184,75,.08)', border: '1px solid rgba(232,184,75,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Package size={17} color="var(--gold)" />
-                    </div>
+                    <ProductPic src={imageByName[rec]} size={56} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{rec}</div>
                       <div style={{ fontSize: 11, color: 'var(--text3)' }}>Passar till deras köp</div>
