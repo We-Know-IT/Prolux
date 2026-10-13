@@ -44,7 +44,11 @@ function setup(opts: { includesVat?: boolean; mode?: 'draft' | 'invoice'; custom
     if (u.pathname === '/v2/customers' && method === 'GET') return ok({ Meta: { TotalNumberOfPages: 1 }, Data: [] })
     if (u.pathname === '/v2/customers' && method === 'POST') return ok({ ...body, Id: 'VC1' }, 201)
     if (u.pathname === '/v2/articles' && method === 'GET') return ok({ Meta: { TotalNumberOfPages: 1 }, Data: [] })
-    if (u.pathname === '/v2/articles' && method === 'POST') return ok({ ...body, Id: 'VA-' + body.Number }, 201)
+    if (u.pathname === '/v2/articleaccountcodings/C25') return ok({ Id: 'C25', VatRate: 0.25 })
+    if (u.pathname === '/v2/articles' && method === 'POST') {
+      if (Math.abs(body.GrossPrice - body.NetPrice * 1.25) > 0.01) return ok({ ErrorCode: 4000, DeveloperErrorMessage: 'IncorrectGrossAndNetAmountsOnArticleForVatRateException' }, 400)
+      return ok({ ...body, Id: 'VA-' + body.Number }, 201)
+    }
     if (u.pathname === '/v2/customerinvoicedrafts' && method === 'POST') {
       const total = body.Rows.reduce((s: number, r: any) => s + r.Quantity * r.UnitPrice * (1 - (r.DiscountPercentage ?? 0) / 100), 0)
       return ok({ ...body, Id: 'D1', IncludesVat: !!opts.includesVat, TotalAmount: Math.round(total * 1.25) }, 201)
@@ -75,7 +79,7 @@ Deno.test('order → customer, articles and invoice draft', async () => {
   // only the article without a Visma id is created
   const arts = calls.filter(c => c.path === '/articles' && c.method === 'POST')
   assertEquals(arts.length, 1)
-  assertEquals([arts[0].body.Number, arts[0].body.NetPrice, arts[0].body.UnitId, arts[0].body.CodingId], ['FRE-RAP-5L', 500, 'U1', 'C25'])
+  assertEquals([arts[0].body.Number, arts[0].body.NetPrice, arts[0].body.GrossPrice, arts[0].body.UnitId, arts[0].body.CodingId], ['FRE-RAP-5L', 500, 625, 'U1', 'C25'])
   assertEquals(state.products.p1.visma_article_id, 'VA-FRE-RAP-5L')
   // draft rows use the order's prices; the campaign discount (1000 → 900) as 10 %
   const draft = calls.find(c => c.path === '/customerinvoicedrafts' && c.method === 'POST')!.body

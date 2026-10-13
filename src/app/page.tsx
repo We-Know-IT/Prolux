@@ -377,7 +377,7 @@ const HERO_TEXT = [
   { label: 'Fälg & Exteriör', heading: 'Rena fälgar.\nKlara resultat.', sub: 'Starka rengöringsmedel formulerade för professionella biltvättar och detailingföretag.' },
 ]
 
-function HeroSlider({ openLogin, loggedIn, heroImages, heroText, paused = false, showcase = [] }: { openLogin: () => void; loggedIn?: boolean; heroImages: string[]; heroText: typeof HERO_TEXT; paused?: boolean; showcase?: { id: string; name: string; image_url: string }[] }) {
+function HeroSlider({ openLogin, loggedIn, heroImages, heroText, paused = false }: { openLogin: () => void; loggedIn?: boolean; heroImages: string[]; heroText: typeof HERO_TEXT; paused?: boolean }) {
   const [current, setCurrent] = useState(0)
   const slides = heroImages.length >= 3 ? heroImages.slice(0, 3) : heroImages.length > 0 ? [heroImages[0], heroImages[0], heroImages[0]] : []
   const total = heroText.length
@@ -435,39 +435,6 @@ function HeroSlider({ openLogin, loggedIn, heroImages, heroText, paused = false,
           </div>
         </div>
       </div>
-
-      {/* Real products and the brands, right side on wide screens */}
-      {showcase.length > 0 && (
-        <div className="hero-showcase" aria-hidden="true">
-          <div className="hero-showcase-products">
-            {showcase.map((p, i) => (
-              <div key={p.id} className="hero-showcase-item" style={{ animationDelay: `${i * 120}ms` }}>
-                <img src={p.image_url} alt="" />
-              </div>
-            ))}
-          </div>
-          <div className="hero-showcase-brands">
-            <span>Officiell distributör</span>
-            <Image src="/brands/frescura.svg" alt="" width={120} height={11} style={{ height: 12, width: 'auto' }} />
-            <Image src="/brands/virtus.svg" alt="" width={30} height={31} style={{ height: 30, width: 'auto' }} />
-          </div>
-        </div>
-      )}
-      <style>{`
-        .hero-showcase { display: none; }
-        @media (min-width: 1180px) {
-          .hero-showcase { display: flex; flex-direction: column; gap: 14px; position: absolute; z-index: 3; right: max(48px, calc((100vw - 1200px) / 2 + 24px)); top: 50%;
-            transform: translateY(-46%); width: 400px; padding: 22px; border-radius: 22px;
-            background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-            box-shadow: 0 24px 60px rgba(0,0,0,.35); }
-          .hero-showcase-products { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-          .hero-showcase-item { aspect-ratio: 3 / 4; border-radius: 14px; background: radial-gradient(120% 90% at 50% 35%, #fff 0%, #F1EDE6 100%);
-            display: flex; align-items: center; justify-content: center; animation: fadeUp .6s ease both; }
-          .hero-showcase-item img { width: 82%; height: 82%; object-fit: contain; mix-blend-mode: multiply; }
-          .hero-showcase-brands { display: flex; align-items: center; gap: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.14); }
-          .hero-showcase-brands span { flex: 1; font-size: 10.5px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: rgba(255,255,255,.75); }
-        }
-      `}</style>
 
       {/* Slide dots */}
       <div style={{ position: 'absolute', bottom: 32, right: 48, display: 'flex', gap: 8, zIndex: 4 }}>
@@ -894,8 +861,7 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
   return (
     <>
       {/* ── HERO — image slider ── */}
-      <HeroSlider openLogin={openLogin} loggedIn={!!authUser} heroImages={siteHome.hero.map(h => h.image_url)} heroText={siteHome.hero} paused={editingSite}
-        showcase={products.filter(p => p.image_url).slice(0, 3)} />
+      <HeroSlider openLogin={openLogin} loggedIn={!!authUser} heroImages={siteHome.hero.map(h => h.image_url)} heroText={siteHome.hero} paused={editingSite} />
 
       {/* ── TRUST STRIP ── */}
       <section style={{ background: 'transparent', borderBottom: '1px solid rgba(0,0,0,.07)' }}>

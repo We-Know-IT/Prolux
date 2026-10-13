@@ -1,4 +1,5 @@
 'use client'
+import { ImportCustomersButton } from '@/components/customers/ImportCustomers'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -91,9 +92,12 @@ export default function CrmCustomersPage() {
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>Kunder</h1>
           {!loading && <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text3)' }}>{customers.length} kunder totalt</p>}
         </div>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+        <ImportCustomersButton onImported={() => loadData()} />
         <button onClick={() => setShowNewCustomer(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', background: 'var(--gold)', border: 'none', borderRadius: 8, color: '#111', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
           <Plus size={14} /> Ny kund
         </button>
+        </div>
       </div>
 
       {/* Search */}

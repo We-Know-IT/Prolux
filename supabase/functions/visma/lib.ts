@@ -262,6 +262,17 @@ export class Visma {
   }
 
   // ── Articles ─────────────────────────────────────────────────────────────
+  // VAT rate (0.25) of an account coding; Visma checks GrossPrice against it.
+  private vatCache = new Map<string, number>()
+  private async vatRate(codingId: string): Promise<number> {
+    if (this.vatCache.has(codingId)) return this.vatCache.get(codingId)!
+    const c = await this.api<any>('GET', `/articleaccountcodings/${codingId}`).catch(() => null)
+    const raw = c?.VatRatePercent ?? c?.VatRate
+    const rate = typeof raw === 'number' ? (raw > 1 ? raw / 100 : raw) : 0.25
+    this.vatCache.set(codingId, rate)
+    return rate
+  }
+
   private async ensureArticle(p: ProductRow | null, item: OrderItemRow, s: VismaSettings): Promise<string> {
     if (p?.visma_article_id) return p.visma_article_id
     const number = cut(p?.sku || item.product_sku || `PLS-${(p?.id || item.product_id || item.product_name).replace(/[^A-Za-z0-9]/g, '').slice(0, 10)}`, 40)!
@@ -269,11 +280,14 @@ export class Visma {
     let id: string | undefined = found[0]?.Id
     if (!id) {
       if (!s.unit_id || !s.coding_id) throw new VismaError('Välj enhet och bokföringskonto för artiklar under Admin → Integrationer → Visma.')
+      const net = round2(p?.list_price ?? item.unit_price)
+      const vat = await this.vatRate(s.coding_id)
       const created = await this.api<any>('POST', '/articles', {
         Number: number,
         Name: cut(p?.name || item.product_name, 50),
         IsActive: true,
-        NetPrice: round2(p?.list_price ?? item.unit_price),
+        NetPrice: net,
+        GrossPrice: round2(net * (1 + vat)),
         UnitId: s.unit_id,
         CodingId: s.coding_id,
       })
@@ -288,7 +302,8 @@ export class Visma {
     if (!p.visma_article_id) return
     const a = await this.api<any>('GET', `/articles/${p.visma_article_id}`)
     if (round2(a.NetPrice) === round2(p.list_price) && a.Name === cut(p.name, 50)) return
-    await this.api('PUT', `/articles/${p.visma_article_id}`, { ...a, NetPrice: round2(p.list_price), Name: cut(p.name, 50) })
+    const vat = a.CodingId ? await this.vatRate(a.CodingId) : 0.25
+    await this.api('PUT', `/articles/${p.visma_article_id}`, { ...a, NetPrice: round2(p.list_price), GrossPrice: round2(p.list_price * (1 + vat)), Name: cut(p.name, 50) })
   }
 
   // ── Invoice for an order ─────────────────────────────────────────────────

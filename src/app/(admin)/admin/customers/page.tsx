@@ -1,4 +1,5 @@
 'use client'
+import { ImportCustomersButton } from '@/components/customers/ImportCustomers'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -47,7 +48,7 @@ export default function AdminCustomers() {
   const [toast, setToast]               = useState('')
   const [form, setForm]                 = useState({ ...EMPTY_FORM })
 
-  useEffect(() => {
+  function load() {
     const sb = createClient()
     Promise.all([
       sb.from('customers').select('*').order('company'),
@@ -56,7 +57,8 @@ export default function AdminCustomers() {
       setCustomers(c || [])
       setOrders(o || [])
     })
-  }, [])
+  }
+  useEffect(() => { load() }, [])
 
   function openCust(c: any) {
     setSelectedCust(c)
@@ -147,6 +149,7 @@ export default function AdminCustomers() {
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text3)', letterSpacing: '.28em', textTransform: 'uppercase', marginBottom: 12, display: 'block' }}>003 / Hantera</span>
           <div style={{ fontFamily: 'var(--font-serif)', fontSize: '40px', fontWeight: 500, color: 'var(--text)', lineHeight: 1.1 }}>Kunder</div>
         </div>
+        <ImportCustomersButton onImported={() => load()} />
         <button
           onClick={() => { setEditMode(false); setForm({ ...EMPTY_FORM }); setShowModal(true) }}
           style={{ padding: '9px 18px', fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', background: 'var(--gold)', border: 'none', borderRadius: 6, color: '#111' }}
