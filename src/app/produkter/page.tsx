@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { PRODUCT_BADGE } from '@/lib/product-badge'
 import AddProductCard from '@/components/site-edit/AddProductCard'
 import { popElement } from '@/lib/pop'
-import Price from '@/components/shop/Price'
+import ProductCard from '@/components/shop/ProductCard'
 
 const SORT_OPTIONS = ['Populärast', 'Lägsta pris', 'Högsta pris', 'Namn A–Ö']
 
@@ -189,50 +189,8 @@ function ProductsContent() {
           <p>Inga produkter hittades.</p>
         </div>
       ) : (
-        <div className="prod-grid" style={{ padding: '24px 40px', gap: 20 } as any}>
-          {paged.map(p => {
-            const added = justAdded === p.id
-            return (
-              <div key={p.id} style={{ background: '#fff', borderRadius: 12, display: 'flex', flexDirection: 'column', boxShadow: '0 1px 4px rgba(0,0,0,.06)', overflow: 'hidden', transition: 'box-shadow .2s' }}
-                onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,.12)')}
-                onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,.06)')}
-              >
-                <Link href={`/produkter/${p.id}`} style={{ textDecoration: 'none', display: 'block' }}>
-                  <div style={{ background: '#ffffff', aspectRatio: '1/1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 28, position: 'relative' }}>
-                    {p.image_url ? (
-                      <img src={p.image_url} alt={p.name} style={{ maxWidth: '82%', maxHeight: '82%', objectFit: 'contain', mixBlendMode: 'multiply' }} />
-                    ) : (
-                      <Package size={64} color="#ccc" strokeWidth={1} />
-                    )}
-                    {PRODUCT_BADGE[p.badge] && (
-                      <span style={{ position: 'absolute', top: 12, left: 12, background: PRODUCT_BADGE[p.badge].bg, color: PRODUCT_BADGE[p.badge].color, fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 3, textTransform: 'uppercase', letterSpacing: '.05em' }}>
-                        {PRODUCT_BADGE[p.badge].label}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-                <div style={{ padding: '14px 18px 18px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: '#aaa', textTransform: 'uppercase', letterSpacing: '.1em', margin: '0 0 4px' }}>
-                    {p.brand || 'ProLuxShine'}
-                  </p>
-                  <Link href={`/produkter/${p.id}`} style={{ textDecoration: 'none' }}>
-                    <p style={{ fontSize: 15, fontWeight: 700, color: '#111', margin: '0 0 14px', lineHeight: 1.3 }}>
-                      {p.name}
-                    </p>
-                  </Link>
-                  <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Price listPrice={p.list_price} showListPrice />
-                    {cart.canShop && <button
-                      onClick={e => { popElement(e.currentTarget); addToCart(p) }}
-                      style={{ width: 40, height: 40, borderRadius: '50%', background: added ? '#4CAF7D' : '#E8B84B', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .2s', flexShrink: 0 }}
-                    >
-                      <ShoppingCart size={16} color="#111" strokeWidth={2.5} />
-                    </button>}
-                  </div>
-                </div>
-              </div>
-            )
-          })}
+        <div className="pcard-grid prod-grid-pad">
+          {paged.map(p => <ProductCard key={p.id} p={p} />)}
           <AddProductCard onCreated={p => setProducts(ps => [...ps, p])} />
         </div>
       )}

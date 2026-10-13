@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { PublicShell, useLoginModal, usePublicCart } from '@/components/layout/PublicShell'
 import Price from '@/components/shop/Price'
+import ProductCard from '@/components/shop/ProductCard'
 import { fmt, formatDate } from '@/lib/utils'
 import { DEFAULT_HOME, DEFAULT_TRUST, HomeContent as SiteHomeContent } from '@/lib/site-content'
 import { useSiteContent, useIsEditingSite, EditableText, EditableImage } from '@/components/site-edit/SiteEdit'
@@ -923,34 +924,10 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
                 Se alla produkter <ArrowRight size={14} />
               </Link>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(190px,1fr))', gap: 16 }}>
+            <div className="pcard-grid">
               {products.map((p, i) => (
                 <Reveal key={p.id} delay={i * 40}>
-                  <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column', transition: 'all .2s', position: 'relative', cursor: 'pointer', height: '100%', boxSizing: 'border-box' }}
-                    onMouseEnter={e => { const el = e.currentTarget as HTMLDivElement; el.style.boxShadow = '0 8px 24px rgba(0,0,0,.1)'; el.style.borderColor = '#C9971A' }}
-                    onMouseLeave={e => { const el = e.currentTarget as HTMLDivElement; el.style.boxShadow = 'none'; el.style.borderColor = '#eee' }}>
-                    {PRODUCT_BADGE[p.badge] && (
-                      <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 2, background: PRODUCT_BADGE[p.badge].bg, color: PRODUCT_BADGE[p.badge].color, fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 4, letterSpacing: '.07em', textTransform: 'uppercase' }}>
-                        {PRODUCT_BADGE[p.badge].label}
-                      </div>
-                    )}
-                    <Link href={`/produkter/${p.id}`} aria-label={p.name} style={{ height: 200, background: '#fff', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '22px 18px 14px' }}>
-                      {p.image_url ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'contain', mixBlendMode: 'multiply' }} /> : <Package size={48} color="#ccc" strokeWidth={1} />}
-                    </Link>
-                    <div style={{ padding: '12px 14px 14px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                      <div style={{ fontSize: 10, color: '#bbb', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3 }}>{p.brand}</div>
-                      <Link href={`/produkter/${p.id}`} style={{ fontSize: 13, fontWeight: 600, color: '#111', flex: 1, lineHeight: 1.35, minHeight: '2.7em', marginBottom: 12, textDecoration: 'none' }}>{p.name}</Link>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                        <Price listPrice={p.list_price} size="sm" />
-                        {cart.canShop && <button onClick={e => { popElement(e.currentTarget); cart.addItem(p, priceList) }} aria-label={`Lägg ${p.name} i varukorgen`}
-                          style={{ width: 36, height: 36, borderRadius: '50%', background: '#C9971A', color: '#111', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background .15s' }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#111'; (e.currentTarget as HTMLButtonElement).style.color = '#fff' }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#C9971A'; (e.currentTarget as HTMLButtonElement).style.color = '#111' }}>
-                          <ShoppingCart size={14} />
-                        </button>}
-                      </div>
-                    </div>
-                  </div>
+                  <ProductCard p={p} />
                 </Reveal>
               ))}
               <AddProductCard minHeight={300} onCreated={p => onProductCreated?.(p)} />
@@ -1175,7 +1152,7 @@ function HomeContent() {
         setCustomer(null)
       }
     })
-    sb.from('products').select('id,name,brand,list_price,image_url,unit,badge').eq('active', true).order('sort_order').limit(12)
+    sb.from('products').select('id,name,brand,list_price,image_url,unit,badge,stock_qty').eq('active', true).order('sort_order').limit(12)
       .then(({ data }) => {
         if (data) {
           setProducts(data)
