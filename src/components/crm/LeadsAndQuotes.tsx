@@ -174,7 +174,8 @@ export function DraftsPanel({ limit = 10 }: { limit?: number }) {
     if (await deleteOpenOrder(createClient(), d.id)) setDrafts(ds => (ds ?? []).filter(x => x.id !== d.id))
   }
   const orderHref = useOrderHref()
-  const ordersHref = useOrdersHref()
+  // Saved carts live in the CRM order list's "Varukorgar" tab.
+  const cartsHref = useInAdmin() ? '/admin/crm/orders?view=history&filter=carts' : '/crm/orders?view=history&filter=carts'
   const [drafts, setDrafts] = useState<any[] | null>(null)
   function load() {
     createClient().from('orders').select('id,order_nr,subtotal,created_at,created_by,customers(company),order_items(qty)')
@@ -188,7 +189,7 @@ export function DraftsPanel({ limit = 10 }: { limit?: number }) {
     <div>
       <div style={heading}>
         <ShoppingCart size={12} /> Sparade varukorgar
-        <Link href={ordersHref} style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text2)', textDecoration: 'none', textTransform: 'none', letterSpacing: 0 }}>Alla ordrar →</Link>
+        <Link href={cartsHref} style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text2)', textDecoration: 'none', textTransform: 'none', letterSpacing: 0 }}>Alla varukorgar →</Link>
       </div>
       <div style={panel}>
         {drafts && drafts.length === 0 && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Inga sparade varukorgar. En varukorg i Ny order sparas här automatiskt.</div>}

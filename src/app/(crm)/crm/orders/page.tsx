@@ -234,6 +234,8 @@ export default function CrmOrdersPage() {
   const [isMobile, setIsMobile]           = useState(false)
   const [showCart, setShowCart]           = useState(false)
   const [newCustomerFor, setNewCustomerFor] = useState<string | null>(null)   // prefilled company while the modal is open
+  // Order or quote asked for without a customer: ask who it is, then carry on.
+  const [afterCustomer, setAfterCustomer] = useState<'pending' | 'pdf' | 'mail' | null>(null)
   const [autoSavedAt, setAutoSavedAt]     = useState('')
   const [saveError, setSaveError]         = useState('')
   // What the logged-in seller has in the car (migration 0020).
@@ -246,7 +248,11 @@ export default function CrmOrdersPage() {
   const toShip  = (i: CartItem) => i.qty - fromCar(i)
   // A draft or quote being edited; saving updates it instead of creating a new order.
   const [editingOrder, setEditingOrder]   = useState<{ id: string; order_nr: number; status: string } | null>(null)
-  const [historyFilter, setHistoryFilter] = useState<'all' | 'open' | 'orders'>('all')
+  // ?filter=carts (e.g. "Alla varukorgar" on the overview) opens the saved carts.
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'carts' | 'quotes' | 'orders'>(() => {
+    const f = searchParams.get('filter')
+    return f === 'carts' || f === 'quotes' || f === 'orders' ? f : 'all'
+  })
   const [openProduct, setOpenProduct]     = useState<Product | null>(null)
   const [assignee, setAssignee]           = useState('')
   const [customerDeals, setCustomerDeals] = useState<{ id: string; title: string; value: number; stage: string }[]>([])
@@ -263,6 +269,8 @@ export default function CrmOrdersPage() {
 
   // The menu's "Ny order" / "Ordrar" links switch view on the same page.
   const viewParam = searchParams.get('view')
+  const filterParam = searchParams.get('filter')
+  useEffect(() => { if (filterParam === 'carts' || filterParam === 'quotes' || filterParam === 'orders') setHistoryFilter(filterParam) }, [filterParam])
   const firstViewRef = useRef(true)
   useEffect(() => {
     if (firstViewRef.current) { firstViewRef.current = false; return }
@@ -676,18 +684,22 @@ export default function CrmOrdersPage() {
 
   // The usual flow: save the cart as a quote (and lead), then PDF or e-mail.
   async function makeQuote(then: 'pdf' | 'mail') {
-    if (!selectedCustomer) {
-      setShowCart(false); setView('confirm')
-      showToast('Välj eller skapa kunden för offerten')
-      setTimeout(() => document.getElementById('kund')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100)
-      return
-    }
+    if (!selectedCustomer) { setShowCart(false); setAfterCustomer(then); return }
     setShowCart(false)
     const o = await saveOrder('quote')
     if (!o) return
     if (then === 'pdf') await downloadQuote(o)
     else await mailQuote(o)
   }
+
+  // Once the customer is chosen or created, finish what was asked for.
+  useEffect(() => {
+    if (!afterCustomer || !selectedCustomer) return
+    const next = afterCustomer
+    setAfterCustomer(null)
+    if (next === 'pending') saveOrder('pending')
+    else makeQuote(next)
+  }, [selectedCustomer]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reopen a draft or quote in the order form. copy: start a new order with
   // the same products and quantities at today's prices ("Lägg ordern igen").
@@ -864,6 +876,28 @@ export default function CrmOrdersPage() {
   ])
   const mainProducts = filteredProducts.filter(p => !pinnedIds.has(p.id))
 
+  const customerNeeded = afterCustomer && !selectedCustomer && newCustomerFor === null && (
+    <Portal>
+      <div onClick={() => setAfterCustomer(null)} style={{ position: 'fixed', inset: 0, zIndex: 1250, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '12vh 16px 16px' }}>
+        <div role="dialog" aria-modal="true" aria-label="Vem är kunden?" onClick={e => e.stopPropagation()}
+          style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 560, padding: '20px 22px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)', flex: 1 }}>Vem är kunden?</h2>
+            <button onClick={() => setAfterCustomer(null)} aria-label="Stäng" style={{ background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', padding: 6, display: 'flex' }}><X size={16} /></button>
+          </div>
+          <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--text2)' }}>
+            Sök en befintlig kund eller skapa en ny – {afterCustomer === 'pending' ? 'sedan läggs ordern direkt' : 'sedan skapas offerten direkt'}.
+          </p>
+          <CustomerPicker customers={customers} autoFocus onPick={selectCustomerAndLoad} onNew={company => setNewCustomerFor(company)} />
+          <button onClick={() => setNewCustomerFor('')}
+            style={{ marginTop: 14, width: '100%', padding: '12px 0', background: 'var(--gold)', border: 'none', borderRadius: 10, color: '#111', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <UserPlus size={16} /> Ny kund
+          </button>
+        </div>
+      </div>
+    </Portal>
+  )
+
   const shareModal = share && (
     <Portal>
       <div onClick={() => setShare(null)} style={{ position: 'fixed', inset: 0, zIndex: 1300, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
@@ -912,7 +946,7 @@ export default function CrmOrdersPage() {
         </button>
       </div>
       <div role="tablist" style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
-        {([['all', 'Alla'], ['open', `Utkast & offerter (${orders.filter(o => o.status === 'draft' || o.status === 'quote').length})`], ['orders', 'Ordrar']] as const).map(([k, l]) => (
+        {([['all', 'Alla'], ['carts', `Varukorgar (${orders.filter(o => o.status === 'draft').length})`], ['quotes', `Offerter (${orders.filter(o => o.status === 'quote').length})`], ['orders', 'Ordrar']] as const).map(([k, l]) => (
           <button key={k} role="tab" aria-selected={historyFilter === k} onClick={() => setHistoryFilter(k)}
             style={{ padding: '7px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer',
               background: historyFilter === k ? 'rgba(232,184,75,.12)' : 'transparent',
@@ -936,7 +970,10 @@ export default function CrmOrdersPage() {
               <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'var(--text3)' }}>Laddar...</td></tr>
             ) : orders
               .filter(o => !onlyMine || o.assigned_to === myName || o.created_by === myName)
-              .filter(o => historyFilter === 'all' || (historyFilter === 'open') === (o.status === 'draft' || o.status === 'quote'))
+              .filter(o => historyFilter === 'all'
+                || (historyFilter === 'carts' && o.status === 'draft')
+                || (historyFilter === 'quotes' && o.status === 'quote')
+                || (historyFilter === 'orders' && o.status !== 'draft' && o.status !== 'quote'))
               .map(o => {
               const isOpen = o.status === 'draft' || o.status === 'quote'
               const expanded = expandedOrderId === o.id
@@ -1030,6 +1067,7 @@ export default function CrmOrdersPage() {
         </table>
       </div>
       {shareModal}
+      {customerNeeded}
       {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#fff', padding: '12px 24px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 999 }}>{toast}</div>}
     </div>
   )
@@ -1223,7 +1261,7 @@ export default function CrmOrdersPage() {
         ) : (
           <>
             <p style={{ fontSize: 13, color: 'var(--text2)', margin: '0 0 12px' }}>
-              Ny kund? Spara som utkast nu och skapa kunden när du har uppgifterna, eller välj en befintlig kund.
+              Valfritt nu – trycker du Lägg order eller Offert utan kund får du välja eller skapa kunden direkt efteråt.
             </p>
             <CustomerPicker customers={customers} onPick={selectCustomerAndLoad} onNew={company => setNewCustomerFor(company)} />
           </>
@@ -1287,13 +1325,13 @@ export default function CrmOrdersPage() {
           <FileDown size={16} /> {editingOrder?.status === 'quote' ? 'Uppdatera offert (PDF)' : 'Offert som PDF'}
         </button>
         <button onClick={() => makeQuote('mail')} disabled={placing || cart.length === 0}
-          title={noCustomer ? 'Välj kund först' : 'Sparar offerten och visar den färdig att klistra in i mejlet'}
+          title={noCustomer ? 'Du väljer eller skapar kunden i nästa steg' : 'Sparar offerten och visar den färdig att klistra in i mejlet'}
           style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid rgba(232,184,75,.5)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 700, cursor: placing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <Mail size={16} /> Mejla offert
         </button>
-        <button onClick={() => saveOrder('pending')} disabled={placing || noCustomer || cart.length === 0}
-          title={noCustomer ? 'Välj kund först' : undefined}
-          style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, color: noCustomer ? 'var(--text2)' : 'var(--text)', fontSize: 14, fontWeight: 700, cursor: placing || noCustomer ? 'not-allowed' : 'pointer', opacity: noCustomer ? .6 : 1 }}>
+        <button onClick={() => noCustomer ? setAfterCustomer('pending') : saveOrder('pending')} disabled={placing || cart.length === 0}
+          title={noCustomer ? 'Du väljer eller skapar kunden i nästa steg' : undefined}
+          style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 700, cursor: placing ? 'not-allowed' : 'pointer' }}>
           {placing ? 'Sparar…' : allFromCar ? 'Lägg order · levererad' : 'Lägg order'}
         </button>
         <button onClick={() => saveOrder('draft')} disabled={placing || cart.length === 0}
@@ -1318,6 +1356,7 @@ export default function CrmOrdersPage() {
           onClose={() => setOpenProduct(null)} />
       </Portal>)}
       {shareModal}
+      {customerNeeded}
       {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#fff', padding: '12px 24px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 1200 }}>{toast}</div>}
     </div>
   )
@@ -1553,7 +1592,7 @@ export default function CrmOrdersPage() {
                       Till kassan →
                     </button>
                   </div>
-                  {!selectedCustomer && <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--text2)', textAlign: 'center' }}>För offerten väljer eller skapar du kunden i kassan.</p>}
+                  {!selectedCustomer && <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--text2)', textAlign: 'center' }}>Ingen kund vald – du väljer eller skapar kunden i nästa steg.</p>}
                   <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                     <button onClick={newCart} style={{ flex: 1, padding: '10px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9, color: 'var(--text)', fontSize: 13, cursor: 'pointer' }}>Ny varukorg</button>
                     <button onClick={discardCart} style={{ flex: 1, padding: '10px 0', background: 'transparent', border: '1px solid rgba(224,82,82,.3)', borderRadius: 9, color: 'var(--red)', fontSize: 13, cursor: 'pointer' }}>Radera varukorgen</button>
@@ -1581,6 +1620,7 @@ export default function CrmOrdersPage() {
       </Portal>)}
 
       {shareModal}
+      {customerNeeded}
       {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#fff', padding: '12px 24px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 1200 }}>{toast}</div>}
     </div>
   )
