@@ -47,7 +47,7 @@ const CART_KEY = 'prolux-cart'
 const NAV_PUBLIC = [
   { href: '/',             label: 'Hem' },
   { href: '/produkter',    label: 'Produkter' },
-  { href: '/#pro-center',  label: 'Återförsäljare' },
+  { href: '/aterforsaljare', label: 'Återförsäljare' },
   { href: '/guider',       label: 'Utbildning' },
   { href: '/om-oss',       label: 'Om Oss' },
   { href: '/om-oss#kontakta-oss', label: 'Kontakt' },

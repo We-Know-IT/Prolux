@@ -377,7 +377,7 @@ const HERO_TEXT = [
   { label: 'Fälg & Exteriör', heading: 'Rena fälgar.\nKlara resultat.', sub: 'Starka rengöringsmedel formulerade för professionella biltvättar och detailingföretag.' },
 ]
 
-function HeroSlider({ openLogin, loggedIn, heroImages, heroText, paused = false }: { openLogin: () => void; loggedIn?: boolean; heroImages: string[]; heroText: typeof HERO_TEXT; paused?: boolean }) {
+function HeroSlider({ openLogin, loggedIn, heroImages, heroText, paused = false, showcase = [] }: { openLogin: () => void; loggedIn?: boolean; heroImages: string[]; heroText: typeof HERO_TEXT; paused?: boolean; showcase?: { id: string; name: string; image_url: string }[] }) {
   const [current, setCurrent] = useState(0)
   const slides = heroImages.length >= 3 ? heroImages.slice(0, 3) : heroImages.length > 0 ? [heroImages[0], heroImages[0], heroImages[0]] : []
   const total = heroText.length
@@ -386,7 +386,7 @@ function HeroSlider({ openLogin, loggedIn, heroImages, heroText, paused = false 
     if (paused) return   // hold the slide still while an admin edits it
     const t = setInterval(() => {
       setCurrent(c => (c + 1) % total)
-    }, 4000)
+    }, 6500)
     return () => clearInterval(t)
   }, [total, paused])
 
@@ -408,35 +408,66 @@ function HeroSlider({ openLogin, loggedIn, heroImages, heroText, paused = false 
       {slides.length === 0 && <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, #0a0c10, #1a1400)' }} />}
 
       {/* Dark overlay */}
-      <div style={{ position: 'absolute', inset: 0, zIndex: 2, background: 'linear-gradient(to right, rgba(0,0,0,.72) 0%, rgba(0,0,0,.35) 60%, rgba(0,0,0,.12) 100%)' }} />
+      <div style={{ position: 'absolute', inset: 0, zIndex: 2, background: 'linear-gradient(100deg, rgba(8,9,12,.86) 0%, rgba(8,9,12,.55) 42%, rgba(8,9,12,.15) 75%, rgba(8,9,12,.05) 100%)' }} />
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 220, zIndex: 2, background: 'linear-gradient(to top, rgba(0,0,0,.65), transparent)' }} />
 
       {/* Content — bottom left */}
       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end', zIndex: 3 }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 48px 80px', width: '100%' }}>
           <div key={current} style={{ animation: 'fadeUp .5s ease' }}>
-            <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.65)', textTransform: 'uppercase', letterSpacing: '.2em' }}>
+            <p style={{ margin: '0 0 14px', fontSize: 12, fontWeight: 700, color: '#E8B84B', textTransform: 'uppercase', letterSpacing: '.22em' }}>
               <EditableText doc="home" path={`hero.${current}.label`} value={slide.label} />
             </p>
-            <h1 style={{ fontFamily: 'var(--font-sans)', fontSize: 'clamp(42px, 6vw, 88px)', fontWeight: 800, color: '#fff', margin: '0 0 16px', lineHeight: 1.0, letterSpacing: '-.02em', whiteSpace: 'pre-line', textTransform: 'uppercase' }}>
+            <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(40px, 5.4vw, 76px)', fontWeight: 700, color: '#fff', margin: '0 0 18px', lineHeight: 1.08, letterSpacing: '-.01em', whiteSpace: 'pre-line', textShadow: '0 2px 24px rgba(0,0,0,.35)' }}>
               <EditableText doc="home" path={`hero.${current}.heading`} value={slide.heading} multiline />
             </h1>
-            <p style={{ fontSize: 15, color: 'rgba(255,255,255,.75)', lineHeight: 1.65, margin: '0 0 32px', maxWidth: 480 }}>
+            <p style={{ fontSize: 17, color: 'rgba(255,255,255,.85)', lineHeight: 1.65, margin: '0 0 32px', maxWidth: 520 }}>
               <EditableText doc="home" path={`hero.${current}.sub`} value={slide.sub} multiline />
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <Link href="/produkter" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 32px', borderRadius: 40, background: '#E8B84B', color: '#0F1115', fontSize: 14, fontWeight: 700, textDecoration: 'none', letterSpacing: '.02em' }}>
                 Utforska produkter <ArrowRight size={15} />
               </Link>
-              {!loggedIn && (
-                <button onClick={openLogin} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 28px', borderRadius: 40, background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.3)', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-                  Logga in
-                </button>
-              )}
+              <Link href="/aterforsaljare" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 28px', borderRadius: 40, background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.3)', color: '#fff', fontSize: 14, fontWeight: 600, textDecoration: 'none', backdropFilter: 'blur(6px)' }}>
+                Bli återförsäljare
+              </Link>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Real products and the brands, right side on wide screens */}
+      {showcase.length > 0 && (
+        <div className="hero-showcase" aria-hidden="true">
+          <div className="hero-showcase-products">
+            {showcase.map((p, i) => (
+              <div key={p.id} className="hero-showcase-item" style={{ animationDelay: `${i * 120}ms` }}>
+                <img src={p.image_url} alt="" />
+              </div>
+            ))}
+          </div>
+          <div className="hero-showcase-brands">
+            <span>Officiell distributör</span>
+            <Image src="/brands/frescura.svg" alt="" width={120} height={11} style={{ height: 12, width: 'auto' }} />
+            <Image src="/brands/virtus.svg" alt="" width={30} height={31} style={{ height: 30, width: 'auto' }} />
+          </div>
+        </div>
+      )}
+      <style>{`
+        .hero-showcase { display: none; }
+        @media (min-width: 1180px) {
+          .hero-showcase { display: flex; flex-direction: column; gap: 14px; position: absolute; z-index: 3; right: max(48px, calc((100vw - 1200px) / 2 + 24px)); top: 50%;
+            transform: translateY(-46%); width: 400px; padding: 22px; border-radius: 22px;
+            background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+            box-shadow: 0 24px 60px rgba(0,0,0,.35); }
+          .hero-showcase-products { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+          .hero-showcase-item { aspect-ratio: 3 / 4; border-radius: 14px; background: radial-gradient(120% 90% at 50% 35%, #fff 0%, #F1EDE6 100%);
+            display: flex; align-items: center; justify-content: center; animation: fadeUp .6s ease both; }
+          .hero-showcase-item img { width: 82%; height: 82%; object-fit: contain; mix-blend-mode: multiply; }
+          .hero-showcase-brands { display: flex; align-items: center; gap: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.14); }
+          .hero-showcase-brands span { flex: 1; font-size: 10.5px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: rgba(255,255,255,.75); }
+        }
+      `}</style>
 
       {/* Slide dots */}
       <div style={{ position: 'absolute', bottom: 32, right: 48, display: 'flex', gap: 8, zIndex: 4 }}>
@@ -862,20 +893,9 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
 
   return (
     <>
-      {/* ── ANNOUNCEMENT BAR ── */}
-      <div style={{ background: '#111', padding: '8px 24px', marginTop: 0 }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', justifyContent: 'center', gap: 'clamp(16px,4vw,48px)', flexWrap: 'wrap' }}>
-          {trust.map(({ icon, title, at }) => { const Icon = featureIcon(icon); return (
-            <div key={at} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'rgba(255,255,255,.8)', whiteSpace: 'nowrap' }}>
-              <Icon size={13} color="#C9971A" strokeWidth={2} />
-              <EditableText doc="home" path={`trust.${at}.title`} value={title} />
-            </div>
-          ) })}
-        </div>
-      </div>
-
       {/* ── HERO — image slider ── */}
-      <HeroSlider openLogin={openLogin} loggedIn={!!authUser} heroImages={siteHome.hero.map(h => h.image_url)} heroText={siteHome.hero} paused={editingSite} />
+      <HeroSlider openLogin={openLogin} loggedIn={!!authUser} heroImages={siteHome.hero.map(h => h.image_url)} heroText={siteHome.hero} paused={editingSite}
+        showcase={products.filter(p => p.image_url).slice(0, 3)} />
 
       {/* ── TRUST STRIP ── */}
       <section style={{ background: 'transparent', borderBottom: '1px solid rgba(0,0,0,.07)' }}>
@@ -969,9 +989,9 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
                 ))}
               </div>
               {!authUser ? (
-                <button onClick={openLogin} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 26px', borderRadius: 7, background: '#C9971A', color: '#111', fontSize: 14, fontWeight: 800, border: 'none', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '.06em', boxShadow: '0 4px 16px rgba(201,151,26,.3)' }}>
+                <Link href="/aterforsaljare" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 26px', borderRadius: 7, background: '#C9971A', color: '#111', fontSize: 14, fontWeight: 800, textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '.06em', boxShadow: '0 4px 16px rgba(201,151,26,.3)' }}>
                   <EditableText doc="home" path={'proCenter.ctaLabel'} value={siteHome.proCenter.ctaLabel} /> <ArrowRight size={15} />
-                </button>
+                </Link>
               ) : (
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 7, background: 'rgba(201,151,26,.12)', border: '1px solid rgba(201,151,26,.25)', color: '#C9971A', fontSize: 13, fontWeight: 600 }}>
                   <Check size={14} /> Inloggad som kund
