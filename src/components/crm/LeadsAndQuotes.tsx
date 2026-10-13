@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Pencil, Sparkles, FileText, ShoppingCart, BellRing } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt, formatDate } from '@/lib/utils'
@@ -12,13 +13,21 @@ const panel: React.CSSProperties = {
   background: 'rgba(13,16,23,.72)', border: '1px solid rgba(255,255,255,.06)', borderRadius: 12,
   boxShadow: '0 1px 0 rgba(255,255,255,.04) inset, 0 4px 24px rgba(0,0,0,.3)', overflow: 'hidden',
 }
+// In the admin, "Alla ordrar" means the admin order list; in the CRM the CRM one.
+function useOrdersHref() {
+  const path = usePathname() || ''
+  return path.startsWith('/admin') && !path.startsWith('/admin/crm') ? '/admin/orders' : '/crm/orders?view=history'
+}
+
 const heading: React.CSSProperties = {
   fontSize: 11, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.09em',
   marginBottom: 10, display: 'flex', alignItems: 'center', gap: 7,
 }
 
 // Open leads (deals not yet won or lost) with notes that can be edited in place.
-export function LeadsPanel({ base = '/crm', limit = 8 }: { base?: string; limit?: number }) {
+export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number }) {
+  const path = usePathname() || ''
+  base = base ?? (path.startsWith('/admin') ? '/admin/crm' : '/crm')
   const [leads, setLeads] = useState<any[] | null>(null)
   const [editId, setEditId] = useState<string | null>(null)
   const [text, setText] = useState('')
@@ -108,6 +117,7 @@ export function LeadsPanel({ base = '/crm', limit = 8 }: { base?: string; limit?
 
 // Open quotes; each opens in the order form (mail it or turn it into an order).
 export function QuotesPanel({ limit = 6 }: { limit?: number }) {
+  const ordersHref = useOrdersHref()
   const [quotes, setQuotes] = useState<any[] | null>(null)
   function load() {
     createClient().from('orders').select('id,order_nr,subtotal,created_at,notes,customers(company)')
@@ -121,7 +131,7 @@ export function QuotesPanel({ limit = 6 }: { limit?: number }) {
     <div>
       <div style={heading}>
         <FileText size={12} /> Offerter
-        <Link href="/crm/orders?view=history" style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text2)', textDecoration: 'none', textTransform: 'none', letterSpacing: 0 }}>Alla ordrar →</Link>
+        <Link href={ordersHref} style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text2)', textDecoration: 'none', textTransform: 'none', letterSpacing: 0 }}>Alla ordrar →</Link>
       </div>
       <div style={panel}>
         {quotes && quotes.length === 0 && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Inga öppna offerter just nu.</div>}
@@ -145,6 +155,7 @@ export function QuotesPanel({ limit = 6 }: { limit?: number }) {
 
 // Saved carts (draft orders), with or without a customer; one click continues them.
 export function DraftsPanel({ limit = 10 }: { limit?: number }) {
+  const ordersHref = useOrdersHref()
   const [drafts, setDrafts] = useState<any[] | null>(null)
   function load() {
     createClient().from('orders').select('id,order_nr,subtotal,created_at,created_by,customers(company),order_items(qty)')
@@ -158,7 +169,7 @@ export function DraftsPanel({ limit = 10 }: { limit?: number }) {
     <div>
       <div style={heading}>
         <ShoppingCart size={12} /> Sparade varukorgar
-        <Link href="/crm/orders?view=history" style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text2)', textDecoration: 'none', textTransform: 'none', letterSpacing: 0 }}>Alla ordrar →</Link>
+        <Link href={ordersHref} style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text2)', textDecoration: 'none', textTransform: 'none', letterSpacing: 0 }}>Alla ordrar →</Link>
       </div>
       <div style={panel}>
         {drafts && drafts.length === 0 && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Inga sparade varukorgar. En varukorg i Ny order sparas här automatiskt.</div>}
