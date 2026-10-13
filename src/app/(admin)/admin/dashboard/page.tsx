@@ -78,7 +78,8 @@ export default function AdminDashboard() {
       sb.from('deals').select('id,assigned_to,value,updated_at').eq('stage', 'Vunnen').gte('updated_at', monthStart).lte('updated_at', monthEnd + 'T23:59:59'),
       sb.from('sales_budgets').select('salesperson,budget').eq('year', year).eq('month', month),
       sb.from('reminders').select('id,customer_id,title,due_date,priority,status,customers(company)').eq('status', 'upcoming').order('due_date').limit(20),
-      sb.from('customer_activities').select('id,activity_type,notes,created_at,customers(company)').order('created_at', { ascending: false }).limit(12),
+      // Notes, calls, e-mails and meetings logged on customer cards (plus new web accounts and B2B enquiries).
+      sb.from('activities').select('id,type,title,body,created_by,created_at,customers(id,company)').order('created_at', { ascending: false }).limit(12),
     ]).then(([{ data: o }, { data: p }, { data: c }, { data: d }, { data: w }, { data: b }, { data: r }, { data: a }]) => {
       setOrders(o || [])
       setProducts(p || [])
@@ -91,12 +92,12 @@ export default function AdminDashboard() {
         setBudgets(map)
       }
       if (r) setReminders(r)
-      if (a) setActivities(a)
+      if (a) setActivities(a.map((x: any) => ({ ...x, activity_type: x.type, notes: [x.title, x.body].filter(Boolean).join(' – ') })))
     })
   }
 
   useEffect(() => { loadData() }, [])
-  useLiveRefresh(['orders', 'products', 'customers', 'deals', 'sales_budgets', 'reminders', 'customer_activities'], loadData)
+  useLiveRefresh(['orders', 'products', 'customers', 'deals', 'sales_budgets', 'reminders', 'activities'], loadData)
 
   // Seed the form from the latest saved budgets when opening it, so a background
   // refresh never overwrites what the user is typing.
@@ -598,10 +599,12 @@ export default function AdminDashboard() {
                       <span style={{ fontSize: 10, fontWeight: 700, color: ACT_COLOR[a.activity_type] || 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.05em' }}>
                         {ACT_LABEL[a.activity_type] || a.activity_type}
                       </span>
-                      <span style={{ fontSize: 10, color: 'var(--text3)' }}>{a.customers?.company}</span>
+                      {a.customers?.id
+                        ? <Link href={`/crm/customers/${a.customers.id}`} style={{ fontSize: 11, color: 'var(--text2)', textDecoration: 'none' }}>{a.customers.company}</Link>
+                        : <span style={{ fontSize: 11, color: 'var(--text2)' }}>{a.customers?.company}</span>}
                     </div>
                     {a.notes && <div style={{ fontSize: 12, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.notes}</div>}
-                    <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{new Date(a.created_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{new Date(a.created_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}{a.created_by ? ` · ${a.created_by}` : ''}</div>
                   </div>
                 </div>
               ))}
