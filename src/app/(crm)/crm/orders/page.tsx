@@ -483,7 +483,8 @@ export default function CrmOrdersPage() {
       // Empty lets the database default it to the customer's account manager.
       // No manager on the customer: the salesperson placing it receives it.
       assigned_to: assignee || (c?.account_manager ? null : myName || null),
-      deal_id: dealId || null,
+      // Only when linked: orders.deal_id needs migration 0006.
+      ...(dealId ? { deal_id: dealId } : {}),
       notes: `Leverans: ${deliveryNote}${discountAmt ? ` | Rabatt: ${String(discountPct).replace('.', ',')} % (${discountAmt} kr)` : ''}`,
     }
   }

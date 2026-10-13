@@ -106,7 +106,7 @@ export default function CustomerDetailPage() {
     if (!id) return
     Promise.all([
       supabase.from('customers').select('*').eq('id', id).single(),
-      supabase.from('orders').select('id,order_nr,status,total,subtotal,vat_amount,created_at,delivery_city,notes,deal_id,order_items(id,product_id,product_name,product_sku,qty,unit_price,list_price,total_price)').eq('customer_id', id).order('created_at', { ascending: false }),
+      supabase.from('orders').select('id,order_nr,status,total,subtotal,vat_amount,created_at,delivery_city,notes,order_items(id,product_id,product_name,product_sku,qty,unit_price,list_price,total_price)').eq('customer_id', id).order('created_at', { ascending: false }),
       supabase.from('activities').select('id,type,title,body,created_by,created_at').eq('customer_id', id).order('created_at', { ascending: false }),
       supabase.from('reminders').select('*').eq('customer_id', id).order('due_date'),
       supabase.from('products').select('id,name,brand,list_price,unit,image_url').eq('active', true).order('sort_order'),
