@@ -39,6 +39,7 @@ export default function StaffPage() {
   const [inviteError, setInviteError]   = useState('')
   const [copied, setCopied]             = useState(false)
   const [password, setPassword]         = useState('')
+  const [existingNote, setExistingNote] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [deleting, setDeleting]         = useState<string | null>(null)
 
@@ -61,19 +62,25 @@ export default function StaffPage() {
     const token = session?.access_token
     if (!token) { setInviteError('Inte inloggad.'); setInviting(false); return }
 
-    const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-staff-user`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ email: inviteEmail, full_name: inviteName, role: inviteRole, password: pw }),
-    })
-
-    const json = await res.json()
-    if (!res.ok) {
-      setInviteError(json.error || 'Något gick fel.')
-    } else {
-      setPassword(pw)
-      setInviteDone(true)
-      await loadStaff()
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-staff-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        body: JSON.stringify({ email: inviteEmail, full_name: inviteName, role: inviteRole, password: pw }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setInviteError(res.status === 404
+          ? 'Funktionen create-staff-user är inte driftsatt i Supabase ännu.'
+          : json.error || json.msg || `Något gick fel (${res.status}).`)
+      } else {
+        setExistingNote(json.existing ? json.message : '')
+        setPassword(json.existing ? '' : pw)
+        setInviteDone(true)
+        await loadStaff()
+      }
+    } catch {
+      setInviteError('Kunde inte nå Supabase-funktionen create-staff-user. Kontrollera att den är driftsatt och att "Verify JWT" är avstängt.')
     }
     setInviting(false)
   }
@@ -95,6 +102,7 @@ export default function StaffPage() {
     setInviteDone(false)
     setInviteError('')
     setPassword('')
+    setExistingNote('')
   }
 
   function copyPassword() {
@@ -233,6 +241,12 @@ export default function StaffPage() {
               </>
             ) : (
               <div>
+                {existingNote ? (
+                  <div style={{ padding: '16px', background: 'rgba(76,175,125,.08)', border: '1px solid rgba(76,175,125,.25)', borderRadius: '10px', marginBottom: '20px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#4CAF7D', marginBottom: '8px' }}>✓ Roll uppdaterad</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text2)' }}>{existingNote}</div>
+                  </div>
+                ) : (
                 <div style={{ padding: '16px', background: 'rgba(76,175,125,.08)', border: '1px solid rgba(76,175,125,.25)', borderRadius: '10px', marginBottom: '20px' }}>
                   <div style={{ fontSize: '14px', fontWeight: 700, color: '#4CAF7D', marginBottom: '8px' }}>✓ Konto skapat!</div>
                   <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '12px' }}>
@@ -248,6 +262,7 @@ export default function StaffPage() {
                     </button>
                   </div>
                 </div>
+                )}
                 <button onClick={resetInvite}
                   style={{ width: '100%', padding: '12px', background: 'var(--gold)', color: '#111', border: 'none', borderRadius: '8px', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>
                   Stäng
