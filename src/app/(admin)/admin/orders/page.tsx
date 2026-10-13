@@ -102,6 +102,12 @@ export default function AdminOrders() {
   }
 
   async function updateStatus(id: string, status: string) {
+    // An order from the CRM needs a customer before it can be placed or delivered.
+    const o = orders.find(x => x.id === id)
+    if (o && !o.customer_id && o.created_by && !['draft', 'quote', 'cancelled'].includes(status)) {
+      showToast('Ordern saknar kund – koppla en kund först (öppna ordern)')
+      return
+    }
     const sb = createClient()
     await sb.from('orders').update({ status }).eq('id', id)
     // Placed orders get their Visma invoice (when automatic invoicing is on).
@@ -109,6 +115,24 @@ export default function AdminOrders() {
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o))
     if (selectedOrder?.id === id) setSelectedOrder((prev: any) => ({ ...prev, status }))
     showToast(`Status uppdaterad → ${STATUS_LABELS[status]}`)
+  }
+
+  // Customers to pick from when an order has none ("Koppla kund").
+  const [customerList, setCustomerList] = useState<{ id: string; company: string; city: string | null; email: string | null; contact_name: string | null }[]>([])
+  useEffect(() => {
+    if (!selectedOrder || selectedOrder.customer_id || customerList.length) return
+    createClient().from('customers').select('id,company,city,email,contact_name').neq('status', 'inactive').order('company')
+      .then(({ data }) => setCustomerList(data ?? []))
+  }, [selectedOrder]) // eslint-disable-line react-hooks/exhaustive-deps
+  async function linkCustomer(id: string, customerId: string) {
+    const c = customerList.find(x => x.id === customerId)
+    if (!c) return
+    const { error } = await createClient().from('orders').update({ customer_id: c.id, delivery_name: c.company, delivery_city: c.city }).eq('id', id)
+    if (error) { showToast('Kunde inte koppla kunden: ' + error.message); return }
+    const patch = { customer_id: c.id, delivery_name: c.company, delivery_city: c.city, customers: { company: c.company, contact_name: c.contact_name, email: c.email } }
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, ...patch } : o))
+    setSelectedOrder((prev: any) => prev?.id === id ? { ...prev, ...patch } : prev)
+    showToast(`${c.company} kopplad till ordern`)
   }
 
   function showToast(msg: string) {
@@ -252,7 +276,13 @@ export default function AdminOrders() {
                   )],
                   ['Datum',     formatDateTime(selectedOrder.created_at)],
                   ['Prislista', selectedOrder.price_list_id || 'Standard'],
-                  ['Kund',      selectedOrder.customers?.company || selectedOrder.delivery_name || '—'],
+                  ['Kund',      selectedOrder.customer_id ? (selectedOrder.customers?.company || selectedOrder.delivery_name || '—') : (
+                    <select key="k" value="" onChange={e => linkCustomer(selectedOrder.id, e.target.value)} aria-label="Koppla kund"
+                      style={{ fontSize: 12, padding: '4px 8px', border: '1px solid var(--red)', borderRadius: 4, background: 'var(--bg3)', color: 'var(--text)', fontFamily: 'var(--font-sans)', maxWidth: 220 }}>
+                      <option value="">Koppla kund…</option>
+                      {customerList.map(c => <option key={c.id} value={c.id}>{c.company}{c.city ? ` · ${c.city}` : ''}</option>)}
+                    </select>
+                  )],
                   ['E-post',    selectedOrder.customers?.email || '—'],
                   ['Säljare', (
                     <select key="a" value={selectedOrder.assigned_to || ''} onChange={e => updateAssignee(selectedOrder.id, e.target.value)}
