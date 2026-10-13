@@ -14,9 +14,17 @@ const panel: React.CSSProperties = {
   boxShadow: '0 1px 0 rgba(255,255,255,.04) inset, 0 4px 24px rgba(0,0,0,.3)', overflow: 'hidden',
 }
 // In the admin, "Alla ordrar" means the admin order list; in the CRM the CRM one.
-function useOrdersHref() {
+function useInAdmin() {
   const path = usePathname() || ''
-  return path.startsWith('/admin') && !path.startsWith('/admin/crm') ? '/admin/orders' : '/crm/orders?view=history'
+  return path.startsWith('/admin') && !path.startsWith('/admin/crm')
+}
+function useOrdersHref() {
+  return useInAdmin() ? '/admin/orders' : '/crm/orders?view=history'
+}
+// One order/quote: the admin order panel in the admin, the order form in the CRM.
+function useOrderHref() {
+  const admin = useInAdmin()
+  return (id: string) => admin ? `/admin/orders?order=${id}` : `/crm/orders?edit=${id}`
 }
 
 const heading: React.CSSProperties = {
@@ -28,6 +36,7 @@ const heading: React.CSSProperties = {
 export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number }) {
   const path = usePathname() || ''
   base = base ?? (path.startsWith('/admin') ? '/admin/crm' : '/crm')
+  const orderHref = useOrderHref()
   const [leads, setLeads] = useState<any[] | null>(null)
   const [editId, setEditId] = useState<string | null>(null)
   const [text, setText] = useState('')
@@ -71,7 +80,7 @@ export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number 
         {(leads ?? []).map((l, i, arr) => (
           <div key={l.id} style={{ padding: '12px 16px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <Link href={quoteByDeal[l.id] ? `/crm/orders?edit=${quoteByDeal[l.id].id}` : l.customers?.id ? `/crm/customers/${l.customers.id}` : `${base}/pipeline`} style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', textDecoration: 'none' }}>
+              <Link href={quoteByDeal[l.id] ? orderHref(quoteByDeal[l.id].id) : l.customers?.id ? `/crm/customers/${l.customers.id}` : `${base}/pipeline`} style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', textDecoration: 'none' }}>
                 {l.customers?.company || l.title}
               </Link>
               <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(74,143,212,.14)', color: '#8DBDF0' }}>{l.stage}</span>
@@ -81,7 +90,7 @@ export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number 
             <div style={{ fontSize: 11, color: 'var(--text2)', margin: '3px 0 6px' }}>{l.title}{l.assigned_to ? ` · ${l.assigned_to}` : ''} · {formatDate(l.updated_at || l.created_at)}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               {quoteByDeal[l.id] && (
-                <Link href={`/crm/orders?edit=${quoteByDeal[l.id].id}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 7, background: 'var(--gold)', color: '#111', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+                <Link href={orderHref(quoteByDeal[l.id].id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 7, background: 'var(--gold)', color: '#111', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
                   <FileText size={12} /> Öppna {quoteByDeal[l.id].status === 'quote' ? 'offert' : 'utkast'} #{quoteByDeal[l.id].order_nr}
                 </Link>
               )}
@@ -117,6 +126,7 @@ export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number 
 
 // Open quotes; each opens in the order form (mail it or turn it into an order).
 export function QuotesPanel({ limit = 6 }: { limit?: number }) {
+  const orderHref = useOrderHref()
   const ordersHref = useOrdersHref()
   const [quotes, setQuotes] = useState<any[] | null>(null)
   function load() {
@@ -137,7 +147,7 @@ export function QuotesPanel({ limit = 6 }: { limit?: number }) {
         {quotes && quotes.length === 0 && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Inga öppna offerter just nu.</div>}
         {quotes === null && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Laddar…</div>}
         {(quotes ?? []).map((q, i, arr) => (
-          <Link key={q.id} href={`/crm/orders?edit=${q.id}`} title="Öppna offerten – mejla den eller gör om den till order"
+          <Link key={q.id} href={orderHref(q.id)} title="Öppna offerten – mejla den eller gör om den till order"
             style={{ display: 'block', padding: '12px 16px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none', textDecoration: 'none' }}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.03)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -155,6 +165,7 @@ export function QuotesPanel({ limit = 6 }: { limit?: number }) {
 
 // Saved carts (draft orders), with or without a customer; one click continues them.
 export function DraftsPanel({ limit = 10 }: { limit?: number }) {
+  const orderHref = useOrderHref()
   const ordersHref = useOrdersHref()
   const [drafts, setDrafts] = useState<any[] | null>(null)
   function load() {
@@ -177,7 +188,7 @@ export function DraftsPanel({ limit = 10 }: { limit?: number }) {
         {(drafts ?? []).map((d, i, arr) => {
           const units = (d.order_items ?? []).reduce((n: number, it: any) => n + (it.qty || 0), 0)
           return (
-            <Link key={d.id} href={`/crm/orders?edit=${d.id}`} title="Fortsätt med varukorgen"
+            <Link key={d.id} href={orderHref(d.id)} title="Fortsätt med varukorgen"
               style={{ display: 'block', padding: '12px 16px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none', textDecoration: 'none' }}
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.03)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -197,6 +208,7 @@ export function DraftsPanel({ limit = 10 }: { limit?: number }) {
 // Quotes and saved carts left untouched for a few days: a nudge to follow up.
 // Shown only when there is something to follow up.
 export function FollowUpPanel({ days = 3 }: { days?: number }) {
+  const orderHref = useOrderHref()
   const [rows, setRows] = useState<any[]>([])
   function load() {
     const before = new Date(Date.now() - days * 86_400_000).toISOString()
@@ -224,7 +236,7 @@ export function FollowUpPanel({ days = 3 }: { days?: number }) {
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{o.customers?.company || 'Utan kund'} <span style={{ color: 'var(--text2)', fontWeight: 400 }}>#{o.order_nr}</span></span>
             <span style={{ fontSize: 12, color: '#E0A85A' }}>{age(o.created_at)} dagar</span>
             <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--gold)' }}>{fmt(o.subtotal)} kr</span>
-            <Link href={`/crm/orders?edit=${o.id}`} style={{ padding: '5px 12px', borderRadius: 7, background: 'var(--gold)', color: '#111', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>Öppna</Link>
+            <Link href={orderHref(o.id)} style={{ padding: '5px 12px', borderRadius: 7, background: 'var(--gold)', color: '#111', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>Öppna</Link>
           </div>
         ))}
       </div>
