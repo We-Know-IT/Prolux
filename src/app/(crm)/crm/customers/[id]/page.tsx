@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { PriceListPicker } from '@/components/crm/NewCustomerModal'
 import IncVat from '@/components/orders/IncVat'
+import Portal from '@/components/ui/Portal'
 import { recommendFor } from '@/lib/recommend'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
@@ -709,7 +710,7 @@ export default function CustomerDetailPage() {
       )}
 
       {/* ── EDIT CUSTOMER MODAL ─────────────────────────────── */}
-      {editMode && customer && (
+      {editMode && customer && (<Portal>
         <div onClick={() => setEditMode(false)} style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 16, padding: '28px 32px', width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 24, fontFamily: 'var(--font-serif)' }}>Redigera kunduppgifter</div>
@@ -787,10 +788,10 @@ export default function CustomerDetailPage() {
             </div>
           </div>
         </div>
-      )}
+      </Portal>)}
 
 
-      {viewOrder && (
+      {viewOrder && (<Portal>
         <div onClick={() => setViewOrder(null)} style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div role="dialog" aria-modal="true" aria-label={`Order #${viewOrder.order_nr}`} onClick={e => e.stopPropagation()}
             style={{ background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 16, width: '100%', maxWidth: 820, maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
@@ -833,7 +834,7 @@ export default function CustomerDetailPage() {
             </div>
           </div>
         </div>
-      )}
+      </Portal>)}
 
       {toast && (
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--bg3)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', padding: '12px 20px', fontSize: 13, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 4px 20px rgba(0,0,0,.4)' }}>

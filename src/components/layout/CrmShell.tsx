@@ -11,10 +11,11 @@ import GuideTour, { GuideButton } from '@/components/onboarding/GuideTour'
 import { CRM_GUIDE } from '@/components/onboarding/guides'
 import { createClient } from '@/lib/supabase/client'
 import { currentStaff } from '@/lib/team'
-import { LayoutDashboard, GitBranch, Users, ShoppingCart, LogOut, Menu, X, CalendarDays, StickyNote, ClipboardList, Truck } from 'lucide-react'
+import { LayoutDashboard, GitBranch, Users, ShoppingCart, LogOut, Menu, X, CalendarDays, StickyNote, ClipboardList, Truck, FileCheck } from 'lucide-react'
 
 export const CRM_SECTIONS = [
   { href: '/crm/dashboard', label: 'Översikt',      icon: LayoutDashboard },
+  { href: '/crm/quotes',    label: 'Offerter & leads', icon: FileCheck },
   { href: '/crm/pipeline',  label: 'Pipeline',       icon: GitBranch },
   { href: '/crm/customers', label: 'Kunder',         icon: Users },
   { href: '/crm/orders',    label: 'Ny order',       icon: ShoppingCart },

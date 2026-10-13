@@ -7,10 +7,12 @@ import { custPrice, fmt, formatDateTime } from '@/lib/utils'
 import IncVat from '@/components/orders/IncVat'
 import { withVat } from '@/lib/pricing'
 import { invoiceInVismaInBackground } from '@/lib/visma'
-import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star, X, RefreshCw, Trash2, UserPlus, Check } from 'lucide-react'
+import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star, X, RefreshCw, Trash2, UserPlus, Check, FileDown, Mail, Copy } from 'lucide-react'
 import NewCustomerModal from '@/components/crm/NewCustomerModal'
+import Portal from '@/components/ui/Portal'
 import { recommendFor } from '@/lib/recommend'
-import { buildQuotePdf, downloadBlob } from '@/lib/quote-pdf'
+import { buildQuotePdf, downloadBlob, type QuotePdfInput } from '@/lib/quote-pdf'
+import { buildQuoteHtml } from '@/lib/quote-html'
 import { DEFAULT_CONTACT } from '@/lib/site-content'
 import { readCart, writeCart, OPEN_CART_EVENT } from '@/lib/crm-cart'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
@@ -596,11 +598,10 @@ export default function CrmOrdersPage() {
   // Draft (utkast) and quote (offert) are saved without affecting stock or
   // budget; "pending" is a real order the salesperson then confirms.
   // A quote also becomes a lead in the pipeline (stage Offert).
-  // mailTo: a tab opened on the click (so it is not blocked as a pop-up) that
-  // gets the quote e-mail once the quote is saved.
-  async function saveOrder(status: 'draft' | 'quote' | 'pending', mailTo?: Window | null) {
-    if (cart.length === 0 || placing) { mailTo?.close(); return }
-    if (!selectedCustomer && status !== 'draft') { mailTo?.close(); showToast('Välj eller skapa en kund först'); return }
+  // A saved quote stays open in the checkout (to mail it or turn it into an order).
+  async function saveOrder(status: 'draft' | 'quote' | 'pending'): Promise<any | null> {
+    if (cart.length === 0 || placing) return null
+    if (!selectedCustomer && status !== 'draft') { showToast('Välj eller skapa en kund först'); return null }
     setPlacing(true)
     if (autosaveRef.current) await autosaveRef.current
     const wasEditing = editingRef.current
@@ -611,7 +612,7 @@ export default function CrmOrdersPage() {
     const finalStatus: OrderStatus = handedOver ? 'delivered' : status
 
     const order = await writeOrder(finalStatus)
-    if (!order) { mailTo?.close(); setPlacing(false); return }
+    if (!order) { setPlacing(false); return null }
 
     // An order on a deal means the deal is won.
     const linkedDeal = customerDeals.find(d => d.id === dealId)
@@ -638,15 +639,37 @@ export default function CrmOrdersPage() {
     }
 
     const saved = { ...order, customers: selectedCustomer }
-    if (mailTo) await mailQuote(saved, mailTo)
     setOrders(os => os.some(o => o.id === order.id) ? os.map(o => o.id === order.id ? saved : o) : [saved, ...os])
+    if (status === 'quote') {
+      const e = { id: order.id, order_nr: order.order_nr, status: 'quote' }
+      editingRef.current = e; setEditingOrder(e)
+      if (order.deal_id) setDealId(order.deal_id)
+      setPlacing(false); setView('confirm')
+      showToast(`Offert #${order.order_nr} sparad${leadNote}`)
+      return saved
+    }
     resetOrderForm()
     setPlacing(false); setView('history')
     if (handedOver) invoiceInVismaInBackground(order.id)   // delivered at once: invoice now
     showToast(status === 'draft' ? `Utkast #${order.order_nr} sparat${selectedCustomer ? '' : ' utan kund'}`
-      : status === 'quote' ? `Offert #${order.order_nr} sparad${leadNote}`
       : handedOver ? `Order #${order.order_nr} levererad från bilen`
       : `Order #${order.order_nr} ${wasEditing?.status === 'quote' ? 'skapad från offerten' : 'skapad'} — bekräfta den när den är klar`)
+    return saved
+  }
+
+  // The usual flow: save the cart as a quote (and lead), then PDF or e-mail.
+  async function makeQuote(then: 'pdf' | 'mail') {
+    if (!selectedCustomer) {
+      setShowCart(false); setView('confirm')
+      showToast('Välj eller skapa kunden för offerten')
+      setTimeout(() => document.getElementById('kund')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100)
+      return
+    }
+    setShowCart(false)
+    const o = await saveOrder('quote')
+    if (!o) return
+    if (then === 'pdf') await downloadQuote(o)
+    else await mailQuote(o)
   }
 
   // Reopen a draft or quote in the order form. copy: start a new order with
@@ -713,19 +736,30 @@ export default function CrmOrdersPage() {
   }
 
   // Opens Gmail with the quote written out, like the quote tool on the customer card.
-  // The quote as a PDF; uploaded so the e-mail can link to it (migration 0020).
-  async function quotePdf(o: any): Promise<{ blob: Blob; url: string | null; name: string } | null> {
+  // Everything the PDF and the e-mail show for a saved quote.
+  async function quoteInput(o: any): Promise<QuotePdfInput | null> {
     const customer = customers.find(c => c.id === (o.customers?.id || o.customer_id))
-    const { data: items } = await supabase.from('order_items').select('product_id,product_name,product_sku,qty,unit_price,delivery').eq('order_id', o.id)
+    const { data: items } = await supabase.from('order_items').select('product_id,product_name,product_sku,qty,unit_price,list_price,delivery').eq('order_id', o.id)
     if (!items?.length) { showToast('Offerten har inga rader'); return null }
-    const blob = await buildQuotePdf({
+    const { data: { user } } = await supabase.auth.getUser()
+    return {
       orderNr: o.order_nr, date: o.created_at || new Date().toISOString(),
       customer: customer || { company: o.delivery_name || '' },
-      items: items.map((it: any) => ({ name: it.product_name, sku: it.product_sku, qty: it.qty, unitPrice: Number(it.unit_price), delivery: it.delivery,
-        imageUrl: products.find(p => p.id === it.product_id)?.image_url })),
+      items: items.map((it: any) => {
+        const p = products.find(x => x.id === it.product_id)
+        return { name: it.product_name, sku: it.product_sku, brand: p?.brand, description: p?.description, qty: it.qty,
+          unitPrice: Number(it.unit_price), listPrice: Number(it.list_price) || null, delivery: it.delivery, imageUrl: p?.image_url }
+      }),
       subtotal: o.subtotal, vat: o.vat_amount, total: o.total,
-      seller: o.assigned_to || myName, contact: DEFAULT_CONTACT,
-    })
+      seller: o.assigned_to || myName, sellerEmail: user?.email, contact: DEFAULT_CONTACT,
+    }
+  }
+
+  // The quote as a PDF; uploaded so the e-mail can link to it (migration 0020).
+  async function quotePdf(o: any, input?: QuotePdfInput | null): Promise<{ blob: Blob; url: string | null; name: string } | null> {
+    const q = input ?? await quoteInput(o)
+    if (!q) return null
+    const blob = await buildQuotePdf(q)
     const name = `Offert-${o.order_nr}-ProLuxShine.pdf`
     const path = `${o.id}/${crypto.randomUUID()}/${name}`
     const { error } = await supabase.storage.from('quotes').upload(path, blob, { contentType: 'application/pdf', upsert: false })
@@ -739,36 +773,37 @@ export default function CrmOrdersPage() {
     if (pdf) downloadBlob(pdf.blob, pdf.name)
   }
 
-  // Opens Gmail with the quote written out and a link to the PDF.
-  async function mailQuote(o: any, win?: Window | null) {
+  // E-mail: Gmail links can only carry plain text, so the quote (looking like
+  // the PDF) is shown here to copy, then pasted into the Gmail draft.
+  const [share, setShare] = useState<{ html: string; text: string; to: string; subject: string; pdf: { blob: Blob; url: string | null; name: string } | null } | null>(null)
+  const [copied, setCopied] = useState(false)
+  async function mailQuote(o: any) {
     const customer = customers.find(c => c.id === (o.customers?.id || o.customer_id))
-    if (!customer?.email) { win?.close(); showToast('Kunden saknar e-postadress'); return }
-    const pdf = await quotePdf(o).catch(() => null)
-    const { data: items } = await supabase.from('order_items').select('product_name,qty,unit_price,delivery').eq('order_id', o.id)
-    const rows = (items || []).map((it: any) =>
-      `• ${it.product_name} — ${it.qty} st × ${fmt(Number(it.unit_price))} kr = ${fmt(it.qty * Number(it.unit_price))} kr${it.delivery === 'car' ? ' (levereras direkt)' : ''}`)
-    if (pdf && !pdf.url) { downloadBlob(pdf.blob, pdf.name); showToast('PDF:en laddades ner – bifoga den i mejlet') }
-    const body = [
-      `Hej ${customer.contact_name || ''},`.trim(),
-      '',
-      `Här kommer offert #${o.order_nr} från ProLuxShine:`,
-      '',
-      ...rows,
-      '',
-      `Summa exkl. moms: ${fmt(o.subtotal)} kr`,
-      `Moms 25 %: ${fmt(o.vat_amount)} kr`,
-      `Totalt inkl. moms: ${fmt(o.total)} kr`,
-      ...(pdf?.url ? ['', `Offerten som PDF: ${pdf.url}`] : []),
-      '',
-      'Svara på detta mejl så lägger vi ordern.',
-      '',
-      'Med vänliga hälsningar,',
-      myName || 'ProLuxShine',
-    ].join('\n')
-    const sub = `Offert #${o.order_nr} från ProLuxShine`
-    const url = `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(customer.email)}&su=${encodeURIComponent(sub)}&body=${encodeURIComponent(body)}`
-    if (win) win.location.href = url
-    else window.open(url, '_blank')
+    showToast('Förbereder offerten…')
+    const q = await quoteInput(o)
+    if (!q) return
+    const pdf = await quotePdf(o, q).catch(() => null)
+    const { html, text } = buildQuoteHtml({ ...q, logoUrl: `${window.location.origin}/email/logo.png`, pdfUrl: pdf?.url })
+    setCopied(false)
+    setShare({ html, text, to: customer?.email || '', subject: `Offert #${o.order_nr} från ProLuxShine`, pdf })
+  }
+  async function copyShare() {
+    if (!share) return
+    try {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([share.html], { type: 'text/html' }),
+        'text/plain': new Blob([share.text], { type: 'text/plain' }),
+      })])
+    } catch {
+      // Older browsers: copy the rendered preview as a selection.
+      const el = document.getElementById('quote-share-copy')
+      if (el) { const r = document.createRange(); r.selectNodeContents(el); const sel = window.getSelection(); sel?.removeAllRanges(); sel?.addRange(r); document.execCommand('copy'); sel?.removeAllRanges() }
+    }
+    setCopied(true)
+  }
+  function openGmail() {
+    if (!share) return
+    window.open(`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(share.to)}&su=${encodeURIComponent(share.subject)}`, '_blank')
   }
 
   async function confirmOrder(id: string) {
@@ -804,6 +839,41 @@ export default function CrmOrdersPage() {
     ...recommendations.map(p => p.id),
   ])
   const mainProducts = filteredProducts.filter(p => !pinnedIds.has(p.id))
+
+  const shareModal = share && (
+    <Portal>
+      <div onClick={() => setShare(null)} style={{ position: 'fixed', inset: 0, zIndex: 1300, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
+        <div role="dialog" aria-modal="true" aria-label="Mejla offerten" onClick={e => e.stopPropagation()}
+          style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 760, maxHeight: '94vh', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Mail size={18} color="var(--gold)" />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{share.subject}</div>
+              <div style={{ fontSize: 12, color: 'var(--text2)' }}>Till {share.to || '(kunden saknar e-post)'}</div>
+            </div>
+            <button onClick={() => setShare(null)} aria-label="Stäng" style={{ background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', padding: 6, display: 'flex' }}><X size={16} /></button>
+          </div>
+          <div style={{ padding: '14px 20px', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontSize: 13, color: 'var(--text)', flex: '1 1 220px' }}><b>1.</b> Kopiera offerten <b style={{ marginLeft: 8 }}>2.</b> Öppna Gmail och klistra in (⌘V / Ctrl+V)</span>
+            <button onClick={copyShare} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', borderRadius: 9, background: copied ? 'var(--green)' : 'var(--gold)', border: 'none', color: copied ? '#fff' : '#111', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+              {copied ? <><Check size={15} /> Kopierad</> : <><Copy size={15} /> Kopiera offerten</>}
+            </button>
+            <button onClick={openGmail} disabled={!share.to} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', borderRadius: 9, background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 14, fontWeight: 700, cursor: share.to ? 'pointer' : 'not-allowed' }}>
+              <Mail size={15} /> Öppna Gmail
+            </button>
+            {share.pdf && (
+              <button onClick={() => downloadBlob(share.pdf!.blob, share.pdf!.name)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', borderRadius: 9, background: 'transparent', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, cursor: 'pointer' }}>
+                <FileDown size={15} /> PDF
+              </button>
+            )}
+          </div>
+          <div style={{ overflowY: 'auto', background: '#f3f1ec', borderRadius: '0 0 16px 16px' }}>
+            <div id="quote-share-copy" dangerouslySetInnerHTML={{ __html: share.html }} />
+          </div>
+        </div>
+      </div>
+    </Portal>
+  )
 
   // ── HISTORY VIEW ───────────────────────────────────────────
   if (view === 'history') return (
@@ -886,7 +956,8 @@ export default function CrmOrdersPage() {
                         ) : (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingTop: 8 }}>
                             {items.map(item => (
-                              <span key={item.id} style={{ fontSize: 11, padding: '3px 8px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 5, color: 'var(--text2)' }}>
+                              <span key={item.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, padding: '5px 10px 5px 5px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)' }}>
+                                {(() => { const p = products.find(x => x.id === item.product_id); return p ? <Thumb p={p} size={40} /> : null })()}
                                 {item.product_name} ×{item.qty}{(item as any).delivery === 'car' ? ' · från bilen' : ''}
                               </span>
                             ))}
@@ -934,6 +1005,7 @@ export default function CrmOrdersPage() {
           </tbody>
         </table>
       </div>
+      {shareModal}
       {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#fff', padding: '12px 24px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 999 }}>{toast}</div>}
     </div>
   )
@@ -1099,7 +1171,7 @@ export default function CrmOrdersPage() {
       </div>
 
       {/* Customer */}
-      <div style={card}>
+      <div id="kund" style={card}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
           <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: 0 }}>Kund</h3>
           {selectedCustomer && (
@@ -1185,42 +1257,43 @@ export default function CrmOrdersPage() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
-        <button onClick={() => saveOrder('draft')} disabled={placing || cart.length === 0}
-          style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: placing ? 'not-allowed' : 'pointer' }}>
-          {noCustomer ? 'Spara utkast utan kund' : 'Spara utkast'}
+        <button onClick={() => makeQuote('pdf')} disabled={placing || cart.length === 0}
+          title="Sparar offerten (och lead i pipelinen) och laddar ner den som PDF"
+          style={{ padding: '14px 0', background: 'var(--gold)', border: 'none', borderRadius: 10, color: '#111', fontSize: 14, fontWeight: 700, cursor: placing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <FileDown size={16} /> {editingOrder?.status === 'quote' ? 'Uppdatera offert (PDF)' : 'Offert som PDF'}
         </button>
-        <button onClick={() => saveOrder('quote')} disabled={placing || noCustomer || cart.length === 0}
-          title={noCustomer ? 'Välj kund först' : 'Sparar offerten och lägger den som lead i pipelinen (steg Offert)'}
-          style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: placing || noCustomer ? 'not-allowed' : 'pointer', opacity: noCustomer ? .55 : 1 }}>
-          {editingOrder?.status === 'quote' ? 'Spara lead' : 'Spara som lead'}
-        </button>
-        <button onClick={() => saveOrder('quote', window.open('about:blank', '_blank'))} disabled={placing || !selectedCustomer?.email || cart.length === 0}
-          title={selectedCustomer?.email ? `Sparar offerten som lead och öppnar ett mejl till ${selectedCustomer.email}` : noCustomer ? 'Välj kund först' : 'Kunden saknar e-postadress'}
-          style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: placing || !selectedCustomer?.email ? 'not-allowed' : 'pointer', opacity: selectedCustomer?.email ? 1 : .55 }}>
-          Mejla offert
+        <button onClick={() => makeQuote('mail')} disabled={placing || cart.length === 0}
+          title={noCustomer ? 'Välj kund först' : 'Sparar offerten och visar den färdig att klistra in i mejlet'}
+          style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid rgba(232,184,75,.5)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 700, cursor: placing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <Mail size={16} /> Mejla offert
         </button>
         <button onClick={() => saveOrder('pending')} disabled={placing || noCustomer || cart.length === 0}
           title={noCustomer ? 'Välj kund först' : undefined}
-          style={{ padding: '14px 0', background: placing || noCustomer ? 'var(--bg4)' : 'var(--gold)', border: 'none', borderRadius: 10, color: placing || noCustomer ? 'var(--text2)' : '#111', fontSize: 14, fontWeight: 700, cursor: placing || noCustomer ? 'not-allowed' : 'pointer' }}>
+          style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, color: noCustomer ? 'var(--text2)' : 'var(--text)', fontSize: 14, fontWeight: 700, cursor: placing || noCustomer ? 'not-allowed' : 'pointer', opacity: noCustomer ? .6 : 1 }}>
           {placing ? 'Sparar…' : allFromCar ? 'Lägg order · levererad' : 'Lägg order'}
+        </button>
+        <button onClick={() => saveOrder('draft')} disabled={placing || cart.length === 0}
+          style={{ padding: '14px 0', background: 'transparent', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text2)', fontSize: 14, fontWeight: 600, cursor: placing ? 'not-allowed' : 'pointer' }}>
+          {noCustomer ? 'Spara utkast utan kund' : 'Spara utkast'}
         </button>
       </div>
       {allFromCar && <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text2)', textAlign: 'center' }}>Allt levereras från bilen — ordern markeras direkt som levererad.</p>}
       <p style={{ fontSize: 12, color: 'var(--text2)', textAlign: 'center', margin: '10px 0 0' }}>
-        Utkast och offerter påverkar inte lager eller budget och syns inte för kunden förrän de blir en order.
+        Offerten sparas som lead i pipelinen. Utkast och offerter påverkar inte lager eller budget förrän de blir en order.
       </p>
 
-      {newCustomerFor !== null && (
+      {newCustomerFor !== null && (<Portal>
         <NewCustomerModal initialCompany={newCustomerFor} accountManager={myName}
           onClose={() => setNewCustomerFor(null)}
           onCreated={c => { setCustomers(cs => [...cs, c].sort((a, b) => a.company.localeCompare(b.company))); selectCustomerAndLoad(c); setNewCustomerFor(null); showToast(`${c.company} skapad`) }} />
-      )}
-      {openProduct && (
+      </Portal>)}
+      {openProduct && (<Portal>
         <ProductSheet p={openProduct} selectedCustomer={selectedCustomer} qty={getQty(openProduct.id)}
           categoryName={categories.find(c => c.id === openProduct.category_id)?.name || ''}
           onAdd={() => addToCart(openProduct)} onRemove={() => updateQty(openProduct.id, -1)}
           onClose={() => setOpenProduct(null)} />
-      )}
+      </Portal>)}
+      {shareModal}
       {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#fff', padding: '12px 24px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 1200 }}>{toast}</div>}
     </div>
   )
@@ -1378,14 +1451,14 @@ export default function CrmOrdersPage() {
       )}
 
       {/* Cart drawer */}
-      {showCart && (
+      {showCart && (<Portal>
         <div onClick={() => setShowCart(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 900 }}>
           <aside role="dialog" aria-modal="true" aria-label="Varukorg" onClick={e => e.stopPropagation()}
             style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(560px, 100vw)', background: 'var(--bg2)', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', boxShadow: '-12px 0 40px rgba(0,0,0,.4)' }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
               <ShoppingCart size={18} color="var(--gold)" />
               <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>Varukorg</span>
-              <span style={{ fontSize: 12, color: 'var(--text2)' }}>{selectedCustomer ? selectedCustomer.company : 'Ingen kund vald'}{editingOrder ? ` · #${editingOrder.order_nr}` : ''}</span>
+              <span style={{ fontSize: 12, color: 'var(--text2)' }}>{selectedCustomer ? `${selectedCustomer.company} · prislista ${selectedCustomer.price_list_id}` : 'Ingen kund vald'}{editingOrder ? ` · ${editingOrder.status === 'quote' ? 'offert' : 'utkast'} #${editingOrder.order_nr}` : ''}</span>
               <button onClick={() => setShowCart(false)} aria-label="Stäng" style={{ ...drawerBtn, marginLeft: 'auto' }}><X size={16} /></button>
             </div>
             {cart.length === 0 ? (
@@ -1436,10 +1509,17 @@ export default function CrmOrdersPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 17, fontWeight: 700, color: 'var(--text)', marginBottom: 14, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
                     <span>Totalt inkl. moms</span><span style={{ color: 'var(--gold)' }}>{fmt(total)} kr</span>
                   </div>
-                  <button onClick={() => { setShowCart(false); setView('confirm') }}
-                    style={{ width: '100%', padding: '14px 0', background: 'var(--gold)', border: 'none', borderRadius: 10, color: '#111', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
-                    Till kassan →
-                  </button>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <button onClick={() => makeQuote('pdf')} disabled={placing}
+                      style={{ padding: '14px 0', background: 'var(--gold)', border: 'none', borderRadius: 10, color: '#111', fontSize: 15, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                      <FileDown size={16} /> Offert som PDF
+                    </button>
+                    <button onClick={() => { setShowCart(false); setView('confirm') }}
+                      style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid rgba(232,184,75,.5)', borderRadius: 10, color: 'var(--text)', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+                      Till kassan →
+                    </button>
+                  </div>
+                  {!selectedCustomer && <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--text2)', textAlign: 'center' }}>För offerten väljer eller skapar du kunden i kassan.</p>}
                   <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                     <button onClick={newCart} style={{ flex: 1, padding: '10px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9, color: 'var(--text)', fontSize: 13, cursor: 'pointer' }}>Ny varukorg</button>
                     <button onClick={discardCart} style={{ flex: 1, padding: '10px 0', background: 'transparent', border: '1px solid rgba(224,82,82,.3)', borderRadius: 9, color: 'var(--red)', fontSize: 13, cursor: 'pointer' }}>Radera varukorgen</button>
@@ -1452,20 +1532,21 @@ export default function CrmOrdersPage() {
             )}
           </aside>
         </div>
-      )}
+      </Portal>)}
 
-      {newCustomerFor !== null && (
+      {newCustomerFor !== null && (<Portal>
         <NewCustomerModal initialCompany={newCustomerFor} accountManager={myName}
           onClose={() => setNewCustomerFor(null)}
           onCreated={c => { setCustomers(cs => [...cs, c].sort((a, b) => a.company.localeCompare(b.company))); selectCustomerAndLoad(c); setNewCustomerFor(null); showToast(`${c.company} skapad`) }} />
-      )}
-      {openProduct && (
+      </Portal>)}
+      {openProduct && (<Portal>
         <ProductSheet p={openProduct} selectedCustomer={selectedCustomer} qty={getQty(openProduct.id)}
           categoryName={categories.find(c => c.id === openProduct.category_id)?.name || ''}
           onAdd={() => addToCart(openProduct)} onRemove={() => updateQty(openProduct.id, -1)}
           onClose={() => setOpenProduct(null)} />
-      )}
+      </Portal>)}
 
+      {shareModal}
       {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#fff', padding: '12px 24px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 1200 }}>{toast}</div>}
     </div>
   )

@@ -11,11 +11,12 @@ import GuideTour, { GuideButton } from '@/components/onboarding/GuideTour'
 import { ADMIN_GUIDE } from '@/components/onboarding/guides'
 import { createClient } from '@/lib/supabase/client'
 import { CRM_SECTIONS } from '@/components/layout/CrmShell'
-import { LayoutDashboard, ShoppingBag, Users, Tag, Megaphone, Zap, LogOut, UserCog, Menu, X, GitBranch, CalendarDays, StickyNote, Bell, FileText, Plug } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, Users, Tag, Megaphone, Zap, LogOut, UserCog, Menu, X, GitBranch, CalendarDays, StickyNote, Bell, FileText, Plug, FileCheck } from 'lucide-react'
 
 const ADMIN_NAV = [
   { href: '/admin/dashboard',  label: 'Översikt',  icon: LayoutDashboard },
   { href: '/admin/orders',     label: 'Ordrar',    icon: ShoppingBag },
+  { href: '/admin/crm/quotes', label: 'Offerter', icon: FileCheck },
   { href: '/admin/customers',  label: 'Kunder',    icon: Users },
   { href: '/admin/products',   label: 'Produkter', icon: Tag },
   { href: '/admin/content',    label: 'Innehåll',  icon: FileText },
