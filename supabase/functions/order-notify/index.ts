@@ -1,6 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
-// E-mail to the salesperson when a customer places an order in the webshop.
+// E-mail to the salesperson and the admins when a customer places an order in the webshop.
 // Called by the database (migration 0020, trigger notify_new_order) with
 // { order_id }. Deploy: Supabase → Edge Functions → new function "order-notify",
 // paste this file, turn OFF "Verify JWT" (the database calls it without a login).
@@ -56,11 +56,11 @@ Deno.serve(async req => {
     .eq('id', orderId).is('notified_at', null).select('id')
   if (!claimed?.length) return json({ skipped: 'redan skickad' })
 
-  // The salesperson on the order, else every admin.
+  // The salesperson on the order and every admin (each address once).
   const { data: staff } = await sb.from('staff_members').select('email,full_name,role')
   const first = (n: string) => (n || '').trim().split(/\s+/)[0]
-  const seller = (staff ?? []).filter(s => order.assigned_to && first(s.full_name) === order.assigned_to && s.email)
-  const recipients = seller.length ? seller : (staff ?? []).filter(s => s.role === 'admin' && s.email)
+  const wanted = (staff ?? []).filter(s => s.email && (s.role === 'admin' || (order.assigned_to && first(s.full_name) === order.assigned_to)))
+  const recipients = wanted.filter((s, i) => wanted.findIndex(x => x.email.toLowerCase() === s.email.toLowerCase()) === i)
   if (!recipients.length) return json({ skipped: 'ingen mottagare' })
 
   const { data: items } = await sb.from('order_items').select('product_name,qty,unit_price,total_price').eq('order_id', orderId)
