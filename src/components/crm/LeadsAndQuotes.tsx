@@ -6,6 +6,7 @@ import { Pencil, Sparkles, FileText, ShoppingCart, BellRing } from 'lucide-react
 import { createClient } from '@/lib/supabase/client'
 import { fmt, formatDate } from '@/lib/utils'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
+import { useMe } from '@/hooks/useMe'
 
 // Shared by the CRM and admin overviews.
 
@@ -18,8 +19,10 @@ function useInAdmin() {
   const path = usePathname() || ''
   return path.startsWith('/admin') && !path.startsWith('/admin/crm')
 }
+// "Alla ordrar": admins always go to Admin → Ordrar, sellers to the CRM list.
 function useOrdersHref() {
-  return useInAdmin() ? '/admin/orders' : '/crm/orders?view=history'
+  const me = useMe()
+  return useInAdmin() || me.role === 'admin' ? '/admin/orders' : '/crm/orders?view=history'
 }
 // One order/quote: the admin order panel in the admin, the order form in the CRM.
 function useOrderHref() {
