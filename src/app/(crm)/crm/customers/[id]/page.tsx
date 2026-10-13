@@ -13,6 +13,7 @@ import { PriceListPicker } from '@/components/crm/NewCustomerModal'
 import IncVat from '@/components/orders/IncVat'
 import Portal from '@/components/ui/Portal'
 import { recommendFor } from '@/lib/recommend'
+import { deleteOpenOrder } from '@/lib/crm-cart'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { useTeam, teamOptions } from '@/hooks/useTeam'
@@ -485,6 +486,15 @@ export default function CustomerDetailPage() {
                       <button onClick={() => router.push(`/crm/orders?edit=${o.id}`)}
                         style={{ padding: '7px 14px', background: 'var(--gold)', border: 'none', borderRadius: 7, color: '#111', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                         Fortsätt
+                      </button>
+                      <button aria-label={`Ta bort ${o.status === 'quote' ? 'offert' : 'varukorg'} #${o.order_nr}`} title="Ta bort"
+                        onClick={async () => {
+                          const what = o.status === 'quote' ? 'offerten' : 'varukorgen'
+                          if (!confirm(`Ta bort ${what} #${o.order_nr}?`)) return
+                          if (await deleteOpenOrder(supabase, o.id)) { setOrders(os => os.filter(x => x.id !== o.id)); showToast(`${what[0].toUpperCase() + what.slice(1)} borttagen`) }
+                        }}
+                        style={{ width: 32, height: 32, borderRadius: 7, background: 'transparent', border: '1px solid rgba(224,82,82,.3)', color: 'var(--red)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   )

@@ -17,3 +17,14 @@ export function writeCart(cart: SavedCart | null) {
   } catch { /* storage blocked: the icon just shows no count */ }
   window.dispatchEvent(new Event(CART_EVENT))
 }
+
+// Deletes a saved cart (draft) or quote. Live orders are never touched.
+export async function deleteOpenOrder(sb: { from: (t: string) => any }, id: string): Promise<boolean> {
+  const { data } = await sb.from('orders').select('status').eq('id', id).maybeSingle()
+  if (!data || !['draft', 'quote'].includes(data.status)) return false
+  await sb.from('order_items').delete().eq('order_id', id)
+  const { error } = await sb.from('orders').delete().eq('id', id)
+  if (error) return false
+  if (readCart()?.draftId === id) writeCart(null)
+  return true
+}

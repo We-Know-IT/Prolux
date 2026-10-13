@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Pencil, Sparkles, FileText, ShoppingCart, BellRing } from 'lucide-react'
+import { Pencil, Sparkles, FileText, ShoppingCart, BellRing, Trash2 } from 'lucide-react'
+import { deleteOpenOrder } from '@/lib/crm-cart'
 import { createClient } from '@/lib/supabase/client'
 import { fmt, formatDate } from '@/lib/utils'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
@@ -168,6 +169,10 @@ export function QuotesPanel({ limit = 6 }: { limit?: number }) {
 
 // Saved carts (draft orders), with or without a customer; one click continues them.
 export function DraftsPanel({ limit = 10 }: { limit?: number }) {
+  async function remove(d: any) {
+    if (!confirm(`Ta bort varukorg #${d.order_nr}${d.customers?.company ? ` (${d.customers.company})` : ''}?`)) return
+    if (await deleteOpenOrder(createClient(), d.id)) setDrafts(ds => (ds ?? []).filter(x => x.id !== d.id))
+  }
   const orderHref = useOrderHref()
   const ordersHref = useOrdersHref()
   const [drafts, setDrafts] = useState<any[] | null>(null)
@@ -191,8 +196,9 @@ export function DraftsPanel({ limit = 10 }: { limit?: number }) {
         {(drafts ?? []).map((d, i, arr) => {
           const units = (d.order_items ?? []).reduce((n: number, it: any) => n + (it.qty || 0), 0)
           return (
-            <Link key={d.id} href={orderHref(d.id)} title="Fortsätt med varukorgen"
-              style={{ display: 'block', padding: '12px 16px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none', textDecoration: 'none' }}
+            <div key={d.id} style={{ display: 'flex', alignItems: 'center', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none' }}>
+            <Link href={orderHref(d.id)} title="Fortsätt med varukorgen"
+              style={{ display: 'block', flex: 1, minWidth: 0, padding: '12px 8px 12px 16px', textDecoration: 'none' }}
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.03)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: d.customers?.company ? 'var(--text)' : 'var(--text2)' }}>{d.customers?.company || 'Utan kund'}</span>
@@ -201,6 +207,11 @@ export function DraftsPanel({ limit = 10 }: { limit?: number }) {
               </div>
               <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 3 }}>{units} st · {formatDate(d.created_at)}{d.created_by ? ` · ${d.created_by}` : ''}</div>
             </Link>
+            <button onClick={() => remove(d)} aria-label={`Ta bort varukorg #${d.order_nr}`} title="Ta bort varukorgen"
+              style={{ margin: '0 12px 0 4px', width: 32, height: 32, flexShrink: 0, borderRadius: 8, background: 'transparent', border: '1px solid rgba(224,82,82,.3)', color: 'var(--red)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Trash2 size={14} />
+            </button>
+            </div>
           )
         })}
       </div>

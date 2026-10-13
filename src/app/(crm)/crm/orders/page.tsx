@@ -14,7 +14,7 @@ import { recommendFor } from '@/lib/recommend'
 import { buildQuotePdf, downloadBlob, type QuotePdfInput } from '@/lib/quote-pdf'
 import { buildQuoteHtml } from '@/lib/quote-html'
 import { DEFAULT_CONTACT } from '@/lib/site-content'
-import { readCart, writeCart, OPEN_CART_EVENT } from '@/lib/crm-cart'
+import { readCart, writeCart, OPEN_CART_EVENT, deleteOpenOrder as removeOpenOrder } from '@/lib/crm-cart'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { currentStaff, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
 import { useTeam, teamOptions } from '@/hooks/useTeam'
@@ -1343,13 +1343,23 @@ export default function CrmOrdersPage() {
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Sparade varukorgar</div>
               <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
                 {drafts.map(o => (
-                  <button key={o.id} type="button" onClick={() => openForEdit(o)}
-                    style={{ flexShrink: 0, textAlign: 'left', padding: '9px 14px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, cursor: 'pointer', minWidth: 170 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <ShoppingCart size={13} color="var(--gold)" /> #{o.order_nr} · {(o as any).customers?.company || 'Utan kund'}
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{fmt(o.subtotal)} kr · {formatDateTime(o.created_at)}</div>
-                  </button>
+                  <div key={o.id} style={{ flexShrink: 0, display: 'flex', alignItems: 'stretch', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, minWidth: 190 }}>
+                    <button type="button" onClick={() => openForEdit(o)}
+                      style={{ flex: 1, textAlign: 'left', padding: '9px 6px 9px 14px', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <ShoppingCart size={13} color="var(--gold)" /> #{o.order_nr} · {(o as any).customers?.company || 'Utan kund'}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{fmt(o.subtotal)} kr · {formatDateTime(o.created_at)}</div>
+                    </button>
+                    <button type="button" aria-label={`Ta bort varukorg #${o.order_nr}`} title="Ta bort varukorgen"
+                      onClick={async () => {
+                        if (!confirm(`Ta bort varukorg #${o.order_nr}?`)) return
+                        if (await removeOpenOrder(supabase, o.id)) { setOrders(os => os.filter(x => x.id !== o.id)); showToast(`Varukorg #${o.order_nr} borttagen`) }
+                      }}
+                      style={{ padding: '0 12px', background: 'transparent', border: 'none', borderLeft: '1px solid var(--border)', color: 'var(--red)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
