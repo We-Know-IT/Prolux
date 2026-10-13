@@ -168,18 +168,27 @@ export default function AdminProducts() {
       </div>
 
       {/* Filters */}
-      <div style={{ padding: '16px 40px', display: 'flex', gap: 10, alignItems: 'center', borderBottom: '1px solid var(--line2)', flexWrap: 'wrap' }}>
+      <div style={{ padding: '16px 40px 12px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, maxWidth: 320 }}>
           <Search size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }} />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Sök namn, SKU, varumärke…"
             style={{ ...inputStyle, paddingLeft: 32, background: 'var(--bg2)' }} />
         </div>
-        <select value={catFilter} onChange={e => setCatFilter(e.target.value)}
-          style={{ padding: '9px 14px', background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 6, color: 'var(--text)', fontSize: 13, outline: 'none' }}>
-          <option value="">Alla kategorier</option>
-          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text3)' }}>{filtered.length} produkter</span>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text2)' }}>{filtered.length} produkter</span>
+      </div>
+      {/* Category filter as chips */}
+      <div role="tablist" aria-label="Kategori" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '0 40px 16px', borderBottom: '1px solid var(--line2)' }}>
+        {[{ id: '', name: 'Alla' }, ...categories].map(c => {
+          const on = catFilter === c.id
+          return (
+            <button key={c.id || 'all'} type="button" role="tab" aria-selected={on} onClick={() => setCatFilter(c.id)}
+              style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap',
+                background: on ? 'var(--gold)' : 'var(--bg3)', border: `1px solid ${on ? 'var(--gold)' : 'var(--line)'}`,
+                color: on ? '#111' : 'var(--text2)', fontWeight: on ? 700 : 500 }}>
+              {c.name}
+            </button>
+          )
+        })}
       </div>
 
       {/* Table */}

@@ -56,40 +56,55 @@ function getRecommendations(boughtNames: string[], allProducts: Product[]): Prod
   return allProducts.filter(p => recs.has(p.id)).slice(0, 4)
 }
 
-function ProductRow({ p, selectedCustomer, getQty, addToCart, updateQty, badge, onOpen }: {
+// Catalogue card: big picture, name, price and +/- right on the card.
+function ProductCard({ p, selectedCustomer, qty, onAdd, onRemove, onOpen, badge }: {
   p: Product
   selectedCustomer: Customer | null
-  getQty: (id: string) => number
-  addToCart: (p: Product) => void
-  updateQty: (id: string, delta: number) => void
+  qty: number
+  onAdd: () => void
+  onRemove: () => void
+  onOpen: () => void
   badge?: 'köpt' | 'rec'
-  onOpen: (p: Product) => void
 }) {
-  const qty   = getQty(p.id)
   const price = custPrice(p.list_price, selectedCustomer?.price_list_id || 'Standard')
+  const stock = stockStatus(p.stock_qty)
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', borderBottom: '1px solid var(--border2)', background: badge === 'köpt' ? 'rgba(232,184,75,.03)' : badge === 'rec' ? 'rgba(74,143,212,.02)' : 'transparent' }}>
-      <button type="button" onClick={() => onOpen(p)} aria-label={`Visa ${p.name}`}
-        style={{ width: 76, height: 76, padding: 4, borderRadius: 10, background: '#fff', border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-in', boxSizing: 'border-box' }}>
-        {p.image_url ? <img src={p.image_url} alt="" loading="lazy" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <Package size={28} color="#999" />}
+    <div style={{ background: 'var(--bg3)', border: `1px solid ${qty > 0 ? 'rgba(232,184,75,.55)' : 'var(--border)'}`, borderRadius: 14, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <button type="button" onClick={onOpen} aria-label={`Visa ${p.name}`}
+        style={{ position: 'relative', height: 190, padding: 14, background: '#fff', border: 'none', cursor: 'zoom-in', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {p.image_url ? <img src={p.image_url} alt="" loading="lazy" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <Package size={48} strokeWidth={1.2} color="#bbb" />}
+        {badge && (
+          <span style={{ position: 'absolute', top: 10, left: 10, fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: '.05em',
+            background: badge === 'köpt' ? '#E8B84B' : '#4A8FD4', color: badge === 'köpt' ? '#111' : '#fff' }}>
+            {badge === 'köpt' ? 'Köpt tidigare' : 'Tips'}
+          </span>
+        )}
+        {qty > 0 && (
+          <span style={{ position: 'absolute', top: 10, right: 10, minWidth: 26, height: 26, padding: '0 7px', borderRadius: 13, background: '#111', color: '#E8B84B', fontSize: 13, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>{qty}</span>
+        )}
       </button>
-      <div onClick={() => onOpen(p)} style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
-          {badge === 'köpt' && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(232,184,75,.15)', color: 'var(--gold)', fontWeight: 700 }}>Köpt</span>}
-          {badge === 'rec'  && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(74,143,212,.15)', color: '#6AAFF0', fontWeight: 700 }}>Rekommenderas</span>}
+      <div style={{ padding: '12px 14px 14px', display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em' }}>{p.brand}</div>
+        <button type="button" onClick={onOpen} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', fontSize: 15, fontWeight: 600, color: 'var(--text)', lineHeight: 1.3 }}>{p.name}</button>
+        <div style={{ fontSize: 11, color: stock.color }}>{stock.label}{p.unit ? ` · ${p.unit}` : ''}</div>
+        <div style={{ marginTop: 'auto', paddingTop: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--gold)' }}>{fmt(price)} kr</span>
+            {price < p.list_price && <span style={{ fontSize: 12, color: 'var(--text2)', textDecoration: 'line-through' }}>{fmt(p.list_price)}</span>}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 10 }}>exkl. moms · {fmt(withVat(price))} kr inkl.</div>
+          {qty === 0 ? (
+            <button type="button" onClick={onAdd} style={{ width: '100%', height: 40, borderRadius: 9, background: 'var(--gold)', border: 'none', color: '#111', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Plus size={15} /> Lägg till
+            </button>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button type="button" onClick={onRemove} aria-label={`Minska ${p.name}`} style={{ width: 40, height: 40, borderRadius: 9, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Minus size={15} /></button>
+              <span style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>{qty}</span>
+              <button type="button" onClick={onAdd} aria-label={`Öka ${p.name}`} style={{ width: 40, height: 40, borderRadius: 9, background: 'var(--gold)', border: 'none', color: '#111', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={15} /></button>
+            </div>
+          )}
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{p.brand} · {p.unit}</div>
-      </div>
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)', flexShrink: 0, textAlign: 'right' }}>{fmt(price)} kr<IncVat net={price} /></div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-        <button onClick={() => updateQty(p.id, -1)} style={{ width: 28, height: 28, borderRadius: 6, background: qty > 0 ? 'var(--bg4)' : 'transparent', border: `1px solid ${qty > 0 ? 'var(--border)' : 'transparent'}`, color: 'var(--text)', cursor: qty > 0 ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: qty > 0 ? 1 : 0 }}>
-          <Minus size={12} />
-        </button>
-        <span style={{ fontSize: 13, fontWeight: 700, color: qty > 0 ? 'var(--gold)' : 'var(--text3)', minWidth: 20, textAlign: 'center' }}>{qty > 0 ? qty : '+'}</span>
-        <button onClick={() => addToCart(p)} style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Plus size={12} />
-        </button>
       </div>
     </div>
   )
@@ -238,6 +253,7 @@ export default function CrmOrdersPage() {
   const [showCart, setShowCart]           = useState(false)
   const [newCustomerFor, setNewCustomerFor] = useState<string | null>(null)   // prefilled company while the modal is open
   const [autoSavedAt, setAutoSavedAt]     = useState('')
+  const [saveError, setSaveError]         = useState('')
   const [delivery, setDelivery]           = useState('Standard (2-3 dagar)')
   // Per cart line: handed over from the car, or shipped from the warehouse.
   const [lineFrom, setLineFrom]           = useState<Record<string, 'car' | 'ship'>>({})
@@ -468,7 +484,10 @@ export default function CrmOrdersPage() {
     } else {
       ;({ data: order, error } = await supabase.from('orders').insert({ ...fields, created_by: myName || null }).select().single())
     }
-    if (error || !order) { showToast(error?.message?.includes('customer_id') ? 'Kör migration 0019 för utkast utan kund' : 'Kunde inte spara ordern'); return null }
+    if (error || !order) {
+      const msg = error?.message?.includes('customer_id') ? 'Kör migration 0019 för utkast utan kund' : `Kunde inte spara: ${error?.message || 'okänt fel'}`
+      setSaveError(msg); showToast(msg); return null
+    }
 
     const { error: itemsError } = await supabase.from('order_items').insert(cart.map(i => ({
       order_id: order.id, product_id: i.product.id,
@@ -479,9 +498,11 @@ export default function CrmOrdersPage() {
     })))
     if (itemsError) {
       if (!editing) await supabase.from('orders').delete().eq('id', order.id)
-      showToast('Orderraderna kunde inte sparas. Har migration 0014 körts?')
+      const msg = `Orderraderna kunde inte sparas: ${itemsError.message}`
+      setSaveError(msg); showToast(msg)
       return null
     }
+    setSaveError('')
     return order
   }
 
@@ -761,7 +782,7 @@ export default function CrmOrdersPage() {
                   <tr onClick={() => toggleOrderExpand(o.id)} style={{ borderBottom: expanded ? 'none' : '1px solid var(--border2)', cursor: 'pointer', background: expanded ? 'rgba(232,184,75,.04)' : 'transparent' }}>
                     <td style={{ padding: '12px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text3)' }}>#{o.order_nr}</td>
                     <td style={{ padding: '12px 16px', color: 'var(--text2)' }}>{formatDateTime(o.created_at)}</td>
-                    <td style={{ padding: '12px 16px', color: 'var(--text)', fontWeight: 500 }}>{(o as any).customers?.company || '—'}</td>
+                    <td style={{ padding: '12px 16px', color: 'var(--text)', fontWeight: 500 }}>{(o as any).customers?.company || 'Utan kund'}</td>
                     <td style={{ padding: '12px 16px', color: o.assigned_to ? 'var(--text2)' : 'var(--red)' }}>{o.assigned_to || 'Saknas'}</td>
                     <td style={{ padding: '12px 16px', color: 'var(--gold)', fontWeight: 700 }}>{fmt(o.subtotal)} kr <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text2)' }}>exkl.</span><IncVat net={o.subtotal} total={o.total} /></td>
                     <td style={{ padding: '12px 16px' }}>
@@ -1111,7 +1132,9 @@ export default function CrmOrdersPage() {
           <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
             {editingOrder?.status === 'quote' ? `Offert #${editingOrder.order_nr}` : 'Skapa ny order'}
           </h1>
-          {editingOrder?.status === 'draft' && autoSavedAt && (
+          {saveError ? (
+            <span role="alert" style={{ fontSize: 12, color: 'var(--red)' }}>{saveError}</span>
+          ) : editingOrder?.status === 'draft' && autoSavedAt && (
             <span style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 5 }}>
               <Check size={13} color="var(--green)" /> Sparad som utkast #{editingOrder.order_nr} {autoSavedAt}
             </span>
@@ -1134,6 +1157,28 @@ export default function CrmOrdersPage() {
             </button>
           </div>
         </div>
+
+        {/* Saved carts: drafts to pick up again */}
+        {(() => {
+          const drafts = orders.filter(o => o.status === 'draft' && o.id !== editingOrder?.id).slice(0, 8)
+          if (drafts.length === 0) return null
+          return (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Sparade varukorgar</div>
+              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+                {drafts.map(o => (
+                  <button key={o.id} type="button" onClick={() => openForEdit(o)}
+                    style={{ flexShrink: 0, textAlign: 'left', padding: '9px 14px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, cursor: 'pointer', minWidth: 170 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <ShoppingCart size={13} color="var(--gold)" /> #{o.order_nr} · {(o as any).customers?.company || 'Utan kund'}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{fmt(o.subtotal)} kr · {formatDateTime(o.created_at)}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Customer: optional here — the catalogue works without one */}
         {selectedCustomer ? (
@@ -1184,47 +1229,42 @@ export default function CrmOrdersPage() {
             style={{ width: '100%', padding: '10px 12px 10px 34px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
         </div>
 
-        {/* Product list */}
-        <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-          {loading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text3)' }}>Laddar produkter...</div>
-          ) : (
+        {/* Catalogue */}
+        {loading ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text2)' }}>Laddar produkter...</div>
+        ) : (() => {
+          const card = (p: Product, badge?: 'köpt' | 'rec') => (
+            <ProductCard key={p.id} p={p} badge={badge} selectedCustomer={selectedCustomer} qty={getQty(p.id)}
+              onAdd={() => addToCart(p)} onRemove={() => updateQty(p.id, -1)} onOpen={() => setOpenProduct(p)} />
+          )
+          const grid = (items: React.ReactNode) => (
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 160 : 210}px, 1fr))`, gap: isMobile ? 10 : 16 }}>{items}</div>
+          )
+          const section = (key: string, title: React.ReactNode, items: React.ReactNode) => (
+            <section key={key} style={{ marginBottom: 28 }}>
+              <h2 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '.08em', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>{title}</h2>
+              {grid(items)}
+            </section>
+          )
+          // Whole catalogue: one section per category, like a printed catalogue.
+          const byCategory = selectedCategory === 'all' && !productSearch
+          const groups = byCategory
+            ? [...categories.map(c => ({ key: c.id, name: c.name, items: mainProducts.filter(p => p.category_id === c.id) })),
+               { key: 'none', name: 'Övrigt', items: mainProducts.filter(p => !categories.some(c => c.id === p.category_id)) }].filter(g => g.items.length)
+            : []
+          return (
             <>
-              {/* ── Senast köpt — pinned ── */}
-              {lastBoughtProducts.length > 0 && (
-                <>
-                  <div style={{ padding: '8px 16px', background: 'rgba(232,184,75,.06)', borderBottom: '1px solid rgba(232,184,75,.12)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Star size={11} color="var(--gold)" />
-                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Senast köpt</span>
-                  </div>
-                  {lastBoughtProducts.map((p) => <ProductRow key={p.id} p={p} selectedCustomer={selectedCustomer} getQty={getQty} addToCart={addToCart} updateQty={updateQty} badge="köpt" onOpen={setOpenProduct} />)}
-                </>
+              {lastBoughtProducts.length > 0 && section('bought', <><Star size={14} color="var(--gold)" /> Köpt tidigare av {selectedCustomer?.company}</>, lastBoughtProducts.map(p => card(p, 'köpt')))}
+              {recommendations.length > 0 && section('rec', <><Tag size={14} color="#6AAFF0" /> Rekommenderas</>, recommendations.map(p => card(p, 'rec')))}
+              {byCategory
+                ? groups.map(g => section(g.key, <>{g.name} <span style={{ fontWeight: 500, color: 'var(--text2)' }}>· {g.items.length}</span></>, g.items.map(p => card(p))))
+                : mainProducts.length > 0 && grid(mainProducts.map(p => card(p)))}
+              {mainProducts.length === 0 && lastBoughtProducts.length === 0 && recommendations.length === 0 && (
+                <div style={{ padding: 40, textAlign: 'center', color: 'var(--text2)', fontSize: 13 }}>Inga produkter hittades</div>
               )}
-
-              {/* ── Rekommendationer — pinned ── */}
-              {recommendations.length > 0 && (
-                <>
-                  <div style={{ padding: '8px 16px', background: 'rgba(74,143,212,.05)', borderBottom: '1px solid rgba(74,143,212,.12)', borderTop: lastBoughtProducts.length > 0 ? '1px solid var(--border2)' : undefined, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Tag size={11} color="#6AAFF0" />
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#6AAFF0', textTransform: 'uppercase', letterSpacing: '.07em' }}>Rekommenderas</span>
-                  </div>
-                  {recommendations.map((p) => <ProductRow key={p.id} p={p} selectedCustomer={selectedCustomer} getQty={getQty} addToCart={addToCart} updateQty={updateQty} badge="rec" onOpen={setOpenProduct} />)}
-                </>
-              )}
-
-              {/* ── All other products ── */}
-              {(lastBoughtProducts.length > 0 || recommendations.length > 0) && mainProducts.length > 0 && (
-                <div style={{ padding: '8px 16px', background: 'rgba(255,255,255,.02)', borderBottom: '1px solid var(--border2)', borderTop: '1px solid var(--border2)' }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Alla produkter</span>
-                </div>
-              )}
-              {mainProducts.length === 0 && lastBoughtProducts.length === 0 && (
-                <div style={{ padding: 40, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>Inga produkter i denna kategori</div>
-              )}
-              {mainProducts.map((p) => <ProductRow key={p.id} p={p} selectedCustomer={selectedCustomer} getQty={getQty} addToCart={addToCart} updateQty={updateQty} onOpen={setOpenProduct} />)}
             </>
-          )}
-        </div>
+          )
+        })()}
       </div>
 
       {/* Cart button that follows along while scrolling */}
