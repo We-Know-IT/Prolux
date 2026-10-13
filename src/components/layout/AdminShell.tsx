@@ -9,6 +9,7 @@ import LeadToast from '@/components/crm/LeadToast'
 import GuideTour, { GuideButton } from '@/components/onboarding/GuideTour'
 import { ADMIN_GUIDE } from '@/components/onboarding/guides'
 import { createClient } from '@/lib/supabase/client'
+import { CRM_SECTIONS } from '@/components/layout/CrmShell'
 import { LayoutDashboard, ShoppingBag, Users, Tag, Megaphone, Zap, LogOut, UserCog, Menu, X, GitBranch, CalendarDays, StickyNote, Bell, FileText, Plug } from 'lucide-react'
 
 const ADMIN_NAV = [
@@ -30,7 +31,7 @@ const ADMIN_NAV_ALL = [
 const CRM_NAV = [
   { href: '/admin/crm/pipeline',  label: 'Pipeline',     icon: GitBranch },
   { href: '/admin/crm/customers', label: 'CRM Kunder',   icon: Users },
-  { href: '/admin/crm/orders',    label: 'CRM Ordrar',   icon: ShoppingBag },
+  { href: '/admin/crm/orders',    label: 'Ny order',     icon: ShoppingBag },
   { href: '/admin/crm/calendar',  label: 'Kalender',     icon: CalendarDays },
   { href: '/admin/crm/notes',     label: 'Anteckningar', icon: StickyNote },
 ]
@@ -38,6 +39,9 @@ const CRM_NAV = [
 export function AdminShell({ children, email }: { children: ReactNode; email: string }) {
   const pathname = usePathname()
   const router   = useRouter()
+  const inCrm    = pathname.startsWith('/crm') || pathname.startsWith('/admin/crm')
+  const [crmSearch, setCrmSearch] = useState('')
+  useEffect(() => { setCrmSearch(window.location.search) }, [pathname])
   const [menuOpen, setMenuOpen] = useState(false)
   const [newOrderCount, setNewOrderCount] = useState(0)
   const [realtimeToast, setRealtimeToast] = useState<{nr: number; company: string} | null>(null)
@@ -271,6 +275,28 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
       <ServiceWorkerRegister />
       <LeadToast href="/admin/crm/pipeline" />
       <GuideTour steps={ADMIN_GUIDE} storageKey="prolux-guide-admin-v1" />
+      {/* In the CRM: its own sections under the admin bar */}
+      {inCrm && (
+        <nav aria-label="CRM" className="swipe-nav" style={{ position: 'sticky', top: 'var(--nav-h)', zIndex: 150, display: 'flex', gap: 4, alignItems: 'center', padding: '8px 20px', overflowX: 'auto', background: 'rgba(10,13,18,.92)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', borderBottom: '1px solid var(--line)' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#6AAFF0', textTransform: 'uppercase', letterSpacing: '.1em', marginRight: 8, flexShrink: 0 }}>CRM</span>
+          {CRM_SECTIONS.map(({ href, label, icon: Icon }) => {
+            const [path, query] = href.split('?')
+            const here = pathname.replace(/^\/admin\/crm/, '/crm')
+            const active = path === '/crm/orders'
+              ? here.startsWith(path) && (query ? crmSearch.includes(query) : !crmSearch.includes('view=history'))
+              : here.startsWith(path)
+            return (
+              <Link key={href} href={href} onClick={() => setCrmSearch(query ? `?${query}` : '')} aria-current={active ? 'page' : undefined}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 7, flexShrink: 0, whiteSpace: 'nowrap', textDecoration: 'none', fontSize: 13,
+                  fontWeight: active ? 600 : 500, color: active ? 'var(--gold)' : 'var(--text2)',
+                  background: active ? 'rgba(232,184,75,.09)' : 'transparent', border: `1px solid ${active ? 'var(--line-gold)' : 'transparent'}` }}>
+                <Icon size={14} /> {label}
+              </Link>
+            )
+          })}
+        </nav>
+      )}
+
       <main style={{ flex: 1 }}>
         {children}
       </main>

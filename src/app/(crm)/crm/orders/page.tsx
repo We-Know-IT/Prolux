@@ -1,6 +1,6 @@
 'use client'
 import { Fragment, useEffect, useState, useRef } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Product, Customer, Category, CartItem, Order, OrderItem, OrderStatus, ORDER_STATUS_LABEL } from '@/types'
 import { custPrice, fmt, formatDateTime } from '@/lib/utils'
@@ -228,6 +228,7 @@ function ProductSheet({ p, categoryName, selectedCustomer, qty, onAdd, onRemove,
 export default function CrmOrdersPage() {
   const SALESPEOPLE = useTeam()
   const searchParams = useSearchParams()
+  const router = useRouter()
   const autoSelectedRef = useRef(false)
   const [view, setView]                   = useState<View>(() => searchParams.get('view') === 'history' ? 'history' : 'new')
   const [orders, setOrders]               = useState<(Order & { customers?: Customer })[]>([])
@@ -273,6 +274,22 @@ export default function CrmOrdersPage() {
   const editingRef  = useRef<typeof editingOrder>(null)
   const autosaveRef = useRef<Promise<void> | null>(null)
   useEffect(() => { editingRef.current = editingOrder }, [editingOrder])
+
+  // The menu's "Ny order" / "Ordrar" links switch view on the same page.
+  const viewParam = searchParams.get('view')
+  const firstViewRef = useRef(true)
+  useEffect(() => {
+    if (firstViewRef.current) { firstViewRef.current = false; return }
+    setView(viewParam === 'history' ? 'history' : 'new')
+  }, [viewParam])
+  // ...and the address follows the view, so those links always switch it.
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    const has = url.searchParams.get('view') === 'history'
+    if ((view === 'history') === has) return
+    if (view === 'history') url.searchParams.set('view', 'history'); else url.searchParams.delete('view')
+    router.replace(url.pathname + url.search, { scroll: false })
+  }, [view]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
@@ -1126,7 +1143,7 @@ export default function CrmOrdersPage() {
   const cartCount = cart.reduce((s, i) => s + i.qty, 0)
   const drawerBtn: React.CSSProperties = { width: 32, height: 32, borderRadius: 8, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }
   return (
-    <div style={{ height: 'calc(100vh - 58px)', overflowY: 'auto' }}>
+    <div>
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: isMobile ? '16px 14px 110px' : '24px 24px 110px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: 0 }}>

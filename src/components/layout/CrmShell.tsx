@@ -10,13 +10,14 @@ import GuideTour, { GuideButton } from '@/components/onboarding/GuideTour'
 import { CRM_GUIDE } from '@/components/onboarding/guides'
 import { createClient } from '@/lib/supabase/client'
 import { currentStaff } from '@/lib/team'
-import { LayoutDashboard, GitBranch, Users, ShoppingCart, LogOut, Menu, X, CalendarDays, StickyNote } from 'lucide-react'
+import { LayoutDashboard, GitBranch, Users, ShoppingCart, LogOut, Menu, X, CalendarDays, StickyNote, ClipboardList } from 'lucide-react'
 
-const NAV = [
+export const CRM_SECTIONS = [
   { href: '/crm/dashboard', label: 'Översikt',      icon: LayoutDashboard },
   { href: '/crm/pipeline',  label: 'Pipeline',       icon: GitBranch },
   { href: '/crm/customers', label: 'Kunder',         icon: Users },
-  { href: '/crm/orders',    label: 'Ordrar',         icon: ShoppingCart },
+  { href: '/crm/orders',    label: 'Ny order',       icon: ShoppingCart },
+  { href: '/crm/orders?view=history', label: 'Ordrar', icon: ClipboardList },
   { href: '/crm/calendar',  label: 'Kalender',       icon: CalendarDays },
   { href: '/crm/notes',     label: 'Anteckningar',   icon: StickyNote },
 ]
@@ -25,6 +26,15 @@ export default function CrmShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
   const [orderToast, setOrderToast] = useState<{ id: string; nr: number; name: string } | null>(null)
+  // Which orders tab is open ("Ny order" or the list) follows the address.
+  const [search, setSearch] = useState('')
+  useEffect(() => { setSearch(window.location.search) }, [pathname])
+  const isActive = (href: string) => {
+    const [path, query] = href.split('?')
+    if (path === '/crm/orders') return pathname.startsWith(path) && (query ? search.includes(query) : !search.includes('view=history'))
+    return pathname.startsWith(path)
+  }
+  const nav = CRM_SECTIONS
   const supabase = createClient()
 
   // Tell the salesperson when a new order is assigned to them, wherever they are in the app.
@@ -79,10 +89,10 @@ export default function CrmShell({ children }: { children: ReactNode }) {
 
         {/* Desktop nav pills */}
         <nav className="crm-desktop-nav swipe-nav" style={{ display: 'none', gap: 2, flex: 1, alignItems: 'center', minWidth: 0 }}>
-          {NAV.map(({ href, label, icon: Icon }) => {
-            const active = pathname.startsWith(href)
+          {nav.map(({ href, label, icon: Icon }) => {
+            const active = isActive(href)
             return (
-              <Link key={href} href={href} aria-current={active ? 'page' : undefined} style={{
+              <Link key={href} href={href} onClick={() => setSearch(href.includes('?') ? '?' + href.split('?')[1] : '')} aria-current={active ? 'page' : undefined} style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '6px 13px', borderRadius: 7,
                 background: active ? 'rgba(232,184,75,.09)' : 'transparent',
@@ -141,10 +151,10 @@ export default function CrmShell({ children }: { children: ReactNode }) {
           display: 'flex', flexDirection: 'column', gap: 6,
           animation: 'fadeIn .15s ease',
         }}>
-          {NAV.map(({ href, label, icon: Icon }) => {
-            const active = pathname.startsWith(href)
+          {nav.map(({ href, label, icon: Icon }) => {
+            const active = isActive(href)
             return (
-              <Link key={href} href={href} onClick={() => setMenuOpen(false)} style={{
+              <Link key={href} href={href} onClick={() => { setMenuOpen(false); setSearch(href.includes('?') ? '?' + href.split('?')[1] : '') }} style={{
                 display: 'flex', alignItems: 'center', gap: 14,
                 padding: '14px 18px', borderRadius: 10,
                 background: active ? 'rgba(232,184,75,.08)' : 'rgba(255,255,255,.03)',

@@ -137,9 +137,14 @@ export default function AdminOrders() {
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text3)', letterSpacing: '.28em', textTransform: 'uppercase', marginBottom: 12, display: 'block' }}>002 / Hantera</span>
           <div style={{ fontFamily: 'var(--font-serif)', fontSize: '40px', fontWeight: 500, color: 'var(--text)', lineHeight: 1.1 }}>Ordrar</div>
         </div>
-        <button onClick={exportCSV} style={{ padding: '9px 18px', fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text2)' }}>
-          ↓ Exportera CSV
-        </button>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button onClick={exportCSV} style={{ padding: '9px 18px', fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text2)' }}>
+            ↓ Exportera CSV
+          </button>
+          <Link href="/admin/crm/orders" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px', background: 'var(--gold)', borderRadius: 8, color: '#111', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
+            + Ny order
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
