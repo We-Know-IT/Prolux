@@ -22,6 +22,17 @@ interface Lookups {
   codings: { id: string; name: string; type: string; vat: number }[]
 }
 
+// Visma gives VAT either as a fraction (0.25) or as percent (25).
+const vatPercent = (v: number | null | undefined) => v == null ? null : Math.round((v <= 1 ? v * 100 : v) * 100) / 100
+
+// Sensible defaults for car care products: unit "st", goods with 25 % VAT.
+function suggest(l: Lookups) {
+  const unit = l.units.find(u => /^st/i.test(u.abbreviation || '') || /^st(yck)?$/i.test(u.name))
+  const coding = l.codings.find(c => vatPercent(c.vat) === 25 && /vara|varor|goods/i.test(c.name))
+    ?? l.codings.find(c => vatPercent(c.vat) === 25)
+  return { unit_id: unit?.id, coding_id: coding?.id }
+}
+
 const card: React.CSSProperties = { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, marginBottom: 20 }
 const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }
 const select: React.CSSProperties = { width: '100%', padding: '10px 12px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 14 }
@@ -48,7 +59,12 @@ export default function IntegrationsPage() {
     setStatus(s); setSettings(s.settings || {})
     const { data: l } = await supabase.from('integration_log').select('*').eq('type', 'visma').order('created_at', { ascending: false }).limit(15)
     setLogs(l || [])
-    if (s.connected) callVisma<Lookups>('lookups').then(setLookups).catch(e => setMsg({ ok: false, text: e.message }))
+    if (s.connected) callVisma<Lookups>('lookups').then(l => {
+      setLookups(l)
+      // Pre-fill what is not chosen yet; the admin still saves it.
+      const d = suggest(l)
+      setSettings(cur => ({ ...cur, unit_id: cur.unit_id || d.unit_id, coding_id: cur.coding_id || d.coding_id }))
+    }).catch(e => setMsg({ ok: false, text: e.message }))
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -133,7 +149,7 @@ export default function IntegrationsPage() {
                 <label style={label} htmlFor="v-coding">Bokföringskonto (nya artiklar)</label>
                 <select id="v-coding" style={select} value={settings.coding_id || ''} onChange={e => setSettings(s => ({ ...s, coding_id: e.target.value }))}>
                   <option value="">Välj…</option>
-                  {lookups?.codings.map(c => <option key={c.id} value={c.id}>{c.name}{c.vat != null ? ` · ${c.vat} % moms` : ''}</option>)}
+                  {lookups?.codings.map(c => <option key={c.id} value={c.id}>{c.name}{vatPercent(c.vat) != null ? ` · ${vatPercent(c.vat)} % moms` : ''}</option>)}
                 </select>
               </div>
             </div>
@@ -159,6 +175,11 @@ export default function IntegrationsPage() {
               <button onClick={syncPayments} disabled={!!busy} style={btn()}><RefreshCw size={14} /> {busy === 'payments' ? 'Kontrollerar…' : 'Kontrollera betalningar nu'}</button>
               {status.last_payment_sync && <span style={{ fontSize: 12, color: 'var(--text2)' }}>Senast: {formatDateTime(status.last_payment_sync)}</span>}
             </div>
+            {(() => {
+              const c = lookups?.codings.find(x => x.id === settings.coding_id)
+              return c && vatPercent(c.vat) !== 25
+                ? <p style={{ fontSize: 12, color: 'var(--gold)', margin: '10px 0 0' }}>Obs: valt konto har {vatPercent(c.vat)} % moms. Bilvårdsprodukter har normalt 25 %.</p> : null
+            })()}
             {!ready && <p style={{ fontSize: 12, color: 'var(--gold)', margin: '10px 0 0' }}>Välj betalningsvillkor, enhet och konto innan första fakturan.</p>}
           </>
         )}
