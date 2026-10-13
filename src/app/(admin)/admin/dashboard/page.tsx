@@ -413,21 +413,6 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Budget history — last 6 months per salesperson */}
-      {(() => {
-        const active = SALESPEOPLE.filter(sp => budgetHistory.some(m => m.sold[sp] || m.budget[sp]))
-        if (active.length === 0) return null
-        return (
-          <div style={{ ...card, padding: '22px 24px', marginBottom: 20 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Budget senaste 6 månaderna</div>
-            <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>Sålt exkl. moms per säljare, jämfört med månadens budget</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 12 }}>
-              {active.map(sp => <BudgetHistoryChart key={sp} salesperson={sp} months={budgetHistory} />)}
-            </div>
-          </div>
-        )
-      })()}
-
       {/* Bottom grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 16 }}>
 
@@ -654,6 +639,21 @@ export default function AdminDashboard() {
           )}
         </div>
       </div>
+      {/* Budget history — last 6 months per salesperson */}
+      {(() => {
+        const active = SALESPEOPLE.filter(sp => budgetHistory.some(m => m.sold[sp] || m.budget[sp]))
+        if (active.length === 0) return null
+        return (
+          <div style={{ ...card, padding: '22px 24px', marginTop: 20 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Budget senaste 6 månaderna</div>
+            <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>Sålt exkl. moms per säljare, jämfört med månadens budget</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 12 }}>
+              {active.map(sp => <BudgetHistoryChart key={sp} salesperson={sp} months={budgetHistory} />)}
+            </div>
+          </div>
+        )
+      })()}
+
       <style>{`
         @media (max-width: 700px) {
           .dash-chart-row { grid-template-columns: 1fr !important; }
