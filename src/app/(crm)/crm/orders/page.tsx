@@ -14,7 +14,7 @@ import { recommendFor } from '@/lib/recommend'
 import { buildQuotePdf, downloadBlob, type QuotePdfInput } from '@/lib/quote-pdf'
 import { buildQuoteHtml } from '@/lib/quote-html'
 import { DEFAULT_CONTACT } from '@/lib/site-content'
-import { readCart, writeCart, OPEN_CART_EVENT, deleteOpenOrder as removeOpenOrder, findMyLatestDraft } from '@/lib/crm-cart'
+import { readCart, writeCart, OPEN_CART_EVENT, deleteOpenOrder as removeOpenOrder, findMyLatestDraft, startOfToday, cleanOldCarts } from '@/lib/crm-cart'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { currentStaff, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
 import { useTeam, teamOptions } from '@/hooks/useTeam'
@@ -362,11 +362,13 @@ export default function CrmOrdersPage() {
     ;(async () => {
       // This browser's cart, else the seller's latest cart from the database
       // (so it is the same in Safari, Chrome and on the phone).
+      cleanOldCarts(supabase, myName).catch(() => {})
       const local = readCart()?.draftId
       const id = local || (await findMyLatestDraft(supabase, myName))?.id
       if (id) {
         const { data } = await supabase.from('orders').select('*,customers(id,company)').eq('id', id).maybeSingle()
-        if (data && data.status === 'draft') await openForEdit(data, false, true)
+        // The active cart lasts until midnight; older ones stay under Sparade varukorgar.
+        if (data && data.status === 'draft' && data.created_at >= startOfToday()) await openForEdit(data, false, true)
         else writeCart(null)
       }
       setCartRestored(true)
@@ -600,11 +602,23 @@ export default function CrmOrdersPage() {
     return () => clearTimeout(t)
   }, [cart, selectedCustomer, lineDisc, carQty, discount, discountEnabled, assignee, delivery, dealId, loading, placing, view]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Starts an empty cart; the current one stays saved as a draft.
+  // Starts an empty cart. With something in the current one, ask first:
+  // keep it under Sparade varukorgar, or empty it.
+  const [askNewCart, setAskNewCart] = useState(false)
   function newCart() {
-    const nr = editingRef.current?.order_nr
+    if (cart.length > 0 && editingRef.current?.status !== 'quote') { setAskNewCart(true); return }
     resetOrderForm(); setShowCart(false); setView('new')
-    if (nr) showToast(`Varukorgen är sparad som utkast #${nr}`)
+  }
+  async function finishNewCart(keep: boolean) {
+    setAskNewCart(false)
+    if (autosaveRef.current) await autosaveRef.current
+    const e = editingRef.current
+    if (!keep && e && e.status === 'draft') {
+      await removeOpenOrder(supabase, e.id)
+      setOrders(os => os.filter(o => o.id !== e.id))
+    }
+    resetOrderForm(); setShowCart(false); setView('new')
+    showToast(keep ? `Varukorgen #${e?.order_nr ?? ''} finns under Sparade varukorgar` : 'Varukorgen är tömd')
   }
 
   async function discardCart() {
@@ -876,6 +890,25 @@ export default function CrmOrdersPage() {
   ])
   const mainProducts = filteredProducts.filter(p => !pinnedIds.has(p.id))
 
+  const newCartModal = askNewCart && (
+    <Portal>
+      <div onClick={() => setAskNewCart(false)} style={{ position: 'fixed', inset: 0, zIndex: 1250, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <div role="dialog" aria-modal="true" aria-label="Ny varukorg" onClick={e => e.stopPropagation()}
+          style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 440, padding: '22px 22px 18px' }}>
+          <h2 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Ny varukorg</h2>
+          <p style={{ margin: '0 0 18px', fontSize: 14, color: 'var(--text2)', lineHeight: 1.5 }}>
+            Vad ska hända med den nuvarande varukorgen ({cart.reduce((n, i) => n + i.qty, 0)} st{selectedCustomer ? `, ${selectedCustomer.company}` : ''})?
+          </p>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <button onClick={() => finishNewCart(true)} style={{ padding: '13px 0', borderRadius: 10, background: 'var(--gold)', border: 'none', color: '#111', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Spara till senare</button>
+            <button onClick={() => finishNewCart(false)} style={{ padding: '13px 0', borderRadius: 10, background: 'transparent', border: '1px solid rgba(224,82,82,.4)', color: 'var(--red)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Töm varukorgen</button>
+            <button onClick={() => setAskNewCart(false)} style={{ padding: '10px 0', borderRadius: 10, background: 'transparent', border: 'none', color: 'var(--text2)', fontSize: 13, cursor: 'pointer' }}>Avbryt</button>
+          </div>
+        </div>
+      </div>
+    </Portal>
+  )
+
   const customerNeeded = afterCustomer && !selectedCustomer && newCustomerFor === null && (
     <Portal>
       <div onClick={() => setAfterCustomer(null)} style={{ position: 'fixed', inset: 0, zIndex: 1250, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '12vh 16px 16px' }}>
@@ -1068,6 +1101,7 @@ export default function CrmOrdersPage() {
       </div>
       {shareModal}
       {customerNeeded}
+      {newCartModal}
       {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#fff', padding: '12px 24px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 999 }}>{toast}</div>}
     </div>
   )
@@ -1357,6 +1391,7 @@ export default function CrmOrdersPage() {
       </Portal>)}
       {shareModal}
       {customerNeeded}
+      {newCartModal}
       {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#fff', padding: '12px 24px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 1200 }}>{toast}</div>}
     </div>
   )
@@ -1598,7 +1633,7 @@ export default function CrmOrdersPage() {
                     <button onClick={discardCart} style={{ flex: 1, padding: '10px 0', background: 'transparent', border: '1px solid rgba(224,82,82,.3)', borderRadius: 9, color: 'var(--red)', fontSize: 13, cursor: 'pointer' }}>Radera varukorgen</button>
                   </div>
                   <p style={{ margin: '10px 0 0', fontSize: 11, color: 'var(--text2)', textAlign: 'center' }}>
-                    Varukorgen sparas automatiskt som utkast{selectedCustomer ? ' på kunden' : ''} – du hittar den under Alla ordrar{selectedCustomer ? ' och på kundkortet' : ''}.
+                    Varukorgen sparas automatiskt och finns kvar resten av dagen – även om du byter sida eller enhet.
                   </p>
                 </div>
               </>
@@ -1621,6 +1656,7 @@ export default function CrmOrdersPage() {
 
       {shareModal}
       {customerNeeded}
+      {newCartModal}
       {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#fff', padding: '12px 24px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 1200 }}>{toast}</div>}
     </div>
   )
