@@ -22,16 +22,25 @@ export function LeadsPanel({ base = '/crm', limit = 8 }: { base?: string; limit?
   const [leads, setLeads] = useState<any[] | null>(null)
   const [editId, setEditId] = useState<string | null>(null)
   const [text, setText] = useState('')
+  const [quoteByDeal, setQuoteByDeal] = useState<Record<string, { id: string; order_nr: number; status: string }>>({})
 
-  function load() {
-    createClient().from('deals')
+  async function load() {
+    const sb = createClient()
+    const { data } = await sb.from('deals')
       .select('id,title,value,stage,notes,assigned_to,source,created_at,updated_at,customers(id,company)')
       .in('stage', ['Prospekt', 'Kontaktad', 'Offert', 'Förhandling'])
       .order('updated_at', { ascending: false }).limit(limit)
-      .then(({ data }) => setLeads(data ?? []))
+    setLeads(data ?? [])
+    const ids = (data ?? []).map(d => d.id)
+    if (!ids.length) return
+    // The quote behind each lead, so one click opens it (needs orders.deal_id, migration 0006).
+    const { data: qs } = await sb.from('orders').select('id,order_nr,status,deal_id').in('deal_id', ids).in('status', ['quote', 'draft']).order('created_at', { ascending: false })
+    const map: Record<string, { id: string; order_nr: number; status: string }> = {}
+    for (const o of (qs ?? []) as any[]) if (!map[o.deal_id]) map[o.deal_id] = o
+    setQuoteByDeal(map)
   }
-  useEffect(load, []) // eslint-disable-line react-hooks/exhaustive-deps
-  useLiveRefresh(['deals'], load)
+  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useLiveRefresh(['deals', 'orders'], load)
 
   async function save(id: string) {
     const notes = text.trim() || null
@@ -53,7 +62,7 @@ export function LeadsPanel({ base = '/crm', limit = 8 }: { base?: string; limit?
         {(leads ?? []).map((l, i, arr) => (
           <div key={l.id} style={{ padding: '12px 16px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <Link href={l.customers?.id ? `/crm/customers/${l.customers.id}` : `${base}/pipeline`} style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', textDecoration: 'none' }}>
+              <Link href={quoteByDeal[l.id] ? `/crm/orders?edit=${quoteByDeal[l.id].id}` : l.customers?.id ? `/crm/customers/${l.customers.id}` : `${base}/pipeline`} style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', textDecoration: 'none' }}>
                 {l.customers?.company || l.title}
               </Link>
               <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(74,143,212,.14)', color: '#8DBDF0' }}>{l.stage}</span>
@@ -61,6 +70,19 @@ export function LeadsPanel({ base = '/crm', limit = 8 }: { base?: string; limit?
               <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--gold)' }}>{l.value ? `${fmt(l.value)} kr` : ''}</span>
             </div>
             <div style={{ fontSize: 11, color: 'var(--text2)', margin: '3px 0 6px' }}>{l.title}{l.assigned_to ? ` · ${l.assigned_to}` : ''} · {formatDate(l.updated_at || l.created_at)}</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              {quoteByDeal[l.id] && (
+                <Link href={`/crm/orders?edit=${quoteByDeal[l.id].id}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 7, background: 'var(--gold)', color: '#111', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+                  <FileText size={12} /> Öppna {quoteByDeal[l.id].status === 'quote' ? 'offert' : 'utkast'} #{quoteByDeal[l.id].order_nr}
+                </Link>
+              )}
+              {l.customers?.id && (
+                <Link href={`/crm/customers/${l.customers.id}`} style={{ padding: '5px 11px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, textDecoration: 'none' }}>Kundkort</Link>
+              )}
+              {l.customers?.id && !quoteByDeal[l.id] && (
+                <Link href={`/crm/orders?customer=${l.customers.id}`} style={{ padding: '5px 11px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, textDecoration: 'none' }}>Skapa offert</Link>
+              )}
+            </div>
             {editId === l.id ? (
               <div>
                 <textarea autoFocus value={text} onChange={e => setText(e.target.value)} rows={3}

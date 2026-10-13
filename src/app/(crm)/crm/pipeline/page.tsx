@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Deal, Customer, DEAL_STAGES, DealStage } from '@/types'
 import { fmt, formatDate } from '@/lib/utils'
-import { Plus, X, User, ChevronDown } from 'lucide-react'
+import { Plus, X, User, ChevronDown, FileText } from 'lucide-react'
+import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { useTeam, teamOptions } from '@/hooks/useTeam'
 import { useMe } from '@/hooks/useMe'
@@ -21,6 +22,8 @@ export default function CrmPipelinePage() {
   const me = useMe()
   const [deals, setDeals] = useState<(Deal & { customers?: Customer })[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
+  // The open quote/draft behind each deal, so it opens with one click.
+  const [quoteByDeal, setQuoteByDeal] = useState<Record<string, { id: string; order_nr: number; status: string }>>({})
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -39,14 +42,20 @@ export default function CrmPipelinePage() {
   function loadData() {
     return Promise.all([
       supabase.from('deals').select('*,customers(id,company)').order('created_at', { ascending: false }),
-      supabase.from('customers').select('id,company').eq('status', 'active').order('company')
-    ]).then(([d, c]) => {
+      supabase.from('customers').select('id,company').eq('status', 'active').order('company'),
+      supabase.from('orders').select('id,order_nr,status,deal_id').not('deal_id', 'is', null).in('status', ['quote', 'draft']).order('created_at', { ascending: false }),
+    ]).then(([d, c, q]) => {
       if (d.data) setDeals(d.data)
       if (c.data) setCustomers(c.data as Customer[])
+      if (q.data) {
+        const map: Record<string, { id: string; order_nr: number; status: string }> = {}
+        for (const o of q.data as any[]) if (!map[o.deal_id]) map[o.deal_id] = o
+        setQuoteByDeal(map)
+      }
     })
   }
 
-  useLiveRefresh(['deals', 'customers'], loadData)
+  useLiveRefresh(['deals', 'customers', 'orders'], loadData)
 
   useEffect(() => {
     loadData().then(() => {
@@ -214,6 +223,12 @@ export default function CrmPipelinePage() {
                       </div>
                     )}
                     {(d as any).notes && <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 8, borderTop: '1px solid var(--line2)', paddingTop: 8, lineHeight: 1.4, whiteSpace: 'pre-line', display: '-webkit-box', WebkitLineClamp: 6, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{(d as any).notes}</div>}
+                    {quoteByDeal[d.id] && (
+                      <Link href={`/crm/orders?edit=${quoteByDeal[d.id].id}`} onClick={e => e.stopPropagation()}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'var(--gold)', color: '#111', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+                        <FileText size={13} /> Öppna {quoteByDeal[d.id].status === 'quote' ? 'offert' : 'utkast'} #{quoteByDeal[d.id].order_nr}
+                      </Link>
+                    )}
                     {/* Move buttons */}
                     <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
                       {DEAL_STAGES.filter(s => s !== stage).slice(0, 3).map(s => (
