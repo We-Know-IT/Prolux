@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { PriceListPicker } from '@/components/crm/NewCustomerModal'
 import IncVat from '@/components/orders/IncVat'
+import { recommendFor } from '@/lib/recommend'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { useTeam, teamOptions } from '@/hooks/useTeam'
@@ -30,29 +31,6 @@ function ProductPic({ src, size }: { src?: string | null; size: number }) {
   )
 }
 
-const AFFINITY: Record<string, string[]> = {
-  'rapidet':  ['magic', 'gommalux', 'green power'],
-  'magic':    ['rapidet', 'carnauba', 'keramisk'],
-  'gommalux': ['rapidet', 'magic'],
-  'carnauba': ['keramisk', 'magic', 'polish'],
-  'keramisk': ['carnauba', 'polish', 'magic'],
-  'green':    ['magic', 'rapidet'],
-  'polish':   ['carnauba', 'keramisk'],
-}
-
-function getRecommendations(topProducts: string[], allProductNames: string[]): string[] {
-  const recs = new Set<string>()
-  for (const bought of topProducts) {
-    const key = Object.keys(AFFINITY).find(k => bought.toLowerCase().includes(k))
-    if (key) {
-      for (const rec of AFFINITY[key]) {
-        const match = allProductNames.find(n => n.toLowerCase().includes(rec) && !topProducts.includes(n))
-        if (match) recs.add(match)
-      }
-    }
-  }
-  return Array.from(recs).slice(0, 4)
-}
 
 type Tab = 'overview' | 'orders' | 'stats' | 'notes'
 type ReminderPriority = 'low' | 'normal' | 'high'
@@ -95,6 +73,8 @@ export default function CustomerDetailPage() {
   const [editSaving, setEditSaving]       = useState(false)
   const [productImages, setProductImages] = useState<Record<string, string | null>>({})
   const [imageByName, setImageByName]     = useState<Record<string, string | null>>({})
+  const [nameById, setNameById]           = useState<Record<string, string>>({})
+  const [recommendations, setRecommendations] = useState<string[]>([])
   const [viewOrder, setViewOrder]         = useState<any | null>(null)
   const [editingActId, setEditingActId]   = useState<string | null>(null)
   const [editingActText, setEditingActText] = useState('')
@@ -116,12 +96,24 @@ export default function CustomerDetailPage() {
       if (o) { setOrders(o as any); setOrderItems(o.filter((x: any) => !NOT_SOLD.includes(x.status)).flatMap((x: any) => x.order_items || [])) }
       if (a) setActivities(a as any)
       if (r) setReminders(r)
-      if (p) { setAllProductNames(p.map((x: any) => x.name)); setProductImages(Object.fromEntries(p.map((x: any) => [x.id, x.image_url]))); setImageByName(Object.fromEntries(p.map((x: any) => [x.name, x.image_url]))) }
+      if (p) { setAllProductNames(p.map((x: any) => x.name)); setProductImages(Object.fromEntries(p.map((x: any) => [x.id, x.image_url]))); setImageByName(Object.fromEntries(p.map((x: any) => [x.name, x.image_url]))); setNameById(Object.fromEntries(p.map((x: any) => [x.id, x.name]))) }
       setLoading(false)
     })
   }
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 3000) }
+
+  // Recommendations: what other customers bought together with this customer's products.
+  useEffect(() => {
+    if (Object.keys(nameById).length === 0) return
+    const qty = new Map<string, number>()
+    for (const it of orderItems) if (it.product_id) qty.set(it.product_id, (qty.get(it.product_id) ?? 0) + it.qty)
+    const top = [...qty.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id]) => id)
+    let alive = true
+    recommendFor(supabase, top, 4, new Set(Object.keys(nameById)))
+      .then(ids => { if (alive) setRecommendations(ids.map(id => nameById[id]).filter(Boolean)) })
+    return () => { alive = false }
+  }, [orderItems, nameById])
 
   async function addActivity() {
     if (!customer || !noteText.trim()) return
@@ -238,8 +230,6 @@ export default function CustomerDetailPage() {
   }
   const topProducts    = Object.values(productFreq).sort((a, b) => b.qty - a.qty).slice(0, 6)
   const maxQty         = topProducts[0]?.qty || 1
-  const lastOrdered    = topProducts.slice(0, 3).map(p => p.name)
-  const recommendations = getRecommendations(lastOrdered, allProductNames)
   const today          = new Date().toISOString().slice(0, 10)
   const overdueReminders  = reminders.filter(r => r.status !== 'done' && r.due_date < today)
   const upcomingReminders = reminders.filter(r => r.status !== 'done' && r.due_date >= today)

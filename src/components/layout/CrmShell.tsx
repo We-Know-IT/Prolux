@@ -5,12 +5,13 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import WebshopLink from '@/components/layout/WebshopLink'
+import CartButton from '@/components/layout/CartButton'
 import LeadToast from '@/components/crm/LeadToast'
 import GuideTour, { GuideButton } from '@/components/onboarding/GuideTour'
 import { CRM_GUIDE } from '@/components/onboarding/guides'
 import { createClient } from '@/lib/supabase/client'
 import { currentStaff } from '@/lib/team'
-import { LayoutDashboard, GitBranch, Users, ShoppingCart, LogOut, Menu, X, CalendarDays, StickyNote, ClipboardList } from 'lucide-react'
+import { LayoutDashboard, GitBranch, Users, ShoppingCart, LogOut, Menu, X, CalendarDays, StickyNote, ClipboardList, Truck } from 'lucide-react'
 
 export const CRM_SECTIONS = [
   { href: '/crm/dashboard', label: 'Översikt',      icon: LayoutDashboard },
@@ -18,6 +19,7 @@ export const CRM_SECTIONS = [
   { href: '/crm/customers', label: 'Kunder',         icon: Users },
   { href: '/crm/orders',    label: 'Ny order',       icon: ShoppingCart },
   { href: '/crm/orders?view=history', label: 'Ordrar', icon: ClipboardList },
+  { href: '/crm/car',       label: 'Bilen',          icon: Truck },
   { href: '/crm/calendar',  label: 'Kalender',       icon: CalendarDays },
   { href: '/crm/notes',     label: 'Anteckningar',   icon: StickyNote },
 ]
@@ -111,6 +113,7 @@ export default function CrmShell({ children }: { children: ReactNode }) {
 
         {/* Right side */}
         <div className="crm-desktop-right" style={{ display: 'none', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
+          <CartButton />
           <GuideButton />
           <WebshopLink variant="bar" />
           <button onClick={logout} title="Logga ut" aria-label="Logga ut" style={{
@@ -129,12 +132,13 @@ export default function CrmShell({ children }: { children: ReactNode }) {
           </button>
         </div>
 
+        <div className="crm-mobile-btn" style={{ marginLeft: 'auto', alignItems: 'center' }}><CartButton /></div>
         {/* Mobile hamburger */}
         <button
           onClick={() => setMenuOpen(o => !o)}
           className="crm-mobile-btn"
           aria-label="Meny"
-          style={{ marginLeft: 'auto', padding: 8, background: 'transparent', border: 'none', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          style={{ marginLeft: 4, padding: 8, background: 'transparent', border: 'none', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
           {menuOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
       </header>
@@ -185,7 +189,7 @@ export default function CrmShell({ children }: { children: ReactNode }) {
 
       <ServiceWorkerRegister />
       <LeadToast href="/crm/pipeline" />
-      <GuideTour steps={CRM_GUIDE} storageKey="prolux-guide-crm-v1" />
+      <GuideTour steps={CRM_GUIDE} storageKey="prolux-guide-crm-v2" />
       {orderToast && (
         <Link href="/crm/dashboard" onClick={() => setOrderToast(null)} style={{ position: 'fixed', top: 72, right: 16, left: 'auto', zIndex: 999, maxWidth: 'calc(100vw - 32px)', background: 'var(--bg2)', border: '1px solid var(--gold)', borderRadius: 12, padding: '14px 18px', boxShadow: '0 8px 32px rgba(0,0,0,.4)', textDecoration: 'none', display: 'block' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Ny order till dig: #{orderToast.nr}</div>

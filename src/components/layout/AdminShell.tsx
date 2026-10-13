@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import WebshopLink from '@/components/layout/WebshopLink'
+import CartButton from '@/components/layout/CartButton'
 import LeadToast from '@/components/crm/LeadToast'
 import GuideTour, { GuideButton } from '@/components/onboarding/GuideTour'
 import { ADMIN_GUIDE } from '@/components/onboarding/guides'
@@ -152,6 +153,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
 
         {/* Right side */}
         <div className="admin-desktop-right" style={{ display: 'none', alignItems: 'center', gap: 10, marginLeft: 'auto', flexShrink: 0 }}>
+          <CartButton />
           <Link href="/admin/orders" data-tour="bell" onClick={() => setNewOrderCount(0)} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 8, background: newOrderCount > 0 ? 'rgba(232,184,75,.12)' : 'rgba(255,255,255,.04)', border: `1px solid ${newOrderCount > 0 ? 'rgba(232,184,75,.3)' : 'var(--line)'}`, textDecoration: 'none', transition: 'all .2s' }}>
             <Bell size={15} color={newOrderCount > 0 ? 'var(--gold)' : 'var(--text3)'} />
             {newOrderCount > 0 && (
@@ -195,12 +197,13 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
           </button>
         </div>
 
+        <div className="admin-mobile-btn" style={{ marginLeft: 'auto', alignItems: 'center' }}><CartButton /></div>
         {/* Mobile hamburger */}
         <button
           onClick={() => setMenuOpen(o => !o)}
           className="admin-mobile-btn"
           aria-label="Meny"
-          style={{ marginLeft: 'auto', padding: 8, background: 'transparent', border: 'none', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          style={{ marginLeft: 4, padding: 8, background: 'transparent', border: 'none', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
           {menuOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
       </header>
@@ -274,7 +277,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
 
       <ServiceWorkerRegister />
       <LeadToast href="/admin/crm/pipeline" />
-      <GuideTour steps={ADMIN_GUIDE} storageKey="prolux-guide-admin-v1" />
+      <GuideTour steps={ADMIN_GUIDE} storageKey="prolux-guide-admin-v2" />
       {/* In the CRM: its own sections under the admin bar */}
       {inCrm && (
         <nav aria-label="CRM" className="swipe-nav" style={{ position: 'sticky', top: 'var(--nav-h)', zIndex: 150, display: 'flex', gap: 4, alignItems: 'center', padding: '8px 20px', overflowX: 'auto', background: 'rgba(10,13,18,.92)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', borderBottom: '1px solid var(--line)' }}>

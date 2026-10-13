@@ -9,6 +9,10 @@ import { withVat } from '@/lib/pricing'
 import { invoiceInVismaInBackground } from '@/lib/visma'
 import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star, X, RefreshCw, Trash2, UserPlus, Check } from 'lucide-react'
 import NewCustomerModal from '@/components/crm/NewCustomerModal'
+import { recommendFor } from '@/lib/recommend'
+import { buildQuotePdf, downloadBlob } from '@/lib/quote-pdf'
+import { DEFAULT_CONTACT } from '@/lib/site-content'
+import { readCart, writeCart, OPEN_CART_EVENT } from '@/lib/crm-cart'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { currentStaff, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
 import { useTeam, teamOptions } from '@/hooks/useTeam'
@@ -29,36 +33,10 @@ function Thumb({ p, size = 36 }: { p: Product; size?: number }) {
   )
 }
 
-const AFFINITY: Record<string, string[]> = {
-  'rapidet':   ['magic', 'gommalux', 'green power'],
-  'magic':     ['rapidet', 'carnauba', 'keramisk'],
-  'gommalux':  ['rapidet', 'magic'],
-  'carnauba':  ['keramisk', 'magic', 'polish'],
-  'keramisk':  ['carnauba', 'polish', 'magic'],
-  'green':     ['magic', 'rapidet'],
-  'polish':    ['carnauba', 'keramisk'],
-}
-
-function getRecommendations(boughtNames: string[], allProducts: Product[]): Product[] {
-  const recs = new Set<string>()
-  for (const name of boughtNames) {
-    const key = Object.keys(AFFINITY).find(k => name.toLowerCase().includes(k))
-    if (key) {
-      for (const recKey of AFFINITY[key]) {
-        const match = allProducts.find(p =>
-          p.name.toLowerCase().includes(recKey) &&
-          !boughtNames.some(b => b.toLowerCase() === p.name.toLowerCase())
-        )
-        if (match) recs.add(match.id)
-      }
-    }
-  }
-  return allProducts.filter(p => recs.has(p.id)).slice(0, 4)
-}
-
 // Catalogue card: big picture, name, price and +/- right on the card.
-function ProductCard({ p, selectedCustomer, qty, onAdd, onRemove, onOpen, badge }: {
+function ProductCard({ p, selectedCustomer, qty, onAdd, onRemove, onOpen, badge, inCar = 0 }: {
   p: Product
+  inCar?: number
   selectedCustomer: Customer | null
   qty: number
   onAdd: () => void
@@ -87,6 +65,7 @@ function ProductCard({ p, selectedCustomer, qty, onAdd, onRemove, onOpen, badge 
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em' }}>{p.brand}</div>
         <button type="button" onClick={onOpen} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', fontSize: 15, fontWeight: 600, color: 'var(--text)', lineHeight: 1.3 }}>{p.name}</button>
         <div style={{ fontSize: 11, color: stock.color }}>{stock.label}{p.unit ? ` · ${p.unit}` : ''}</div>
+        {inCar > 0 && <div style={{ fontSize: 11, fontWeight: 700, color: '#6AAFF0' }}>I bilen: {inCar} st</div>}
         <div style={{ marginTop: 'auto', paddingTop: 8 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--gold)' }}>{fmt(price)} kr</span>
@@ -255,6 +234,8 @@ export default function CrmOrdersPage() {
   const [newCustomerFor, setNewCustomerFor] = useState<string | null>(null)   // prefilled company while the modal is open
   const [autoSavedAt, setAutoSavedAt]     = useState('')
   const [saveError, setSaveError]         = useState('')
+  // What the logged-in seller has in the car (migration 0020).
+  const [myCar, setMyCar]                 = useState<Record<string, number>>({})
   const [delivery, setDelivery]           = useState('Standard (2-3 dagar)')
   // Per cart line: handed over from the car, or shipped from the warehouse.
   // Units per line handed over from the car (-1 = all of them); the rest is shipped.
@@ -311,7 +292,7 @@ export default function CrmOrdersPage() {
   useEffect(() => {
     Promise.all([
       supabase.from('orders').select('*,customers(id,company)').order('created_at', { ascending: false }).limit(50),
-      supabase.from('customers').select('id,company,contact_name,price_list_id,city,org_nr,phone,email,account_manager').eq('status', 'active').order('company'),
+      supabase.from('customers').select('id,company,contact_name,price_list_id,address,postal_code,city,org_nr,phone,email,account_manager,customer_type').eq('status', 'active').order('company'),
       supabase.from('products').select('id,sku,name,brand,unit,list_price,stock_qty,active,image_url,category_id,description').eq('active', true).order('sort_order'),
       supabase.from('categories').select('id,name,sort_order').order('sort_order'),
     ]).then(([o, c, p, cat]) => {
@@ -361,19 +342,48 @@ export default function CrmOrdersPage() {
     })
   }, [loading, customers]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The cart is remembered in this browser: coming back to Ny order picks up the
+  // saved draft again, and the cart icon in the top bar shows it.
+  const [cartRestored, setCartRestored] = useState(false)
+  useEffect(() => {
+    if (loading || cartRestored) return
+    const saved = readCart()
+    const fromLink = ['edit', 'reorder', 'customer'].some(k => searchParams.get(k))
+    if (fromLink || !saved?.draftId) { setCartRestored(true); return }
+    supabase.from('orders').select('*,customers(id,company)').eq('id', saved.draftId).maybeSingle().then(async ({ data }) => {
+      if (data && data.status === 'draft') await openForEdit(data, false, true)
+      else writeCart(null)
+      setCartRestored(true)
+    })
+  }, [loading]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!cartRestored) return
+    writeCart({ draftId: editingOrder?.status === 'draft' ? editingOrder.id : null, count: cart.reduce((n, i) => n + i.qty, 0) })
+  }, [cart, editingOrder, cartRestored])
+  // The top bar's cart icon: ?cart=1 from another page, or an event on this one.
+  const cartParam = searchParams.get('cart')
+  useEffect(() => { if (cartParam) setShowCart(true) }, [cartParam])
+  useEffect(() => {
+    const open = () => setShowCart(true)
+    window.addEventListener(OPEN_CART_EVENT, open)
+    return () => window.removeEventListener(OPEN_CART_EVENT, open)
+  }, [])
+
   async function loadLastBought(customer: Customer) {
     const { data } = await supabase
       .from('orders')
-      .select('order_items(product_name)')
+      .select('order_items(product_id,product_name)')
       .eq('customer_id', customer.id)
+      .not('status', 'in', '(draft,quote,cancelled)')
       .order('created_at', { ascending: false })
       .limit(3)
     if (data) {
-      const names: string[] = [...new Set(
-        data.flatMap((o: any) => (o.order_items || []).map((i: any) => i.product_name as string))
-      )].slice(0, 5)
+      const lines = data.flatMap((o: any) => o.order_items || [])
+      const names: string[] = [...new Set(lines.map((i: any) => i.product_name as string))].slice(0, 5)
       setLastBought(names)
-      setRecommendations(getRecommendations(names, products))
+      // What others bought together with these, from real orders.
+      const ids = await recommendFor(supabase, lines.map((i: any) => i.product_id).filter(Boolean), 4, new Set(products.map(p => p.id)))
+      setRecommendations(ids.map(id => products.find(p => p.id === id)).filter((p): p is Product => !!p))
     } else {
       setLastBought([])
       setRecommendations([])
@@ -393,6 +403,13 @@ export default function CrmOrdersPage() {
   useEffect(() => {
     currentStaff(supabase).then(me => { setMyName(me.name); setIsAdmin(me.isAdmin) })
   }, [])
+  function loadMyCar() {
+    if (!myName) return
+    supabase.from('car_stock').select('product_id,qty').eq('salesperson', myName)
+      .then(({ data }) => setMyCar(Object.fromEntries((data ?? []).map((r: any) => [r.product_id, r.qty]))))
+  }
+  useEffect(loadMyCar, [myName]) // eslint-disable-line react-hooks/exhaustive-deps
+  useLiveRefresh(['car_stock'], loadMyCar)
 
   // Choosing (or changing) the customer keeps the cart, at the new price list.
   function selectCustomerAndLoad(c: Customer) {
@@ -634,7 +651,7 @@ export default function CrmOrdersPage() {
 
   // Reopen a draft or quote in the order form. copy: start a new order with
   // the same products and quantities at today's prices ("Lägg ordern igen").
-  async function openForEdit(o: any, copy = false) {
+  async function openForEdit(o: any, copy = false, stay = false) {
     // A draft can be without a customer; one is chosen in the checkout.
     const customer = customers.find(c => c.id === (o.customers?.id || o.customer_id)) || null
     if ((o.customers?.id || o.customer_id) && !customer) { showToast('Kunden hittades inte'); return }
@@ -682,7 +699,7 @@ export default function CrmOrdersPage() {
     const e = { id: o.id, order_nr: o.order_nr, status: o.status }
     editingRef.current = e
     setEditingOrder(e)
-    setView('confirm')
+    if (!stay) setView('confirm')
   }
 
   async function deleteOpenOrder(o: any) {
@@ -696,12 +713,41 @@ export default function CrmOrdersPage() {
   }
 
   // Opens Gmail with the quote written out, like the quote tool on the customer card.
+  // The quote as a PDF; uploaded so the e-mail can link to it (migration 0020).
+  async function quotePdf(o: any): Promise<{ blob: Blob; url: string | null; name: string } | null> {
+    const customer = customers.find(c => c.id === (o.customers?.id || o.customer_id))
+    const { data: items } = await supabase.from('order_items').select('product_id,product_name,product_sku,qty,unit_price,delivery').eq('order_id', o.id)
+    if (!items?.length) { showToast('Offerten har inga rader'); return null }
+    const blob = await buildQuotePdf({
+      orderNr: o.order_nr, date: o.created_at || new Date().toISOString(),
+      customer: customer || { company: o.delivery_name || '' },
+      items: items.map((it: any) => ({ name: it.product_name, sku: it.product_sku, qty: it.qty, unitPrice: Number(it.unit_price), delivery: it.delivery,
+        imageUrl: products.find(p => p.id === it.product_id)?.image_url })),
+      subtotal: o.subtotal, vat: o.vat_amount, total: o.total,
+      seller: o.assigned_to || myName, contact: DEFAULT_CONTACT,
+    })
+    const name = `Offert-${o.order_nr}-ProLuxShine.pdf`
+    const path = `${o.id}/${crypto.randomUUID()}/${name}`
+    const { error } = await supabase.storage.from('quotes').upload(path, blob, { contentType: 'application/pdf', upsert: false })
+    const url = error ? null : supabase.storage.from('quotes').getPublicUrl(path).data.publicUrl
+    return { blob, url, name }
+  }
+
+  async function downloadQuote(o: any) {
+    showToast('Skapar PDF…')
+    const pdf = await quotePdf(o)
+    if (pdf) downloadBlob(pdf.blob, pdf.name)
+  }
+
+  // Opens Gmail with the quote written out and a link to the PDF.
   async function mailQuote(o: any, win?: Window | null) {
-    const customer = customers.find(c => c.id === o.customers?.id)
+    const customer = customers.find(c => c.id === (o.customers?.id || o.customer_id))
     if (!customer?.email) { win?.close(); showToast('Kunden saknar e-postadress'); return }
+    const pdf = await quotePdf(o).catch(() => null)
     const { data: items } = await supabase.from('order_items').select('product_name,qty,unit_price,delivery').eq('order_id', o.id)
     const rows = (items || []).map((it: any) =>
       `• ${it.product_name} — ${it.qty} st × ${fmt(Number(it.unit_price))} kr = ${fmt(it.qty * Number(it.unit_price))} kr${it.delivery === 'car' ? ' (levereras direkt)' : ''}`)
+    if (pdf && !pdf.url) { downloadBlob(pdf.blob, pdf.name); showToast('PDF:en laddades ner – bifoga den i mejlet') }
     const body = [
       `Hej ${customer.contact_name || ''},`.trim(),
       '',
@@ -712,6 +758,7 @@ export default function CrmOrdersPage() {
       `Summa exkl. moms: ${fmt(o.subtotal)} kr`,
       `Moms 25 %: ${fmt(o.vat_amount)} kr`,
       `Totalt inkl. moms: ${fmt(o.total)} kr`,
+      ...(pdf?.url ? ['', `Offerten som PDF: ${pdf.url}`] : []),
       '',
       'Svara på detta mejl så lägger vi ordern.',
       '',
@@ -848,6 +895,9 @@ export default function CrmOrdersPage() {
                         {isOpen && (
                           <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                             {o.status === 'quote' && (
+                              <button onClick={() => downloadQuote(o)} style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Ladda ner PDF</button>
+                            )}
+                            {o.status === 'quote' && (
                               <button onClick={() => mailQuote(o)} style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Mejla offerten</button>
                             )}
                             <button onClick={() => openForEdit(o)} style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
@@ -904,7 +954,13 @@ export default function CrmOrdersPage() {
             <Check size={13} color="var(--green)" /> Sparas automatiskt som utkast #{editingOrder.order_nr}
           </span>
         )}
-        <button onClick={() => setView('new')} style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--text)', fontSize: 13, cursor: 'pointer' }}>
+        {editingOrder?.status === 'quote' && (
+          <button onClick={() => { const o = orders.find(x => x.id === editingOrder.id); if (o) downloadQuote(o) }}
+            style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--text)', fontSize: 13, cursor: 'pointer' }}>
+            Ladda ner PDF
+          </button>
+        )}
+        <button onClick={() => setView('new')} style={{ marginLeft: editingOrder?.status === 'quote' ? 0 : 'auto', display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--text)', fontSize: 13, cursor: 'pointer' }}>
           <ArrowLeft size={15} /> Lägg till fler produkter
         </button>
       </div>
@@ -959,6 +1015,9 @@ export default function CrmOrdersPage() {
                               )
                             })}
                           </div>
+                          {car > 0 && Object.keys(myCar).length > 0 && car > (myCar[id] ?? 0) && (
+                            <div style={{ marginTop: 6, fontSize: 11, color: '#E0A85A' }}>Du har {myCar[id] ?? 0} st i bilen</div>
+                          )}
                           {mode === 'split' && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 12, color: 'var(--text2)', whiteSpace: 'nowrap' }}>
                               <span>Bilen</span>
@@ -1278,7 +1337,7 @@ export default function CrmOrdersPage() {
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--text2)' }}>Laddar produkter...</div>
         ) : (() => {
           const card = (p: Product, badge?: 'köpt' | 'rec') => (
-            <ProductCard key={p.id} p={p} badge={badge} selectedCustomer={selectedCustomer} qty={getQty(p.id)}
+            <ProductCard key={p.id} p={p} badge={badge} selectedCustomer={selectedCustomer} qty={getQty(p.id)} inCar={myCar[p.id] ?? 0}
               onAdd={() => addToCart(p)} onRemove={() => updateQty(p.id, -1)} onOpen={() => setOpenProduct(p)} />
           )
           const grid = (items: React.ReactNode) => (
