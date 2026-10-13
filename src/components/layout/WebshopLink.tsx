@@ -2,11 +2,14 @@
 import { useEffect, useState } from 'react'
 import { Store } from 'lucide-react'
 
-// Link from admin/CRM to the webshop. On crm.proluxshine.com "/" leads back
-// to the CRM, so it points at www; the login is shared, so the user stays
-// logged in there (admins get "Redigera sida").
+// Link from admin/CRM to the webshop. Until the new webshop is on www
+// (NEXT_PUBLIC_WEBSHOP_ON_WWW), it opens on crm.proluxshine.com/webbshop;
+// afterwards it points at www. The login is shared either way, so admins can
+// use "Redigera sida".
+const WEBSHOP_ON_WWW = process.env.NEXT_PUBLIC_WEBSHOP_ON_WWW === 'true'
+
 export default function WebshopLink({ variant }: { variant: 'bar' | 'menu' }) {
-  const [href, setHref] = useState('https://www.proluxshine.com/')
+  const [href, setHref] = useState(WEBSHOP_ON_WWW ? 'https://www.proluxshine.com/' : '/webbshop')
   useEffect(() => {
     if (!window.location.hostname.startsWith('crm.')) setHref('/')
   }, [])

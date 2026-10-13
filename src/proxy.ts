@@ -13,6 +13,12 @@ const WWW_HOSTS = ['proluxshine.com', 'www.proluxshine.com']
 // changes show up on www.proluxshine.com immediately.
 const CRM_ALLOWED_PREFIXES = ['/crm', '/admin', '/login', '/auth', '/reset-password']
 
+// Until the new webshop is published on www (set NEXT_PUBLIC_WEBSHOP_ON_WWW=true
+// in Vercel then), it can be viewed on crm.proluxshine.com: /webbshop opens it,
+// and a cookie keeps "/" on the webshop until the user goes back to admin/CRM.
+const WEBSHOP_ON_WWW = process.env.NEXT_PUBLIC_WEBSHOP_ON_WWW === 'true'
+const SHOP_PREVIEW_COOKIE = 'shop_preview'
+
 export async function proxy(request: NextRequest) {
   const host = request.headers.get('host')?.toLowerCase().split(':')[0] ?? ''
   const { pathname, search } = request.nextUrl
@@ -21,7 +27,13 @@ export async function proxy(request: NextRequest) {
   const isCrmHost = CRM_HOSTS.includes(host)
   const isWwwHost = WWW_HOSTS.includes(host)
 
-  if (isCrmHost) {
+  if (isCrmHost && !WEBSHOP_ON_WWW && pathname === '/webbshop') {
+    const res = NextResponse.redirect(new URL('/', request.url))
+    res.cookies.set(SHOP_PREVIEW_COOKIE, '1', { path: '/', sameSite: 'lax', secure: true, httpOnly: true })
+    return res
+  }
+
+  if (isCrmHost && WEBSHOP_ON_WWW) {
     const allowed = pathname === '/' || CRM_ALLOWED_PREFIXES.some(p => pathname.startsWith(p))
     if (!allowed) {
       return NextResponse.redirect(new URL(`https://www.proluxshine.com${pathname}${search}`))
@@ -55,8 +67,10 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const role: string | undefined = userRole(user)
 
-  // crm.proluxshine.com/ → each role's own start page (admins: admin Översikt).
-  if (isCrmHost && pathname === '/') {
+  // crm.proluxshine.com/ → each role's own start page (admins: admin Översikt),
+  // unless the webshop preview is open.
+  const shopPreview = isCrmHost && !WEBSHOP_ON_WWW && request.cookies.get(SHOP_PREVIEW_COOKIE)?.value === '1'
+  if (isCrmHost && pathname === '/' && !shopPreview) {
     const start = !user ? '/login' : role === 'admin' ? '/admin/dashboard' : role === 'crm' ? '/crm/dashboard' : '/login'
     return NextResponse.redirect(new URL(start, request.url))
   }
@@ -83,6 +97,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
+  if (isCrmHost) {
+    // Back in admin/CRM: "/" leads to the start page again.
+    if (shopPreview && (pathname.startsWith('/admin') || pathname.startsWith('/crm'))) supabaseResponse.cookies.delete(SHOP_PREVIEW_COOKIE)
+    // The webshop preview on the CRM address is not for search engines.
+    supabaseResponse.headers.set('X-Robots-Tag', 'noindex, nofollow')
+  }
   return supabaseResponse
 }
 
