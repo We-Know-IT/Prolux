@@ -3,7 +3,9 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ShoppingCart } from 'lucide-react'
-import { CART_EVENT, OPEN_CART_EVENT, readCart } from '@/lib/crm-cart'
+import { CART_EVENT, OPEN_CART_EVENT, readCart, writeCart, findMyLatestDraft } from '@/lib/crm-cart'
+import { createClient } from '@/lib/supabase/client'
+import { currentStaff } from '@/lib/team'
 
 // Cart icon in the admin/CRM top bar: shows the current order's item count
 // and opens the cart (from anywhere: goes to Ny order with the cart open).
@@ -13,6 +15,11 @@ export default function CartButton({ href = '/crm/orders' }: { href?: string }) 
   useEffect(() => {
     const update = () => setCount(readCart()?.count ?? 0)
     update()
+    // Nothing remembered in this browser: show the seller's latest saved cart.
+    if (!readCart()) {
+      const sb = createClient()
+      currentStaff(sb).then(me => findMyLatestDraft(sb, me.name)).then(d => { if (d && !readCart()) writeCart({ draftId: d.id, count: d.count }) }).catch(() => {})
+    }
     window.addEventListener(CART_EVENT, update)
     window.addEventListener('storage', update)
     return () => { window.removeEventListener(CART_EVENT, update); window.removeEventListener('storage', update) }

@@ -14,7 +14,7 @@ import { recommendFor } from '@/lib/recommend'
 import { buildQuotePdf, downloadBlob, type QuotePdfInput } from '@/lib/quote-pdf'
 import { buildQuoteHtml } from '@/lib/quote-html'
 import { DEFAULT_CONTACT } from '@/lib/site-content'
-import { readCart, writeCart, OPEN_CART_EVENT, deleteOpenOrder as removeOpenOrder } from '@/lib/crm-cart'
+import { readCart, writeCart, OPEN_CART_EVENT, deleteOpenOrder as removeOpenOrder, findMyLatestDraft } from '@/lib/crm-cart'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { currentStaff, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
 import { useTeam, teamOptions } from '@/hooks/useTeam'
@@ -294,7 +294,7 @@ export default function CrmOrdersPage() {
   useEffect(() => {
     Promise.all([
       supabase.from('orders').select('*,customers(id,company)').order('created_at', { ascending: false }).limit(50),
-      supabase.from('customers').select('id,company,contact_name,price_list_id,address,postal_code,city,org_nr,phone,email,account_manager,customer_type').eq('status', 'active').order('company'),
+      supabase.from('customers').select('id,company,contact_name,price_list_id,address,postal_code,city,org_nr,phone,email,account_manager,customer_type').neq('status', 'inactive').order('company'),
       supabase.from('products').select('id,sku,name,brand,unit,list_price,stock_qty,active,image_url,category_id,description').eq('active', true).order('sort_order'),
       supabase.from('categories').select('id,name,sort_order').order('sort_order'),
     ]).then(([o, c, p, cat]) => {
@@ -348,16 +348,22 @@ export default function CrmOrdersPage() {
   // saved draft again, and the cart icon in the top bar shows it.
   const [cartRestored, setCartRestored] = useState(false)
   useEffect(() => {
-    if (loading || cartRestored) return
-    const saved = readCart()
+    if (loading || cartRestored || !myName) return
     const fromLink = ['edit', 'reorder', 'customer'].some(k => searchParams.get(k))
-    if (fromLink || !saved?.draftId) { setCartRestored(true); return }
-    supabase.from('orders').select('*,customers(id,company)').eq('id', saved.draftId).maybeSingle().then(async ({ data }) => {
-      if (data && data.status === 'draft') await openForEdit(data, false, true)
-      else writeCart(null)
+    if (fromLink) { setCartRestored(true); return }
+    ;(async () => {
+      // This browser's cart, else the seller's latest cart from the database
+      // (so it is the same in Safari, Chrome and on the phone).
+      const local = readCart()?.draftId
+      const id = local || (await findMyLatestDraft(supabase, myName))?.id
+      if (id) {
+        const { data } = await supabase.from('orders').select('*,customers(id,company)').eq('id', id).maybeSingle()
+        if (data && data.status === 'draft') await openForEdit(data, false, true)
+        else writeCart(null)
+      }
       setCartRestored(true)
-    })
-  }, [loading]) // eslint-disable-line react-hooks/exhaustive-deps
+    })()
+  }, [loading, myName]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!cartRestored) return
     writeCart({ draftId: editingOrder?.status === 'draft' ? editingOrder.id : null, count: cart.reduce((n, i) => n + i.qty, 0) })
@@ -517,14 +523,24 @@ export default function CrmOrdersPage() {
     const fields = orderFields(status)
     let order: any = null
     let error: any = null
+    // The old lines, to put back if saving fails half-way (never lose a cart).
+    let oldLines: any[] = []
+    const restore = async () => {
+      if (!editing || oldLines.length === 0) return
+      await supabase.from('orders').update({ status: editing.status }).eq('id', editing.id)
+      await supabase.from('order_items').insert(oldLines.map(({ id: _id, created_at: _c, ...l }) => l))
+    }
     if (editing) {
       // The draft/quote holds no stock, so its old lines can simply be replaced.
+      const { data: old } = await supabase.from('order_items').select('*').eq('order_id', editing.id)
+      oldLines = old ?? []
       await supabase.from('order_items').delete().eq('order_id', editing.id)
       ;({ data: order, error } = await supabase.from('orders').update(fields).eq('id', editing.id).select().single())
     } else {
       ;({ data: order, error } = await supabase.from('orders').insert({ ...fields, created_by: myName || null }).select().single())
     }
     if (error || !order) {
+      await restore()
       const msg = error?.message?.includes('customer_id') ? 'Kör migration 0019 för utkast utan kund' : `Kunde inte spara: ${error?.message || 'okänt fel'}`
       setSaveError(msg); showToast(msg); return null
     }
@@ -540,6 +556,7 @@ export default function CrmOrdersPage() {
       }))))
     if (itemsError) {
       if (!editing) await supabase.from('orders').delete().eq('id', order.id)
+      else await restore()
       const msg = `Orderraderna kunde inte sparas: ${itemsError.message}`
       setSaveError(msg); showToast(msg)
       return null
@@ -676,8 +693,15 @@ export default function CrmOrdersPage() {
   // the same products and quantities at today's prices ("Lägg ordern igen").
   async function openForEdit(o: any, copy = false, stay = false) {
     // A draft can be without a customer; one is chosen in the checkout.
-    const customer = customers.find(c => c.id === (o.customers?.id || o.customer_id)) || null
-    if ((o.customers?.id || o.customer_id) && !customer) { showToast('Kunden hittades inte'); return }
+    const customerId = o.customers?.id || o.customer_id
+    let customer = customers.find(c => c.id === customerId) || null
+    if (customerId && !customer) {
+      // Not in the list (e.g. an inactive customer): fetch the card itself.
+      const { data } = await supabase.from('customers').select('id,company,contact_name,price_list_id,address,postal_code,city,org_nr,phone,email,account_manager,customer_type').eq('id', customerId).maybeSingle()
+      if (!data) { showToast('Kunden hittades inte'); return }
+      customer = data as Customer
+      setCustomers(cs => [...cs, data as Customer])
+    }
     const { data: items } = await supabase.from('order_items').select('*').eq('order_id', o.id)
     const lines: CartItem[] = []
     const from: Record<string, number> = {}

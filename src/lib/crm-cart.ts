@@ -28,3 +28,13 @@ export async function deleteOpenOrder(sb: { from: (t: string) => any }, id: stri
   if (readCart()?.draftId === id) writeCart(null)
   return true
 }
+
+// The seller's latest saved cart in the database, so the cart follows the
+// login across browsers and devices (not just this browser's memory).
+export async function findMyLatestDraft(sb: { from: (t: string) => any }, myName: string): Promise<{ id: string; count: number } | null> {
+  if (!myName) return null
+  const { data } = await sb.from('orders').select('id,order_items(qty)')
+    .eq('status', 'draft').eq('created_by', myName).order('created_at', { ascending: false }).limit(1).maybeSingle()
+  if (!data) return null
+  return { id: data.id, count: (data.order_items ?? []).reduce((n: number, i: any) => n + (i.qty || 0), 0) }
+}
