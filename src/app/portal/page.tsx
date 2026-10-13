@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { reorderToCart } from '@/lib/reorder'
 import { PublicShell, usePublicCart } from '@/components/layout/PublicShell'
 import { fmt } from '@/lib/utils'
 import {
@@ -93,13 +94,9 @@ function PortalContent({ user }: { user: SupaUser }) {
   const topIds       = new Set(topProducts.map(([id]) => id))
   const recommended  = products.filter(p => !topIds.has(p.id)).slice(0, 4)
 
-  function reorder(o: any) {
-    if (!o.order_items?.length) return
-    o.order_items.forEach((item: any) => {
-      for (let i = 0; i < item.qty; i++)
-        cart.addItem({ id: item.product_id || item.id, name: item.product_name, brand: '', list_price: item.list_price || item.unit_price, image_url: null, unit: '' }, pl)
-    })
-    cart.openCart()
+  async function reorder(o: any) {
+    const { added } = await reorderToCart(createClient(), cart, o, pl)
+    if (!added) alert('Produkterna i den här ordern finns tyvärr inte längre i sortimentet.')
   }
 
   const TABS = [

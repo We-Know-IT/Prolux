@@ -7,7 +7,7 @@ import { custPrice, fmt, formatDateTime } from '@/lib/utils'
 import IncVat from '@/components/orders/IncVat'
 import { withVat } from '@/lib/pricing'
 import { invoiceInVismaInBackground } from '@/lib/visma'
-import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star, X } from 'lucide-react'
+import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star, X, RefreshCw } from 'lucide-react'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { currentStaff, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
 import { useTeam, teamOptions } from '@/hooks/useTeam'
@@ -252,13 +252,16 @@ export default function CrmOrdersPage() {
   }, [loading, customers, products])
 
   // ?edit=<order id> (e.g. from the admin order list) opens a draft or quote in the form.
+  // ?reorder=<order id> starts a new order with the same products.
   const editOpenedRef = useRef(false)
   useEffect(() => {
-    const editId = searchParams.get('edit')
+    const reorderId = searchParams.get('reorder')
+    const editId = searchParams.get('edit') || reorderId
     if (loading || !editId || editOpenedRef.current || customers.length === 0) return
     editOpenedRef.current = true
     supabase.from('orders').select('*,customers(id,company)').eq('id', editId).single().then(({ data }) => {
       if (!data) { showToast('Ordern hittades inte'); return }
+      if (reorderId) { openForEdit(data, true); return }
       if (data.status !== 'draft' && data.status !== 'quote') { setView('history'); showToast(`#${data.order_nr} är redan en order`); return }
       openForEdit(data)
     })
@@ -427,8 +430,9 @@ export default function CrmOrdersPage() {
       : `Order #${order.order_nr} skapad — bekräfta den när den är klar`)
   }
 
-  // Reopen a draft or quote in the order form.
-  async function openForEdit(o: any) {
+  // Reopen a draft or quote in the order form. copy: start a new order with
+  // the same products and quantities at today's prices ("Lägg ordern igen").
+  async function openForEdit(o: any, copy = false) {
     const customer = customers.find(c => c.id === o.customers?.id)
     if (!customer) { showToast('Kunden hittades inte'); return }
     const { data: items } = await supabase.from('order_items').select('*').eq('order_id', o.id)
@@ -437,16 +441,30 @@ export default function CrmOrdersPage() {
     for (const it of items || []) {
       const product = products.find(p => p.id === it.product_id)
       if (!product) continue
-      lines.push({ product, qty: it.qty, unitPrice: Number(it.unit_price) })
+      if (copy && product.active === false) continue
+      const unitPrice = copy ? custPrice(product.list_price, customer.price_list_id || 'Standard') : Number(it.unit_price)
+      const same = lines.find(l => l.product.id === product.id)
+      if (same) same.qty += it.qty
+      else lines.push({ product, qty: it.qty, unitPrice })
       from[product.id] = it.delivery === 'car' ? 'car' : 'ship'
     }
+    if (copy && lines.length === 0) { showToast('Produkterna i ordern finns inte längre'); return }
     setSelectedCustomer(customer)
     setCart(lines); setLineFrom(from)
     setAssignee(o.assigned_to || '')
+    loadLastBought(customer)
+    if (copy) {
+      setDiscountEnabled(false); setDiscount('')
+      setEditingOrder(null)
+      await loadCustomerDeals(customer)
+      setView('confirm')
+      const skipped = (items || []).length - lines.length
+      showToast(`Kopierat från #${o.order_nr} med dagens priser${skipped > 0 ? ` · ${skipped} rad${skipped > 1 ? 'er' : ''} utgått` : ''}`)
+      return
+    }
     const linesTotal = lines.reduce((sum, l) => sum + l.qty * l.unitPrice, 0)
     const disc = Math.round(linesTotal - (o.subtotal || 0))
     setDiscountEnabled(disc > 0); setDiscount(disc > 0 ? String(disc) : '')
-    loadLastBought(customer)
     await loadCustomerDeals(customer)
     if (o.deal_id) setDealId(o.deal_id)
     setEditingOrder({ id: o.id, order_nr: o.order_nr, status: o.status })
@@ -623,6 +641,11 @@ export default function CrmOrdersPage() {
                             </button>
                             <button onClick={() => deleteOpenOrder(o)} style={{ padding: '7px 12px', borderRadius: 7, background: 'transparent', border: '1px solid rgba(224,82,82,.35)', color: 'var(--red)', fontSize: 12, cursor: 'pointer' }}>Radera</button>
                           </div>
+                        )}
+                        {!isOpen && (
+                          <button onClick={() => openForEdit(o, true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 12, padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                            <RefreshCw size={12} /> Lägg ordern igen
+                          </button>
                         )}
                         {!isOpen && o.status !== 'pending' && (canConfirmOrder(o, myName, isAdmin) || o.transport_order_id) && (
                           <div style={{ marginTop: 14 }}>

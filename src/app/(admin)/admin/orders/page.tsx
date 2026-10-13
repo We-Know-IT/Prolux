@@ -6,7 +6,7 @@ import IncVat from '@/components/orders/IncVat'
 import { withVat, VAT_RATE } from '@/lib/pricing'
 import { callVisma, invoiceInVismaInBackground, VISMA_STATUS } from '@/lib/visma'
 import { fmt, formatDateTime } from '@/lib/utils'
-import { X } from 'lucide-react'
+import { X, RefreshCw } from 'lucide-react'
 import ShipOrderForm from '@/components/orders/ShipOrderForm'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { useTeam, teamOptions } from '@/hooks/useTeam'
@@ -229,6 +229,12 @@ export default function AdminOrders() {
                     Öppna i ordern
                   </Link>
                 </div>
+              )}
+              {selectedOrder.status !== 'draft' && selectedOrder.status !== 'quote' && (
+                <Link href={`/admin/crm/orders?reorder=${selectedOrder.id}`}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 20, padding: '9px 14px', borderRadius: 8, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
+                  <RefreshCw size={14} /> Lägg ordern igen
+                </Link>
               )}
               {/* Order info */}
               <div style={{ marginBottom: 24 }}>
