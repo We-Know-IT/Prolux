@@ -7,6 +7,10 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 //
 // POST { email, full_name, role: 'admin' | 'crm' | 'portal', password }
 // Authorization: Bearer <admin's token>
+//
+// Also removes people: POST { action: 'delete', email?, customer_id? }
+//   Deletes the login. A colleague also leaves the team (staff_members);
+//   a customer card is deleted, or set inactive when it has order history.
 
 const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
@@ -29,6 +33,7 @@ Deno.serve(async req => {
 
   let body: any = {}
   try { body = await req.json() } catch { /* empty */ }
+  if (body.action === 'delete') return await removeUser(body, caller.user!)
   const email = String(body.email ?? '').trim().toLowerCase()
   const fullName = String(body.full_name ?? '').trim()
   const role = String(body.role ?? '')
@@ -77,3 +82,59 @@ Deno.serve(async req => {
 
   return json({ ok: true, existing: false })
 })
+
+// Login id for an e-mail (the admin API has no lookup by e-mail).
+async function userIdByEmail(email: string): Promise<string | null> {
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await sb.auth.admin.listUsers({ page, perPage: 1000 })
+    if (error) throw new Error(error.message)
+    const hit = data.users.find(u => u.email?.toLowerCase() === email)
+    if (hit) return hit.id
+    if (data.users.length < 1000) return null
+  }
+  return null
+}
+
+async function removeUser(body: any, me: { id: string; email?: string }) {
+  try {
+    const customerId = body.customer_id ? String(body.customer_id) : null
+    const { data: card } = customerId
+      ? await sb.from('customers').select('id,email,auth_user_id').eq('id', customerId).maybeSingle()
+      : { data: null }
+    if (customerId && !card) return json({ error: 'Kunden hittades inte.' }, 404)
+    const email = String(body.email ?? card?.email ?? '').trim().toLowerCase()
+    // A customer card only removes the login linked to it, never one found by e-mail
+    // (a colleague could share the address).
+    const userId = card ? card.auth_user_id : (email ? await userIdByEmail(email) : null)
+    if (userId === me.id || (email && email === me.email?.toLowerCase())) {
+      return json({ error: 'Du kan inte ta bort dig själv.' }, 400)
+    }
+
+    // Colleague: out of the team first, so the login loses its role.
+    if (!customerId && email) {
+      const { error } = await sb.from('staff_members').delete().ilike('email', email)
+      if (error) return json({ error: `Kunde inte ta bort medarbetaren: ${error.message}` }, 500)
+    }
+
+    // The login. Customer cards keep their history, so unlink them first.
+    if (userId) {
+      await sb.from('customers').update({ auth_user_id: null }).eq('auth_user_id', userId)
+      const { error } = await sb.auth.admin.deleteUser(userId)
+      if (error && !/not found/i.test(error.message)) return json({ error: `Kunde inte ta bort inloggningen: ${error.message}` }, 500)
+    }
+
+    // Customer card: deleted when it has no orders, otherwise kept as inactive.
+    let customer: 'deleted' | 'inactive' | null = null
+    if (card) {
+      const { count } = await sb.from('orders').select('id', { count: 'exact', head: true }).eq('customer_id', card.id)
+      const { error } = count ? { error: true } : await sb.from('customers').delete().eq('id', card.id)
+      if (error) {
+        await sb.from('customers').update({ status: 'inactive', auth_user_id: null }).eq('id', card.id)
+        customer = 'inactive'
+      } else customer = 'deleted'
+    }
+    return json({ ok: true, login_deleted: !!userId, customer })
+  } catch (e) {
+    return json({ error: e instanceof Error ? e.message : String(e) }, 500)
+  }
+}

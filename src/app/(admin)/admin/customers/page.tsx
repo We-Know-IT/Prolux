@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { fmt } from '@/lib/utils'
 import { X } from 'lucide-react'
 import { isLiveOrder } from '@/lib/team'
+import { removeUser } from '@/lib/remove-user'
 
 const PL_COLORS: Record<string, { bg: string; color: string }> = {
   A:        { bg: 'rgba(232,184,75,.15)',  color: '#E8B84B' },
@@ -47,6 +48,27 @@ export default function AdminCustomers() {
   const [editMode, setEditMode]         = useState(false)
   const [toast, setToast]               = useState('')
   const [form, setForm]                 = useState({ ...EMPTY_FORM })
+  const [removing, setRemoving]         = useState(false)
+
+  // Removes the customer's login and the card (kept as inactive if it has orders).
+  async function removeCustomer(c: any) {
+    const hasOrders = orders.some(o => o.customer_id === c.id)
+    const what = hasOrders
+      ? `Ta bort inloggningen för ${c.company}? Kunden har ordrar, så kundkortet blir inaktivt och orderhistoriken sparas.`
+      : `Ta bort ${c.company} och kundens inloggning? Det går inte att ångra.`
+    if (!confirm(what)) return
+    setRemoving(true)
+    try {
+      const r = await removeUser({ customer_id: c.id })
+      if (r.customer === 'deleted') setCustomers(prev => prev.filter(x => x.id !== c.id))
+      else setCustomers(prev => prev.map(x => x.id === c.id ? { ...x, status: 'inactive', auth_user_id: null } : x))
+      setSelectedCust(null)
+      showToast(r.customer === 'deleted' ? `${c.company} borttagen` : `${c.company} inaktiverad, inloggningen borttagen`)
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : String(e))
+    }
+    setRemoving(false)
+  }
 
   function load() {
     const sb = createClient()
@@ -226,6 +248,7 @@ export default function AdminCustomers() {
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => openEditModal(selectedCust)} style={{ padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 6, background: 'transparent', color: 'var(--text2)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>Redigera</button>
+                <button onClick={() => removeCustomer(selectedCust)} disabled={removing} style={{ padding: '6px 12px', border: '1px solid rgba(224,82,82,.35)', borderRadius: 6, background: 'transparent', color: 'var(--red)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>{removing ? 'Tar bort…' : 'Ta bort'}</button>
                 <button onClick={() => setSelectedCust(null)} style={{ width: 28, height: 28, border: '1px solid var(--border)', borderRadius: 6, background: 'transparent', color: 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                   <X size={14} />
                 </button>

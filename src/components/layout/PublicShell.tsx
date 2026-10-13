@@ -85,6 +85,8 @@ function PublicShellInner({ children }: { children: ReactNode }) {
   const [authUser, setAuthUser]   = useState<SupaUser | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [customer, setCustomer]   = useState<any>(null)
+  // Admin/säljare: the name from Team, not a customer card or old login metadata.
+  const [staffName, setStaffName] = useState<string | null>(null)
   const [regMode, setRegMode] = useState(false)
   const EMPTY_REG = { email: '', password: '', company: '', org_nr: '', contact_name: '', phone: '' }
   const [regForm, setRegForm] = useState(EMPTY_REG)
@@ -136,6 +138,11 @@ function PublicShellInner({ children }: { children: ReactNode }) {
   async function fetchCustomer(sb: any, userId: string) {
     const { data } = await sb.from('customers').select('*').eq('auth_user_id', userId).single()
     if (data) setCustomer(data)
+    const { data: { user } } = await sb.auth.getUser()
+    if (user?.email && userRole(user) !== 'portal') {
+      const { data: staff } = await sb.from('staff_members').select('full_name').ilike('email', user.email).maybeSingle()
+      setStaffName(staff?.full_name || null)
+    }
   }
 
   useEffect(() => {
@@ -225,7 +232,7 @@ function PublicShellInner({ children }: { children: ReactNode }) {
   async function handleLogout() {
     const sb = createClient()
     await sb.auth.signOut()
-    setAuthUser(null); setCustomer(null); setCartItems([])
+    setAuthUser(null); setCustomer(null); setStaffName(null); setCartItems([])
     setUserDropOpen(false)
   }
 
@@ -277,7 +284,7 @@ function PublicShellInner({ children }: { children: ReactNode }) {
   const subtotal   = pricedItems.reduce((s, i) => s + i.unit_price * i.qty, 0)
 
   const regBlocked = regLoading || !regForm.email || !regForm.password || !(regType === 'private' ? regForm.contact_name : regForm.company).trim()
-  const displayName = customer?.contact_name || authUser?.user_metadata?.full_name || authUser?.email?.split('@')[0] || 'Kund'
+  const displayName = staffName || customer?.contact_name || authUser?.user_metadata?.full_name || authUser?.email?.split('@')[0] || 'Kund'
   const showCart = canShop
 
   // Compact: icon with a count badge, so the header never runs out of room.

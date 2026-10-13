@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { UserPlus, Trash2, Shield, User, Briefcase, Copy, Check, RefreshCw } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
+import { removeUser } from '@/lib/remove-user'
 
 type Role = 'admin' | 'crm' | 'portal'
 
@@ -42,6 +43,7 @@ export default function StaffPage() {
   const [existingNote, setExistingNote] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [deleting, setDeleting]         = useState<string | null>(null)
+  const [deleteError, setDeleteError]   = useState('')
 
   async function loadStaff() {
     setLoading(true)
@@ -88,8 +90,13 @@ export default function StaffPage() {
   async function handleDelete(id: string, email: string) {
     if (deleteConfirm !== id) { setDeleteConfirm(id); return }
     setDeleting(id)
-    await supabase.from('staff_members').delete().eq('id', id)
-    setStaff(s => s.filter(m => m.id !== id))
+    setDeleteError('')
+    try {
+      await removeUser({ email })
+      setStaff(s => s.filter(m => m.id !== id))
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : String(e))
+    }
     setDeleteConfirm(null)
     setDeleting(null)
   }
@@ -133,6 +140,10 @@ export default function StaffPage() {
         </div>
       </div>
 
+      {deleteError && (
+        <div role="alert" style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: 'rgba(224,82,82,.1)', border: '1px solid rgba(224,82,82,.3)', color: '#F08A8A', fontSize: 13 }}>{deleteError}</div>
+      )}
+
       {/* Role legend */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
         {(Object.keys(ROLE_LABEL) as Role[]).map(r => (
@@ -172,7 +183,7 @@ export default function StaffPage() {
                   disabled={deleting === member.id}
                   style={{ padding: '5px 10px', background: deleteConfirm === member.id ? 'rgba(224,82,82,.15)' : 'var(--bg3)', border: `1px solid ${deleteConfirm === member.id ? 'rgba(224,82,82,.4)' : 'var(--border)'}`, borderRadius: '6px', color: deleteConfirm === member.id ? '#E05252' : 'var(--text3)', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <Trash2 size={12} />
-                  {deleteConfirm === member.id ? 'Bekräfta?' : 'Ta bort'}
+                  {deleting === member.id ? 'Tar bort…' : deleteConfirm === member.id ? 'Bekräfta?' : 'Ta bort'}
                 </button>
               </div>
             </div>
