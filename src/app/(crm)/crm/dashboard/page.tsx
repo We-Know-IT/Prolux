@@ -10,7 +10,7 @@ import { useTeam } from '@/hooks/useTeam'
 import { useBudgetHistory } from '@/hooks/useBudgetHistory'
 import BudgetHistoryChart from '@/components/BudgetHistoryChart'
 import ReminderModal, { type Reminder } from '@/components/crm/ReminderModal'
-import { LeadsPanel } from '@/components/crm/LeadsAndQuotes'
+import { LeadsPanel, DraftsPanel } from '@/components/crm/LeadsAndQuotes'
 import { nextBirthday, formatBirthday } from '@/lib/birthdays'
 
 const supabase = createClient()
@@ -277,6 +277,7 @@ export default function CrmDashboardPage() {
 
       {/* Leads with notes */}
       <div style={{ marginBottom: 24 }}><LeadsPanel /></div>
+      <div style={{ marginBottom: 24 }}><DraftsPanel /></div>
 
       {/* Upcoming birthdays — for greetings and offers */}
       {birthdays.length > 0 && (

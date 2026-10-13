@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Pencil, Sparkles, FileText } from 'lucide-react'
+import { Pencil, Sparkles, FileText, ShoppingCart } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt, formatDate } from '@/lib/utils'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
@@ -138,6 +138,46 @@ export function QuotesPanel({ limit = 6 }: { limit?: number }) {
             <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 3 }}>{formatDate(q.created_at)}{q.notes ? ` · ${String(q.notes).split('\n')[0].slice(0, 80)}` : ''}</div>
           </Link>
         ))}
+      </div>
+    </div>
+  )
+}
+
+// Saved carts (draft orders), with or without a customer; one click continues them.
+export function DraftsPanel({ limit = 10 }: { limit?: number }) {
+  const [drafts, setDrafts] = useState<any[] | null>(null)
+  function load() {
+    createClient().from('orders').select('id,order_nr,subtotal,created_at,created_by,customers(company),order_items(qty)')
+      .eq('status', 'draft').order('created_at', { ascending: false }).limit(limit)
+      .then(({ data }) => setDrafts(data ?? []))
+  }
+  useEffect(load, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useLiveRefresh(['orders'], load)
+
+  return (
+    <div>
+      <div style={heading}>
+        <ShoppingCart size={12} /> Sparade varukorgar
+        <Link href="/crm/orders?view=history" style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text2)', textDecoration: 'none', textTransform: 'none', letterSpacing: 0 }}>Alla ordrar →</Link>
+      </div>
+      <div style={panel}>
+        {drafts && drafts.length === 0 && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Inga sparade varukorgar. En varukorg i Ny order sparas här automatiskt.</div>}
+        {drafts === null && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Laddar…</div>}
+        {(drafts ?? []).map((d, i, arr) => {
+          const units = (d.order_items ?? []).reduce((n: number, it: any) => n + (it.qty || 0), 0)
+          return (
+            <Link key={d.id} href={`/crm/orders?edit=${d.id}`} title="Fortsätt med varukorgen"
+              style={{ display: 'block', padding: '12px 16px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none', textDecoration: 'none' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.03)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: d.customers?.company ? 'var(--text)' : 'var(--text2)' }}>{d.customers?.company || 'Utan kund'}</span>
+                <span style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>#{d.order_nr}</span>
+                <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--gold)' }}>{fmt(d.subtotal)} kr</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 3 }}>{units} st · {formatDate(d.created_at)}{d.created_by ? ` · ${d.created_by}` : ''}</div>
+            </Link>
+          )
+        })}
       </div>
     </div>
   )
