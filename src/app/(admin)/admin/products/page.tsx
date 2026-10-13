@@ -211,7 +211,10 @@ export default function AdminProducts() {
             {filtered.map(p => {
               const stockColor = p.stock_qty === 0 ? 'var(--red)' : p.stock_qty < 10 ? 'var(--gold)' : 'var(--green)'
               return (
-                <tr key={p.id} style={{ opacity: p.active ? 1 : 0.5 }}>
+                <tr key={p.id} onClick={canEdit ? () => openEdit(p) : undefined} title={canEdit ? `Öppna ${p.name}` : undefined}
+                  style={{ opacity: p.active ? 1 : 0.5, cursor: canEdit ? 'pointer' : 'default', transition: 'background .12s' }}
+                  onMouseEnter={e => { if (canEdit) e.currentTarget.style.background = 'rgba(255,255,255,.03)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
                   <td style={{ padding: '13px 0', paddingRight: 16, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text3)', borderBottom: '1px solid var(--line2)', whiteSpace: 'nowrap' }}>{p.sku}</td>
                   <td style={{ padding: '10px 0', paddingRight: 16, borderBottom: '1px solid var(--line2)', minWidth: 220 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -245,10 +248,10 @@ export default function AdminProducts() {
                   <td style={{ padding: '13px 0', borderBottom: '1px solid var(--line2)' }}>
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                       {canEdit && (<>
-                        <button onClick={() => openEdit(p)} style={{ width: 30, height: 30, border: '1px solid var(--line)', borderRadius: 6, background: 'transparent', color: 'var(--text3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                        <button onClick={e => { e.stopPropagation(); openEdit(p) }} aria-label={`Redigera ${p.name}`} style={{ width: 30, height: 30, border: '1px solid var(--line)', borderRadius: 6, background: 'transparent', color: 'var(--text3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                           <Pencil size={13} />
                         </button>
-                        <button onClick={() => setConfirmDelete(p.id)} style={{ width: 30, height: 30, border: '1px solid rgba(224,82,82,.2)', borderRadius: 6, background: 'transparent', color: 'var(--red)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                        <button onClick={e => { e.stopPropagation(); setConfirmDelete(p.id) }} aria-label={`Ta bort ${p.name}`} style={{ width: 30, height: 30, border: '1px solid rgba(224,82,82,.2)', borderRadius: 6, background: 'transparent', color: 'var(--red)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                           <Trash2 size={13} />
                         </button>
                       </>)}
