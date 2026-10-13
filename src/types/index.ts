@@ -39,6 +39,7 @@ export interface Customer {
   birthday: string | null
   last_order_at: string | null
   account_manager?: string | null
+  fixed_info?: string | null
   created_at: string
 }
 

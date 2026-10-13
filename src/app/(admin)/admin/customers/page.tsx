@@ -266,7 +266,7 @@ export default function AdminCustomers() {
                   ['Telefon',   selectedCust.phone || '—'],
                   ['Adress',    [selectedCust.address, [selectedCust.postal_code, selectedCust.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—'],
                   ['Org.nr',    selectedCust.org_nr || '—'],
-                  ['Prislista', selectedCust.price_list_id],
+                  ['Prislista', `${selectedCust.price_list_id} · ${({ A: '40', B: '30', C: '20' } as Record<string, string>)[selectedCust.price_list_id] || '0'} % rabatt`],
                   ['Status',    STATUS_LABELS[selectedCust.status] || selectedCust.status],
                 ].map(([k, v]) => (
                   <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.04)', fontSize: 13 }}>
@@ -397,10 +397,10 @@ export default function AdminCustomers() {
                 <div>
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Prislista</label>
                   <select value={form.price_list_id} onChange={e => setForm(p => ({ ...p, price_list_id: e.target.value }))} style={{ width: '100%', padding: '10px 14px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontFamily: 'var(--font-sans)', fontSize: 14, outline: 'none' }}>
-                    <option value="Standard">Standard</option>
-                    <option value="C">C – Volym</option>
-                    <option value="B">B – Återförsäljare</option>
-                    <option value="A">A – Partner</option>
+                    <option value="Standard">Standard · 0 % rabatt</option>
+                    <option value="C">C · 20 % rabatt</option>
+                    <option value="B">B · 30 % rabatt</option>
+                    <option value="A">A · 40 % rabatt</option>
                   </select>
                 </div>
                 <div>

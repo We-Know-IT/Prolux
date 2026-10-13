@@ -7,7 +7,8 @@ import { custPrice, fmt, formatDateTime } from '@/lib/utils'
 import IncVat from '@/components/orders/IncVat'
 import { withVat } from '@/lib/pricing'
 import { invoiceInVismaInBackground } from '@/lib/visma'
-import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star, X, RefreshCw } from 'lucide-react'
+import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star, X, RefreshCw, Trash2, UserPlus, Check } from 'lucide-react'
+import NewCustomerModal from '@/components/crm/NewCustomerModal'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { currentStaff, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
 import { useTeam, teamOptions } from '@/hooks/useTeam'
@@ -69,16 +70,16 @@ function ProductRow({ p, selectedCustomer, getQty, addToCart, updateQty, badge, 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', borderBottom: '1px solid var(--border2)', background: badge === 'köpt' ? 'rgba(232,184,75,.03)' : badge === 'rec' ? 'rgba(74,143,212,.02)' : 'transparent' }}>
       <button type="button" onClick={() => onOpen(p)} aria-label={`Visa ${p.name}`}
-        style={{ width: 44, height: 44, padding: 0, borderRadius: 8, background: '#F4F2EE', border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-in' }}>
-        {p.image_url ? <img src={p.image_url} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <Package size={20} color="#999" />}
+        style={{ width: 76, height: 76, padding: 4, borderRadius: 10, background: '#fff', border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-in', boxSizing: 'border-box' }}>
+        {p.image_url ? <img src={p.image_url} alt="" loading="lazy" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <Package size={28} color="#999" />}
       </button>
       <div onClick={() => onOpen(p)} style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
           {badge === 'köpt' && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(232,184,75,.15)', color: 'var(--gold)', fontWeight: 700 }}>Köpt</span>}
           {badge === 'rec'  && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(74,143,212,.15)', color: '#6AAFF0', fontWeight: 700 }}>Rekommenderas</span>}
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text3)' }}>{p.brand} · {p.unit}</div>
+        <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{p.brand} · {p.unit}</div>
       </div>
       <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)', flexShrink: 0, textAlign: 'right' }}>{fmt(price)} kr<IncVat net={price} /></div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
@@ -90,6 +91,55 @@ function ProductRow({ p, selectedCustomer, getQty, addToCart, updateQty, badge, 
           <Plus size={12} />
         </button>
       </div>
+    </div>
+  )
+}
+
+// Search existing customers, or add a new one. Results show only while typing,
+// so the catalogue stays in focus.
+function CustomerPicker({ customers, onPick, onNew, autoFocus = false }: {
+  customers: Customer[]
+  onPick: (c: Customer) => void
+  onNew: (company: string) => void
+  autoFocus?: boolean
+}) {
+  const [q, setQ] = useState('')
+  const term = q.trim().toLowerCase()
+  const hits = term ? customers.filter(c =>
+    c.company.toLowerCase().includes(term) || (c.contact_name || '').toLowerCase().includes(term) ||
+    (c.org_nr || '').replace(/\D/g, '').includes(term.replace(/\D/g, '') || '§') || (c.email || '').toLowerCase().includes(term)).slice(0, 8) : []
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ position: 'relative', flex: 1 }}>
+          <Search size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }} />
+          <input autoFocus={autoFocus} placeholder="Sök kund – företag, namn, org.nr eller e-post" value={q} onChange={e => setQ(e.target.value)} aria-label="Sök kund"
+            style={{ width: '100%', padding: '10px 12px 10px 32px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+        </div>
+        <button type="button" onClick={() => onNew(q.trim())}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 14px', borderRadius: 8, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          <UserPlus size={15} /> Ny kund
+        </button>
+      </div>
+      {term && (
+        <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, top: 'calc(100% + 6px)', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', boxShadow: '0 12px 30px rgba(0,0,0,.45)' }}>
+          {hits.map(c => (
+            <button key={c.id} type="button" onClick={() => { onPick(c); setQ('') }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--border2)', cursor: 'pointer', textAlign: 'left' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(232,184,75,.05)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+              <span>
+                <span style={{ display: 'block', fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{c.company}</span>
+                <span style={{ display: 'block', fontSize: 12, color: 'var(--text2)' }}>{[c.contact_name, c.city].filter(Boolean).join(' · ')}</span>
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--text2)', whiteSpace: 'nowrap' }}>Prislista {c.price_list_id}</span>
+            </button>
+          ))}
+          <button type="button" onClick={() => { onNew(q.trim()); setQ('') }}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '11px 14px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--gold)', fontSize: 13, fontWeight: 600 }}>
+            <UserPlus size={14} /> {hits.length ? 'Ingen av dessa – skapa ny kund' : `Ingen träff – skapa "${q.trim()}" som ny kund`}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -185,7 +235,9 @@ export default function CrmOrdersPage() {
   // Extra discount in percent per cart line, on top of the price list.
   const [lineDisc, setLineDisc]           = useState<Record<string, string>>({})
   const [isMobile, setIsMobile]           = useState(false)
-  const [showMobileCart, setShowMobileCart] = useState(false)
+  const [showCart, setShowCart]           = useState(false)
+  const [newCustomerFor, setNewCustomerFor] = useState<string | null>(null)   // prefilled company while the modal is open
+  const [autoSavedAt, setAutoSavedAt]     = useState('')
   const [delivery, setDelivery]           = useState('Standard (2-3 dagar)')
   // Per cart line: handed over from the car, or shipped from the warehouse.
   const [lineFrom, setLineFrom]           = useState<Record<string, 'car' | 'ship'>>({})
@@ -201,6 +253,10 @@ export default function CrmOrdersPage() {
   const [confirmingId, setConfirmingId]   = useState<string | null>(null)
   const [onlyMine, setOnlyMine]           = useState(false)
   const [placing, setPlacing]             = useState(false)
+  // The cart is saved as a draft automatically; these keep saves in order.
+  const editingRef  = useRef<typeof editingOrder>(null)
+  const autosaveRef = useRef<Promise<void> | null>(null)
+  useEffect(() => { editingRef.current = editingOrder }, [editingOrder])
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
@@ -302,12 +358,24 @@ export default function CrmOrdersPage() {
     currentStaff(supabase).then(me => { setMyName(me.name); setIsAdmin(me.isAdmin) })
   }, [])
 
+  // Choosing (or changing) the customer keeps the cart, at the new price list.
   function selectCustomerAndLoad(c: Customer) {
     setSelectedCustomer(c)
     setAssignee(c.account_manager || myName)
-    setCart([]); setLineDisc({})
+    setCart(items => items.map(i => ({ ...i, unitPrice: custPrice(i.product.list_price, c.price_list_id || 'Standard') })))
     loadLastBought(c)
     loadCustomerDeals(c)
+  }
+
+  function clearCustomer() {
+    setSelectedCustomer(null)
+    setCart(items => items.map(i => ({ ...i, unitPrice: custPrice(i.product.list_price, 'Standard') })))
+    setCustomerSearch(''); setLastBought([]); setRecommendations([]); setCustomerDeals([]); setDealId('')
+  }
+
+  function removeLine(productId: string) {
+    setCart(items => items.filter(i => i.product.id !== productId))
+    setLineDisc(d => { const n = { ...d }; delete n[productId]; return n })
   }
 
   // Deals the order can be linked to, so a won deal and its order are only
@@ -358,52 +426,49 @@ export default function CrmOrdersPage() {
   const total = afterDiscount + vat
 
   function resetOrderForm() {
+    editingRef.current = null; setAutoSavedAt('')
     setCart([]); setSelectedCustomer(null); setCustomerSearch(''); setProductSearch('')
     setDiscount(''); setDiscountEnabled(false); setDelivery('Standard (2-3 dagar)'); setLineFrom({}); setLineDisc({})
     setLastBought([]); setSelectedCategory('all'); setCustomerDeals([]); setDealId(''); setEditingOrder(null)
   }
 
-  // Draft (utkast) and quote (offert) are saved without affecting stock or
-  // budget; "pending" is a real order the salesperson then confirms.
-  // mailTo: a tab opened on the click (so it is not blocked as a pop-up) that
-  // gets the quote e-mail once the quote is saved.
-  async function saveOrder(status: 'draft' | 'quote' | 'pending', mailTo?: Window | null) {
-    if (!selectedCustomer || cart.length === 0 || placing) { mailTo?.close(); return }
-    setPlacing(true)
+  function orderFields(status: OrderStatus) {
     const carLines  = cart.filter(i => lineFrom[i.product.id] === 'car').length
     const shipLines = cart.length - carLines
-    // Everything handed over from the car: the order is already delivered,
-    // no confirmation needed. Anything to ship keeps the normal flow.
-    const handedOver = status === 'pending' && shipLines === 0
-    const finalStatus: OrderStatus = handedOver ? 'delivered' : status
     const deliveryNote = [
       carLines  ? `Från bilen (${carLines} rad${carLines > 1 ? 'er' : ''})` : '',
       shipLines ? `Frakt: ${delivery}` : '',
     ].filter(Boolean).join(' · ')
-    const fields = {
-      customer_id: selectedCustomer.id,
-      status: finalStatus,
-      price_list_id: selectedCustomer.price_list_id,
-      delivery_name: selectedCustomer.company,
-      delivery_city: selectedCustomer.city,
+    const c = selectedCustomer
+    return {
+      customer_id: c?.id ?? null,
+      status,
+      price_list_id: c?.price_list_id || 'Standard',
+      delivery_name: c?.company ?? null,
+      delivery_city: c?.city ?? null,
       subtotal: afterDiscount, vat_amount: vat, total,
       // Empty lets the database default it to the customer's account manager.
       // No manager on the customer: the salesperson placing it receives it.
-      assigned_to: assignee || (selectedCustomer.account_manager ? null : myName || null),
-      ...(dealId ? { deal_id: dealId } : {}),
+      assigned_to: assignee || (c?.account_manager ? null : myName || null),
+      deal_id: dealId || null,
       notes: `Leverans: ${deliveryNote}${discountAmt ? ` | Rabatt: ${String(discountPct).replace('.', ',')} % (${discountAmt} kr)` : ''}`,
     }
+  }
 
+  // Writes the order and its lines: updates the draft/quote being edited, else creates one.
+  async function writeOrder(status: OrderStatus): Promise<any | null> {
+    const editing = editingRef.current
+    const fields = orderFields(status)
     let order: any = null
     let error: any = null
-    if (editingOrder) {
+    if (editing) {
       // The draft/quote holds no stock, so its old lines can simply be replaced.
-      await supabase.from('order_items').delete().eq('order_id', editingOrder.id)
-      ;({ data: order, error } = await supabase.from('orders').update(fields).eq('id', editingOrder.id).select().single())
+      await supabase.from('order_items').delete().eq('order_id', editing.id)
+      ;({ data: order, error } = await supabase.from('orders').update(fields).eq('id', editing.id).select().single())
     } else {
       ;({ data: order, error } = await supabase.from('orders').insert({ ...fields, created_by: myName || null }).select().single())
     }
-    if (error || !order) { mailTo?.close(); showToast('Kunde inte spara ordern'); setPlacing(false); return }
+    if (error || !order) { showToast(error?.message?.includes('customer_id') ? 'Kör migration 0019 för utkast utan kund' : 'Kunde inte spara ordern'); return null }
 
     const { error: itemsError } = await supabase.from('order_items').insert(cart.map(i => ({
       order_id: order.id, product_id: i.product.id,
@@ -413,40 +478,127 @@ export default function CrmOrdersPage() {
       delivery: lineFrom[i.product.id] === 'car' ? 'car' : 'ship',
     })))
     if (itemsError) {
-      if (!editingOrder) await supabase.from('orders').delete().eq('id', order.id)
-      mailTo?.close()
+      if (!editing) await supabase.from('orders').delete().eq('id', order.id)
       showToast('Orderraderna kunde inte sparas. Har migration 0014 körts?')
-      setPlacing(false); return
+      return null
     }
+    return order
+  }
+
+  // The cart is kept as a draft while you work, so you can show the customer
+  // something else (or close the page) and pick it up again from the order list
+  // or the customer card. Quotes being edited are not touched.
+  useEffect(() => {
+    if (loading || placing || view === 'history' || cart.length === 0) return
+    const editing = editingRef.current
+    if (editing && editing.status !== 'draft') return
+    const t = setTimeout(() => {
+      const run = async () => {
+        if (autosaveRef.current) await autosaveRef.current
+        if (editingRef.current && editingRef.current.status !== 'draft') return
+        const order = await writeOrder('draft')
+        if (!order) return
+        if (!editingRef.current) {
+          const e = { id: order.id, order_nr: order.order_nr, status: 'draft' }
+          editingRef.current = e
+          setEditingOrder(e)
+        }
+        const saved = { ...order, customers: selectedCustomer }
+        setOrders(os => os.some(o => o.id === order.id) ? os.map(o => o.id === order.id ? saved : o) : [saved, ...os])
+        setAutoSavedAt(new Date().toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }))
+      }
+      autosaveRef.current = run().finally(() => { autosaveRef.current = null })
+    }, 1500)
+    return () => clearTimeout(t)
+  }, [cart, selectedCustomer, lineDisc, lineFrom, discount, discountEnabled, assignee, delivery, dealId, loading, placing, view]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Starts an empty cart; the current one stays saved as a draft.
+  function newCart() {
+    const nr = editingRef.current?.order_nr
+    resetOrderForm(); setShowCart(false); setView('new')
+    if (nr) showToast(`Varukorgen är sparad som utkast #${nr}`)
+  }
+
+  async function discardCart() {
+    const editing = editingRef.current
+    if (!confirm(editing ? `Radera varukorgen (utkast #${editing.order_nr})?` : 'Tömma varukorgen?')) return
+    if (autosaveRef.current) await autosaveRef.current
+    const e = editingRef.current
+    if (e && e.status === 'draft') {
+      await supabase.from('order_items').delete().eq('order_id', e.id)
+      await supabase.from('orders').delete().eq('id', e.id)
+      setOrders(os => os.filter(o => o.id !== e.id))
+    }
+    resetOrderForm(); setShowCart(false); setView('new')
+  }
+
+  // Draft (utkast) and quote (offert) are saved without affecting stock or
+  // budget; "pending" is a real order the salesperson then confirms.
+  // A quote also becomes a lead in the pipeline (stage Offert).
+  // mailTo: a tab opened on the click (so it is not blocked as a pop-up) that
+  // gets the quote e-mail once the quote is saved.
+  async function saveOrder(status: 'draft' | 'quote' | 'pending', mailTo?: Window | null) {
+    if (cart.length === 0 || placing) { mailTo?.close(); return }
+    if (!selectedCustomer && status !== 'draft') { mailTo?.close(); showToast('Välj eller skapa en kund först'); return }
+    setPlacing(true)
+    if (autosaveRef.current) await autosaveRef.current
+    const wasEditing = editingRef.current
+    const shipLines = cart.filter(i => lineFrom[i.product.id] !== 'car').length
+    // Everything handed over from the car: the order is already delivered,
+    // no confirmation needed. Anything to ship keeps the normal flow.
+    const handedOver = status === 'pending' && shipLines === 0
+    const finalStatus: OrderStatus = handedOver ? 'delivered' : status
+
+    const order = await writeOrder(finalStatus)
+    if (!order) { mailTo?.close(); setPlacing(false); return }
 
     // An order on a deal means the deal is won.
     const linkedDeal = customerDeals.find(d => d.id === dealId)
     if (status === 'pending' && linkedDeal && linkedDeal.stage !== 'Vunnen') {
       await supabase.from('deals').update({ stage: 'Vunnen', updated_at: new Date().toISOString() }).eq('id', linkedDeal.id)
     }
+    // A quote is a lead: it goes into the pipeline at "Offert" with the quote's value.
+    let leadNote = ''
+    if (status === 'quote' && selectedCustomer) {
+      const now = new Date().toISOString()
+      const existing = linkedDeal || (order.deal_id ? { id: order.deal_id, stage: '' } : null)
+      if (existing) {
+        const move = ['Prospekt', 'Kontaktad', ''].includes(existing.stage) ? { stage: 'Offert' } : {}
+        await supabase.from('deals').update({ ...move, value: afterDiscount, updated_at: now }).eq('id', existing.id)
+      } else {
+        const { data: deal } = await supabase.from('deals').insert({
+          title: `Offert #${order.order_nr}`, customer_id: selectedCustomer.id, value: afterDiscount, stage: 'Offert',
+          assigned_to: order.assigned_to || selectedCustomer.account_manager || myName || null,
+          notes: `Offert #${order.order_nr} från orderformuläret`, source: 'crm',
+        }).select('id').single()
+        if (deal) { await supabase.from('orders').update({ deal_id: deal.id }).eq('id', order.id); order.deal_id = deal.id }
+      }
+      leadNote = ' · lead i pipelinen'
+    }
 
     const saved = { ...order, customers: selectedCustomer }
     if (mailTo) await mailQuote(saved, mailTo)
-    setOrders(os => editingOrder ? os.map(o => o.id === order.id ? saved : o) : [saved, ...os])
+    setOrders(os => os.some(o => o.id === order.id) ? os.map(o => o.id === order.id ? saved : o) : [saved, ...os])
     resetOrderForm()
     setPlacing(false); setView('history')
     if (handedOver) invoiceInVismaInBackground(order.id)   // delivered at once: invoice now
-    showToast(status === 'draft' ? `Utkast #${order.order_nr} sparat`
-      : status === 'quote' ? `Offert #${order.order_nr} skapad`
+    showToast(status === 'draft' ? `Utkast #${order.order_nr} sparat${selectedCustomer ? '' : ' utan kund'}`
+      : status === 'quote' ? `Offert #${order.order_nr} sparad${leadNote}`
       : handedOver ? `Order #${order.order_nr} levererad från bilen`
-      : `Order #${order.order_nr} skapad — bekräfta den när den är klar`)
+      : `Order #${order.order_nr} ${wasEditing?.status === 'quote' ? 'skapad från offerten' : 'skapad'} — bekräfta den när den är klar`)
   }
 
   // Reopen a draft or quote in the order form. copy: start a new order with
   // the same products and quantities at today's prices ("Lägg ordern igen").
   async function openForEdit(o: any, copy = false) {
-    const customer = customers.find(c => c.id === o.customers?.id)
-    if (!customer) { showToast('Kunden hittades inte'); return }
+    // A draft can be without a customer; one is chosen in the checkout.
+    const customer = customers.find(c => c.id === (o.customers?.id || o.customer_id)) || null
+    if ((o.customers?.id || o.customer_id) && !customer) { showToast('Kunden hittades inte'); return }
     const { data: items } = await supabase.from('order_items').select('*').eq('order_id', o.id)
     const lines: CartItem[] = []
     const from: Record<string, 'car' | 'ship'> = {}
     const disc: Record<string, string> = {}
-    const pl = customer.price_list_id || 'Standard'
+    const pl = customer?.price_list_id || 'Standard'
     for (const it of items || []) {
       const product = products.find(p => p.id === it.product_id)
       if (!product) continue
@@ -466,22 +618,26 @@ export default function CrmOrdersPage() {
     setSelectedCustomer(customer)
     setCart(lines); setLineFrom(from); setLineDisc(disc)
     setAssignee(o.assigned_to || '')
-    loadLastBought(customer)
+    if (customer) loadLastBought(customer)
+    else { setLastBought([]); setRecommendations([]) }
     // Order discount in percent of the lines after their own discounts.
     const linesTotal = lines.reduce((sum, l) => sum + l.qty * Math.round(l.unitPrice * (1 - pctOf(disc[l.product.id]) / 100)), 0)
     const orderPct = linesTotal > 0 ? Math.round((linesTotal - (o.subtotal || 0)) / linesTotal * 1000) / 10 : 0
     setDiscountEnabled(orderPct > 0); setDiscount(orderPct > 0 ? String(orderPct).replace('.', ',') : '')
     if (copy) {
-      setEditingOrder(null)
-      await loadCustomerDeals(customer)
+      setEditingOrder(null); editingRef.current = null
+      if (customer) await loadCustomerDeals(customer)
       setView('confirm')
       const skipped = (items || []).length - lines.length
       showToast(`Kopierat från #${o.order_nr} med dagens priser${skipped > 0 ? ` · ${skipped} rad${skipped > 1 ? 'er' : ''} utgått` : ''}`)
       return
     }
-    await loadCustomerDeals(customer)
+    if (customer) await loadCustomerDeals(customer)
+    else { setCustomerDeals([]); setDealId('') }
     if (o.deal_id) setDealId(o.deal_id)
-    setEditingOrder({ id: o.id, order_nr: o.order_nr, status: o.status })
+    const e = { id: o.id, order_nr: o.order_nr, status: o.status }
+    editingRef.current = e
+    setEditingOrder(e)
     setView('confirm')
   }
 
@@ -689,109 +845,34 @@ export default function CrmOrdersPage() {
   )
 
   // ── CONFIRM VIEW ───────────────────────────────────────────
-  if (view === 'confirm' && selectedCustomer) return (
-    <div style={{ padding: '24px 20px', maxWidth: 720, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
+  const card: React.CSSProperties = { background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 16 }
+  const selectStyle: React.CSSProperties = { width: '100%', padding: '11px 36px 11px 14px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 14, outline: 'none', appearance: 'none', cursor: 'pointer' }
+  const smallBtn: React.CSSProperties = { width: 30, height: 30, borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+  const noCustomer = !selectedCustomer
+  if (view === 'confirm') return (
+    <div style={{ padding: '24px 20px 60px', maxWidth: 980, margin: '0 auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
-          {editingOrder ? `${editingOrder.status === 'quote' ? 'Offert' : 'Utkast'} #${editingOrder.order_nr}` : 'Granska order'}
+          {editingOrder?.status === 'quote' ? `Offert #${editingOrder.order_nr}` : 'Kassan'}
         </h1>
-        <button onClick={() => setView('new')} style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--text2)', fontSize: 13, cursor: 'pointer' }}>
-          <ArrowLeft size={15} /> Ändra produkter
+        {editingOrder?.status === 'draft' && (
+          <span style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Check size={13} color="var(--green)" /> Sparas automatiskt som utkast #{editingOrder.order_nr}
+          </span>
+        )}
+        <button onClick={() => setView('new')} style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--text)', fontSize: 13, cursor: 'pointer' }}>
+          <ArrowLeft size={15} /> Lägg till fler produkter
         </button>
       </div>
-      <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, marginBottom: 16 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', margin: '0 0 4px' }}>{selectedCustomer.company}</h2>
-        <p style={{ fontSize: 12, color: 'var(--text3)', margin: '0 0 20px' }}>Org.nr: {selectedCustomer.org_nr || '—'}</p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 32px' }}>
-          {[
-            { label: 'Kontaktperson', value: selectedCustomer.contact_name },
-            { label: 'E-post', value: selectedCustomer.email },
-            { label: 'Telefon', value: selectedCustomer.phone || '—' },
-            { label: 'Adress', value: selectedCustomer.city || '—' },
-          ].map(({ label, value }) => (
-            <div key={label}>
-              <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{value}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: discountEnabled ? 16 : 0 }}>
-          <input type="checkbox" checked={discountEnabled} onChange={e => setDiscountEnabled(e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--gold)', cursor: 'pointer' }} />
-          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Rabatt på hela ordern</span>
-        </label>
-        {discountEnabled && (
-          <div style={{ display: 'flex', gap: 10 }}>
-            <div style={{ flex: 1, position: 'relative' }}>
-              <input type="text" inputMode="decimal" placeholder="Ange procent, t.ex. 10" value={discount} onChange={e => setDiscount(e.target.value.replace(/[^\d,.]/g, ''))}
-                style={{ width: '100%', padding: '11px 36px 11px 14px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
-              <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text2)', fontSize: 14 }}>%</span>
-            </div>
-          </div>
-        )}
-        {discountEnabled && discountAmt > 0 && <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text2)' }}>−{fmt(discountAmt)} kr exkl. moms. Rabatt per artikel sätter du i kassan nedan.</p>}
-      </div>
-      <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: '0 0 4px' }}>Säljare</h3>
-        <p style={{ fontSize: 12, color: 'var(--text3)', margin: '0 0 12px' }}>Säljaren som hanterar ordern och får den på sin budget.</p>
-        <div style={{ position: 'relative' }}>
-          <select value={assignee} onChange={e => setAssignee(e.target.value)}
-            style={{ width: '100%', padding: '11px 36px 11px 14px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 14, outline: 'none', appearance: 'none', cursor: 'pointer' }}>
-            <option value="">{selectedCustomer.account_manager ? `Kundansvarig (${selectedCustomer.account_manager})` : '— Ingen säljare —'}</option>
-            {teamOptions(SALESPEOPLE, assignee).map(sp => <option key={sp} value={sp}>{sp}{sp === selectedCustomer.account_manager ? ' (kundansvarig)' : ''}</option>)}
-          </select>
-          <ChevronDown size={15} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', pointerEvents: 'none' }} />
-        </div>
-      </div>
-      {customerDeals.length > 0 && (
-        <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: '0 0 4px' }}>Koppla till affär</h3>
-          <p style={{ fontSize: 12, color: 'var(--text3)', margin: '0 0 12px' }}>Affären markeras som vunnen och räknas via ordern, så budgeten inte räknar samma försäljning två gånger.</p>
-          <div style={{ position: 'relative' }}>
-            <select value={dealId} onChange={e => setDealId(e.target.value)}
-              style={{ width: '100%', padding: '11px 36px 11px 14px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 14, outline: 'none', appearance: 'none', cursor: 'pointer' }}>
-              <option value="">— Ingen affär —</option>
-              {customerDeals.map(d => <option key={d.id} value={d.id}>{d.title} · {d.stage} · {fmt(d.value || 0)} kr</option>)}
-            </select>
-            <ChevronDown size={15} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', pointerEvents: 'none' }} />
-          </div>
-        </div>
-      )}
-      <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Truck size={15} color="var(--text2)" /> Leverans
-        </h3>
-        <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 12px' }}>
-          Välj per rad nedan: <strong style={{ color: 'var(--text)' }}>Bilen</strong> lämnas direkt till kunden och dras inte från lagret, <strong style={{ color: 'var(--text)' }}>Frakt</strong> skickas från lagret.
-        </p>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: cart.some(i => lineFrom[i.product.id] !== 'car') ? 12 : 0 }}>
-          <button type="button" onClick={() => setLineFrom(Object.fromEntries(cart.map(i => [i.product.id, 'car'])))}
-            style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, cursor: 'pointer' }}>Allt från bilen</button>
-          <button type="button" onClick={() => setLineFrom({})}
-            style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, cursor: 'pointer' }}>Allt med frakt</button>
-        </div>
-        {cart.some(i => lineFrom[i.product.id] !== 'car') && (
-          <div style={{ position: 'relative' }}>
-            <select value={delivery} onChange={e => setDelivery(e.target.value)} aria-label="Fraktsätt"
-              style={{ width: '100%', padding: '11px 36px 11px 14px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 14, outline: 'none', appearance: 'none', cursor: 'pointer' }}>
-              <option>Standard (2-3 dagar)</option>
-              <option>Express (nästa dag)</option>
-            </select>
-            <ChevronDown size={15} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', pointerEvents: 'none' }} />
-          </div>
-        )}
-      </div>
-      <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 24 }}>
-        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: 0 }}>Kassan</h3>
-        </div>
+
+      {/* Kassan: lines, discounts and totals first */}
+      <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', minWidth: 660, borderCollapse: 'collapse', fontSize: 13 }}>
+        <table style={{ width: '100%', minWidth: 720, borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)' }}>
-              {['Produkt', 'Leverans', 'Antal', 'Rabatt', 'À-pris', 'Summa'].map(h => (
-                <th key={h} style={{ padding: '10px 14px', textAlign: 'left', color: 'var(--text2)', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>{h}</th>
+              {['Produkt', 'Leverans', 'Antal', 'Rabatt', 'À-pris', 'Summa', ''].map((h, i) => (
+                <th key={i} style={{ padding: '12px 14px', textAlign: 'left', color: 'var(--text2)', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.05em' }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -801,22 +882,24 @@ export default function CrmOrdersPage() {
               const hasDiscount = price < i.product.list_price
               return (
                 <tr key={i.product.id} style={{ borderBottom: '1px solid var(--border2)' }}>
-                  <td style={{ padding: '11px 14px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <Thumb p={i.product} size={40} />
+                  <td style={{ padding: '12px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <button type="button" onClick={() => setOpenProduct(i.product)} aria-label={`Visa ${i.product.name}`} style={{ padding: 0, border: 'none', background: 'none', cursor: 'zoom-in' }}>
+                        <Thumb p={i.product} size={60} />
+                      </button>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, color: 'var(--text)' }}>{i.product.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text2)' }}>{i.product.brand} · {i.product.unit}</div>
+                        <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: 14 }}>{i.product.name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text2)' }}>{i.product.brand} · {i.product.unit}</div>
                       </div>
                     </div>
                   </td>
-                  <td style={{ padding: '11px 14px' }}>
+                  <td style={{ padding: '12px 14px' }}>
                     <div role="group" aria-label={`Leverans för ${i.product.name}`} style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 7, overflow: 'hidden' }}>
                       {(['car', 'ship'] as const).map(v => {
                         const on = (lineFrom[i.product.id] || 'ship') === v
                         return (
                           <button key={v} type="button" aria-pressed={on} onClick={() => setLineFrom(f => ({ ...f, [i.product.id]: v }))}
-                            style={{ padding: '5px 10px', fontSize: 12, fontWeight: on ? 700 : 500, border: 'none', cursor: 'pointer',
+                            style={{ padding: '6px 10px', fontSize: 12, fontWeight: on ? 700 : 500, border: 'none', cursor: 'pointer',
                               background: on ? 'rgba(232,184,75,.15)' : 'var(--bg4)', color: on ? 'var(--text)' : 'var(--text2)' }}>
                             {v === 'car' ? 'Bilen' : 'Frakt'}
                           </button>
@@ -824,8 +907,14 @@ export default function CrmOrdersPage() {
                       })}
                     </div>
                   </td>
-                  <td style={{ padding: '11px 14px', color: 'var(--text2)' }}>{i.qty}</td>
-                  <td style={{ padding: '11px 14px' }}>
+                  <td style={{ padding: '12px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <button type="button" onClick={() => updateQty(i.product.id, -1)} aria-label={`Minska ${i.product.name}`} style={smallBtn}><Minus size={13} /></button>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', minWidth: 22, textAlign: 'center' }}>{i.qty}</span>
+                      <button type="button" onClick={() => updateQty(i.product.id, 1)} aria-label={`Öka ${i.product.name}`} style={smallBtn}><Plus size={13} /></button>
+                    </div>
+                  </td>
+                  <td style={{ padding: '12px 14px' }}>
                     <div style={{ position: 'relative', width: 78 }}>
                       <input type="text" inputMode="decimal" aria-label={`Rabatt i procent för ${i.product.name}`} placeholder="0"
                         value={lineDisc[i.product.id] ?? ''} onChange={e => setLineDisc(d => ({ ...d, [i.product.id]: e.target.value.replace(/[^\d,.]/g, '') }))}
@@ -833,22 +922,44 @@ export default function CrmOrdersPage() {
                       <span style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--text2)', fontSize: 12 }}>%</span>
                     </div>
                   </td>
-                  <td style={{ padding: '11px 14px' }}>
-                    {hasDiscount && <div style={{ fontSize: 11, color: 'var(--text3)', textDecoration: 'line-through' }}>{fmt(i.product.list_price)} kr</div>}
-                    <div style={{ color: hasDiscount ? 'var(--green)' : 'var(--text2)', fontWeight: hasDiscount ? 600 : 400 }}>{fmt(price)} kr</div>
+                  <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
+                    {hasDiscount && <div style={{ fontSize: 11, color: 'var(--text2)', textDecoration: 'line-through' }}>{fmt(i.product.list_price)} kr</div>}
+                    <div style={{ color: hasDiscount ? 'var(--green)' : 'var(--text)', fontWeight: 600 }}>{fmt(price)} kr</div>
                   </td>
-                  <td style={{ padding: '11px 14px', fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap' }}>{fmt(i.qty * price)} kr<IncVat net={i.qty * price} /></td>
+                  <td style={{ padding: '12px 14px', fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap' }}>{fmt(i.qty * price)} kr<IncVat net={i.qty * price} /></td>
+                  <td style={{ padding: '12px 10px' }}>
+                    <button type="button" onClick={() => removeLine(i.product.id)} aria-label={`Ta bort ${i.product.name}`} title="Ta bort raden"
+                      style={{ ...smallBtn, background: 'transparent', border: '1px solid rgba(224,82,82,.3)', color: 'var(--red)' }}><Trash2 size={14} /></button>
+                  </td>
                 </tr>
               )
             })}
+            {cart.length === 0 && (
+              <tr><td colSpan={7} style={{ padding: 30, textAlign: 'center', color: 'var(--text2)' }}>Varukorgen är tom. <button onClick={() => setView('new')} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: 13 }}>Lägg till produkter</button></td></tr>
+            )}
           </tbody>
         </table>
         </div>
         <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingBottom: 8 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+              <input type="checkbox" checked={discountEnabled} onChange={e => setDiscountEnabled(e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--gold)', cursor: 'pointer' }} />
+              <Tag size={13} /> Rabatt på hela ordern
+            </label>
+            {discountEnabled && (
+              <div style={{ position: 'relative', width: 110 }}>
+                <input type="text" inputMode="decimal" placeholder="t.ex. 10" aria-label="Orderrabatt i procent" autoFocus value={discount} onChange={e => setDiscount(e.target.value.replace(/[^\d,.]/g, ''))}
+                  style={{ width: '100%', padding: '7px 26px 7px 10px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box', textAlign: 'right' }} />
+                <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text2)', fontSize: 13 }}>%</span>
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text2)' }}>
+            <span>Varor exkl. moms</span><span>{fmt(subtotal)} kr</span>
+          </div>
           {discountAmt > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--green)' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Tag size={13} /> Rabatt {String(discountPct).replace('.', ',')} %</span>
-              <span>-{fmt(discountAmt)} kr</span>
+              <span>Rabatt {String(discountPct).replace('.', ',')} %</span><span>−{fmt(discountAmt)} kr</span>
             </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text)' }}>
@@ -857,27 +968,116 @@ export default function CrmOrdersPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text2)' }}>
             <span>Moms (25%)</span><span>{fmt(vat)} kr</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 700, color: 'var(--text)', paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 17, fontWeight: 700, color: 'var(--text)', paddingTop: 8, borderTop: '1px solid var(--border)' }}>
             <span>Totalt inkl. moms</span><span style={{ color: 'var(--gold)' }}>{fmt(total)} kr</span>
           </div>
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
-        <button onClick={() => saveOrder('draft')} disabled={placing}
+
+      {/* Customer */}
+      <div style={card}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: 0 }}>Kund</h3>
+          {selectedCustomer && (
+            <button onClick={clearCustomer} style={{ padding: '6px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, cursor: 'pointer' }}>Byt kund</button>
+          )}
+        </div>
+        {selectedCustomer ? (
+          <>
+            <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>{selectedCustomer.company}</div>
+            <div style={{ fontSize: 12, color: 'var(--text2)', margin: '2px 0 14px' }}>Org.nr: {selectedCustomer.org_nr || '—'} · Prislista {selectedCustomer.price_list_id}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px 28px' }}>
+              {[
+                { label: 'Kontaktperson', value: selectedCustomer.contact_name || '—' },
+                { label: 'E-post', value: selectedCustomer.email || '—' },
+                { label: 'Telefon', value: selectedCustomer.phone || '—' },
+                { label: 'Ort', value: selectedCustomer.city || '—' },
+              ].map(({ label, value }) => (
+                <div key={label}>
+                  <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>{label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflowWrap: 'anywhere' }}>{value}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: 13, color: 'var(--text2)', margin: '0 0 12px' }}>
+              Ny kund? Spara som utkast nu och skapa kunden när du har uppgifterna, eller välj en befintlig kund.
+            </p>
+            <CustomerPicker customers={customers} onPick={selectCustomerAndLoad} onNew={company => setNewCustomerFor(company)} />
+          </>
+        )}
+      </div>
+
+      {selectedCustomer && (
+        <div style={card}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: '0 0 4px' }}>Säljare</h3>
+          <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 12px' }}>Säljaren som hanterar ordern och får den på sin budget.</p>
+          <div style={{ position: 'relative' }}>
+            <select value={assignee} onChange={e => setAssignee(e.target.value)} style={selectStyle}>
+              <option value="">{selectedCustomer.account_manager ? `Kundansvarig (${selectedCustomer.account_manager})` : '— Ingen säljare —'}</option>
+              {teamOptions(SALESPEOPLE, assignee).map(sp => <option key={sp} value={sp}>{sp}{sp === selectedCustomer.account_manager ? ' (kundansvarig)' : ''}</option>)}
+            </select>
+            <ChevronDown size={15} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', pointerEvents: 'none' }} />
+          </div>
+        </div>
+      )}
+      {selectedCustomer && customerDeals.length > 0 && (
+        <div style={card}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: '0 0 4px' }}>Koppla till affär</h3>
+          <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 12px' }}>Affären markeras som vunnen och räknas via ordern, så budgeten inte räknar samma försäljning två gånger.</p>
+          <div style={{ position: 'relative' }}>
+            <select value={dealId} onChange={e => setDealId(e.target.value)} style={selectStyle}>
+              <option value="">— Ingen affär —</option>
+              {customerDeals.map(d => <option key={d.id} value={d.id}>{d.title} · {d.stage} · {fmt(d.value || 0)} kr</option>)}
+            </select>
+            <ChevronDown size={15} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', pointerEvents: 'none' }} />
+          </div>
+        </div>
+      )}
+      <div style={card}>
+        <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Truck size={15} color="var(--text2)" /> Leverans
+        </h3>
+        <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 12px' }}>
+          Välj per rad i kassan: <strong style={{ color: 'var(--text)' }}>Bilen</strong> lämnas direkt till kunden och dras inte från lagret, <strong style={{ color: 'var(--text)' }}>Frakt</strong> skickas från lagret.
+        </p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: cart.some(i => lineFrom[i.product.id] !== 'car') ? 12 : 0 }}>
+          <button type="button" onClick={() => setLineFrom(Object.fromEntries(cart.map(i => [i.product.id, 'car'])))}
+            style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, cursor: 'pointer' }}>Allt från bilen</button>
+          <button type="button" onClick={() => setLineFrom({})}
+            style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, cursor: 'pointer' }}>Allt med frakt</button>
+        </div>
+        {cart.some(i => lineFrom[i.product.id] !== 'car') && (
+          <div style={{ position: 'relative' }}>
+            <select value={delivery} onChange={e => setDelivery(e.target.value)} aria-label="Fraktsätt" style={selectStyle}>
+              <option>Standard (2-3 dagar)</option>
+              <option>Express (nästa dag)</option>
+            </select>
+            <ChevronDown size={15} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', pointerEvents: 'none' }} />
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
+        <button onClick={() => saveOrder('draft')} disabled={placing || cart.length === 0}
           style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: placing ? 'not-allowed' : 'pointer' }}>
-          Spara utkast
+          {noCustomer ? 'Spara utkast utan kund' : 'Spara utkast'}
         </button>
-        <button onClick={() => saveOrder('quote')} disabled={placing}
-          style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: placing ? 'not-allowed' : 'pointer' }}>
-          {editingOrder?.status === 'quote' ? 'Spara offert' : 'Skapa offert'}
+        <button onClick={() => saveOrder('quote')} disabled={placing || noCustomer || cart.length === 0}
+          title={noCustomer ? 'Välj kund först' : 'Sparar offerten och lägger den som lead i pipelinen (steg Offert)'}
+          style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: placing || noCustomer ? 'not-allowed' : 'pointer', opacity: noCustomer ? .55 : 1 }}>
+          {editingOrder?.status === 'quote' ? 'Spara lead' : 'Spara som lead'}
         </button>
-        <button onClick={() => saveOrder('quote', window.open('about:blank', '_blank'))} disabled={placing || !selectedCustomer?.email}
-          title={selectedCustomer?.email ? `Sparar offerten och öppnar ett mejl till ${selectedCustomer.email}` : 'Kunden saknar e-postadress'}
-          style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: placing || !selectedCustomer?.email ? 'not-allowed' : 'pointer', opacity: selectedCustomer?.email ? 1 : .6 }}>
+        <button onClick={() => saveOrder('quote', window.open('about:blank', '_blank'))} disabled={placing || !selectedCustomer?.email || cart.length === 0}
+          title={selectedCustomer?.email ? `Sparar offerten som lead och öppnar ett mejl till ${selectedCustomer.email}` : noCustomer ? 'Välj kund först' : 'Kunden saknar e-postadress'}
+          style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: placing || !selectedCustomer?.email ? 'not-allowed' : 'pointer', opacity: selectedCustomer?.email ? 1 : .55 }}>
           Mejla offert
         </button>
-        <button onClick={() => saveOrder('pending')} disabled={placing}
-          style={{ padding: '14px 0', background: placing ? 'var(--bg4)' : 'var(--gold)', border: 'none', borderRadius: 10, color: placing ? 'var(--text3)' : '#111', fontSize: 14, fontWeight: 700, cursor: placing ? 'not-allowed' : 'pointer' }}>
+        <button onClick={() => saveOrder('pending')} disabled={placing || noCustomer || cart.length === 0}
+          title={noCustomer ? 'Välj kund först' : undefined}
+          style={{ padding: '14px 0', background: placing || noCustomer ? 'var(--bg4)' : 'var(--gold)', border: 'none', borderRadius: 10, color: placing || noCustomer ? 'var(--text2)' : '#111', fontSize: 14, fontWeight: 700, cursor: placing || noCustomer ? 'not-allowed' : 'pointer' }}>
           {placing ? 'Sparar…' : allFromCar ? 'Lägg order · levererad' : 'Lägg order'}
         </button>
       </div>
@@ -885,75 +1085,77 @@ export default function CrmOrdersPage() {
       <p style={{ fontSize: 12, color: 'var(--text2)', textAlign: 'center', margin: '10px 0 0' }}>
         Utkast och offerter påverkar inte lager eller budget och syns inte för kunden förrän de blir en order.
       </p>
+
+      {newCustomerFor !== null && (
+        <NewCustomerModal initialCompany={newCustomerFor} accountManager={myName}
+          onClose={() => setNewCustomerFor(null)}
+          onCreated={c => { setCustomers(cs => [...cs, c].sort((a, b) => a.company.localeCompare(b.company))); selectCustomerAndLoad(c); setNewCustomerFor(null); showToast(`${c.company} skapad`) }} />
+      )}
+      {openProduct && (
+        <ProductSheet p={openProduct} selectedCustomer={selectedCustomer} qty={getQty(openProduct.id)}
+          categoryName={categories.find(c => c.id === openProduct.category_id)?.name || ''}
+          onAdd={() => addToCart(openProduct)} onRemove={() => updateQty(openProduct.id, -1)}
+          onClose={() => setOpenProduct(null)} />
+      )}
+      {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#fff', padding: '12px 24px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 1200 }}>{toast}</div>}
     </div>
   )
 
   // ── NEW ORDER VIEW ─────────────────────────────────────────
   const cartCount = cart.reduce((s, i) => s + i.qty, 0)
+  const drawerBtn: React.CSSProperties = { width: 32, height: 32, borderRadius: 8, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 58px)', overflow: 'hidden' }}>
-
-      {/* LEFT: customer + products */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px 14px' : '24px 20px', paddingBottom: isMobile && cart.length > 0 ? 90 : undefined }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+    <div style={{ height: 'calc(100vh - 58px)', overflowY: 'auto' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: isMobile ? '16px 14px 110px' : '24px 24px 110px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
-            {editingOrder ? `${editingOrder.status === 'quote' ? 'Offert' : 'Utkast'} #${editingOrder.order_nr}` : 'Skapa ny order'}
+            {editingOrder?.status === 'quote' ? `Offert #${editingOrder.order_nr}` : 'Skapa ny order'}
           </h1>
-          {editingOrder && (
-            <button onClick={() => { resetOrderForm(); setView('history') }}
-              style={{ marginLeft: 12, marginRight: 'auto', background: 'none', border: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>
-              Avbryt redigering
-            </button>
+          {editingOrder?.status === 'draft' && autoSavedAt && (
+            <span style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Check size={13} color="var(--green)" /> Sparad som utkast #{editingOrder.order_nr} {autoSavedAt}
+            </span>
           )}
-          <button onClick={() => setView('history')} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 12, cursor: 'pointer' }}>
-            Alla ordrar →
-          </button>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+            {editingOrder && (
+              <button onClick={newCart} style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>
+                Ny varukorg
+              </button>
+            )}
+            <button onClick={() => setView('history')} style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer' }}>
+              Alla ordrar →
+            </button>
+            <button onClick={() => setShowCart(true)} aria-label={`Varukorg, ${cartCount} varor`}
+              style={{ position: 'relative', width: 44, height: 44, borderRadius: 10, background: cartCount ? 'rgba(232,184,75,.12)' : 'var(--bg3)', border: `1px solid ${cartCount ? 'rgba(232,184,75,.4)' : 'var(--border)'}`, color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShoppingCart size={19} />
+              {cartCount > 0 && (
+                <span style={{ position: 'absolute', top: -6, right: -6, minWidth: 20, height: 20, padding: '0 5px', borderRadius: 10, background: 'var(--gold)', color: '#111', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>{cartCount}</span>
+              )}
+            </button>
+          </div>
         </div>
 
-        {/* Customer selector — collapses once a customer is chosen */}
+        {/* Customer: optional here — the catalogue works without one */}
         {selectedCustomer ? (
-          <div style={{ background: 'rgba(232,184,75,.06)', border: '1.5px solid rgba(232,184,75,.25)', borderRadius: 12, marginBottom: 16, padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3 }}>Kund</div>
+          <div style={{ background: 'rgba(232,184,75,.06)', border: '1px solid rgba(232,184,75,.25)', borderRadius: 12, marginBottom: 16, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 2 }}>Kund</div>
               <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{selectedCustomer.company}</div>
-              <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>
                 {selectedCustomer.contact_name && `${selectedCustomer.contact_name} · `}Prislista {selectedCustomer.price_list_id}
               </div>
             </div>
-            <button onClick={() => { setSelectedCustomer(null); setCart([]); setCustomerSearch(''); setLastBought([]); setRecommendations([]); setCustomerDeals([]); setDealId('') }}
-              style={{ padding: '7px 14px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text2)', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <button onClick={clearCustomer}
+              style={{ padding: '7px 14px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
               Byt kund
             </button>
           </div>
         ) : (
-          <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, marginBottom: 16, overflow: 'hidden' }}>
-            <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>👤 Välj kund</span>
-            </div>
-            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ position: 'relative' }}>
-                <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }} />
-                <input autoFocus placeholder="Sök företag..." value={customerSearch} onChange={e => setCustomerSearch(e.target.value)}
-                  style={{ width: '100%', padding: '8px 10px 8px 30px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
-              </div>
-            </div>
-            <div style={{ maxHeight: 220, overflowY: 'auto' }}>
-              {filteredCustomers.slice(0, 10).map(c => (
-                <button key={c.id} onClick={() => selectCustomerAndLoad(c)}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--border2)', cursor: 'pointer' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(232,184,75,.04)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                >
-                  <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{c.company}</span>
-                  <span style={{ fontSize: 11, color: 'var(--text3)' }}>Prislista {c.price_list_id}</span>
-                </button>
-              ))}
-              {filteredCustomers.length === 0 && <p style={{ padding: '16px', textAlign: 'center', color: 'var(--text3)', fontSize: 13, margin: 0 }}>Inga kunder hittades</p>}
-            </div>
+          <div style={{ marginBottom: 16 }}>
+            <CustomerPicker customers={customers} onPick={selectCustomerAndLoad} onNew={company => setNewCustomerFor(company)} />
+            <p style={{ margin: '6px 2px 0', fontSize: 12, color: 'var(--text2)' }}>Kund är valfritt här – du kan välja eller skapa kunden i kassan.</p>
           </div>
         )}
-
-{/* Strip removed — pinned rows now appear at top of product list */}
 
         {/* Category filter */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10, overflowX: 'auto' }}>
@@ -1025,127 +1227,95 @@ export default function CrmOrdersPage() {
         </div>
       </div>
 
-      {/* Mobile: floating cart button */}
-      {isMobile && cart.length > 0 && !showMobileCart && (
-        <button onClick={() => setShowMobileCart(true)} style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: 'var(--gold)', border: 'none', borderRadius: 30, color: '#111', fontSize: 14, fontWeight: 700, padding: '14px 28px', cursor: 'pointer', zIndex: 500, display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 4px 20px rgba(232,184,75,.4)' }}>
-          <ShoppingCart size={18} /> Varukorg ({cartCount}) · {fmt(subtotal)} kr exkl. moms
+      {/* Cart button that follows along while scrolling */}
+      {cart.length > 0 && !showCart && (
+        <button onClick={() => setShowCart(true)} style={{ position: 'fixed', bottom: 20, right: isMobile ? '50%' : 28, transform: isMobile ? 'translateX(50%)' : undefined, background: 'var(--gold)', border: 'none', borderRadius: 30, color: '#111', fontSize: 14, fontWeight: 700, padding: '14px 24px', cursor: 'pointer', zIndex: 500, display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 6px 24px rgba(0,0,0,.45)' }}>
+          <ShoppingCart size={17} /> {cartCount} st · {fmt(afterDiscount)} kr
         </button>
       )}
 
-      {/* Mobile: cart overlay */}
-      {isMobile && showMobileCart && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 400 }} onClick={() => setShowMobileCart(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'var(--bg2)', borderRadius: '16px 16px 0 0', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Varukorg</span>
-              <button onClick={() => setShowMobileCart(false)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 20 }}>×</button>
+      {/* Cart drawer */}
+      {showCart && (
+        <div onClick={() => setShowCart(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 900 }}>
+          <aside role="dialog" aria-modal="true" aria-label="Varukorg" onClick={e => e.stopPropagation()}
+            style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(560px, 100vw)', background: 'var(--bg2)', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', boxShadow: '-12px 0 40px rgba(0,0,0,.4)' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <ShoppingCart size={18} color="var(--gold)" />
+              <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>Varukorg</span>
+              <span style={{ fontSize: 12, color: 'var(--text2)' }}>{selectedCustomer ? selectedCustomer.company : 'Ingen kund vald'}{editingOrder ? ` · #${editingOrder.order_nr}` : ''}</span>
+              <button onClick={() => setShowCart(false)} aria-label="Stäng" style={{ ...drawerBtn, marginLeft: 'auto' }}><X size={16} /></button>
             </div>
-            <div style={{ overflowY: 'auto', flex: 1, padding: '12px 16px' }}>
-              {cart.map(i => (
-                <div key={i.product.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--line2)' }}>
-                  <Thumb p={i.product} size={40} />
-                  <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{i.product.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text3)' }}>{i.qty} × {fmt(linePrice(i))} kr</div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <button onClick={() => updateQty(i.product.id, -1)} style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--bg4)', border: '1px solid var(--line)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Minus size={12} /></button>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--gold)', minWidth: 20, textAlign: 'center' }}>{i.qty}</span>
-                    <button onClick={() => updateQty(i.product.id, 1)} style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--bg4)', border: '1px solid var(--line)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={12} /></button>
-                  </div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginLeft: 12, minWidth: 60, textAlign: 'right' }}>{fmt(i.qty * linePrice(i))} kr<IncVat net={i.qty * linePrice(i)} /></div>
+            {cart.length === 0 ? (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: 'var(--text2)' }}>
+                <ShoppingCart size={36} strokeWidth={1.2} />
+                <span style={{ fontSize: 13 }}>Varukorgen är tom</span>
+              </div>
+            ) : (
+              <>
+                <div style={{ flex: 1, overflowY: 'auto', padding: '6px 20px' }}>
+                  {cart.map(i => {
+                    const price = linePrice(i)
+                    return (
+                      <div key={i.product.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderBottom: '1px solid var(--border2)' }}>
+                        <button type="button" onClick={() => setOpenProduct(i.product)} aria-label={`Visa ${i.product.name}`} style={{ padding: 0, border: 'none', background: 'none', cursor: 'zoom-in' }}>
+                          <Thumb p={i.product} size={68} />
+                        </button>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{i.product.name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text2)', margin: '2px 0 8px' }}>
+                            {fmt(price)} kr/st{linePct(i) > 0 ? ` · −${String(linePct(i)).replace('.', ',')} %` : ''}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <button onClick={() => updateQty(i.product.id, -1)} aria-label={`Minska ${i.product.name}`} style={drawerBtn}><Minus size={13} /></button>
+                            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', minWidth: 22, textAlign: 'center' }}>{i.qty}</span>
+                            <button onClick={() => updateQty(i.product.id, 1)} aria-label={`Öka ${i.product.name}`} style={drawerBtn}><Plus size={13} /></button>
+                            <button onClick={() => removeLine(i.product.id)} aria-label={`Ta bort ${i.product.name}`} title="Ta bort raden"
+                              style={{ ...drawerBtn, marginLeft: 6, background: 'transparent', border: '1px solid rgba(224,82,82,.3)', color: 'var(--red)' }}><Trash2 size={14} /></button>
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', textAlign: 'right', whiteSpace: 'nowrap' }}>{fmt(i.qty * price)} kr<IncVat net={i.qty * price} /></div>
+                      </div>
+                    )
+                  })}
                 </div>
-              ))}
-            </div>
-            <div style={{ padding: '14px 20px', borderTop: '1px solid var(--line)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text)', marginBottom: 6 }}>
-                <span>Summa exkl. moms</span><span>{fmt(subtotal)} kr</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text2)', marginBottom: 6 }}>
-                <span>Moms (25%)</span><span>{fmt(Math.round(subtotal * 0.25))} kr</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>
-                <span>Totalt inkl. moms</span><span style={{ color: 'var(--gold)' }}>{fmt(subtotal + Math.round(subtotal * 0.25))} kr</span>
-              </div>
-              <button onClick={() => { setView('confirm'); setShowMobileCart(false) }} disabled={!selectedCustomer}
-                style={{ width: '100%', padding: 14, background: selectedCustomer ? 'var(--gold)' : 'var(--bg4)', border: 'none', borderRadius: 10, color: selectedCustomer ? '#111' : 'var(--text3)', fontSize: 15, fontWeight: 700, cursor: selectedCustomer ? 'pointer' : 'not-allowed' }}>
-                {selectedCustomer ? 'Gå till kassan →' : 'Välj kund först'}
-              </button>
-            </div>
-          </div>
+                <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)' }}>
+                  {discountAmt > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13, color: 'var(--green)' }}>
+                      <span>Rabatt {String(discountPct).replace('.', ',')} %</span><span>−{fmt(discountAmt)} kr</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13, color: 'var(--text)' }}>
+                    <span>Summa exkl. moms</span><span>{fmt(afterDiscount)} kr</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, fontSize: 13, color: 'var(--text2)' }}>
+                    <span>Moms (25%)</span><span>{fmt(vat)} kr</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 17, fontWeight: 700, color: 'var(--text)', marginBottom: 14, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                    <span>Totalt inkl. moms</span><span style={{ color: 'var(--gold)' }}>{fmt(total)} kr</span>
+                  </div>
+                  <button onClick={() => { setShowCart(false); setView('confirm') }}
+                    style={{ width: '100%', padding: '14px 0', background: 'var(--gold)', border: 'none', borderRadius: 10, color: '#111', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+                    Till kassan →
+                  </button>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                    <button onClick={newCart} style={{ flex: 1, padding: '10px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9, color: 'var(--text)', fontSize: 13, cursor: 'pointer' }}>Ny varukorg</button>
+                    <button onClick={discardCart} style={{ flex: 1, padding: '10px 0', background: 'transparent', border: '1px solid rgba(224,82,82,.3)', borderRadius: 9, color: 'var(--red)', fontSize: 13, cursor: 'pointer' }}>Radera varukorgen</button>
+                  </div>
+                  <p style={{ margin: '10px 0 0', fontSize: 11, color: 'var(--text2)', textAlign: 'center' }}>
+                    Varukorgen sparas automatiskt som utkast{selectedCustomer ? ' på kunden' : ''} – du hittar den under Alla ordrar{selectedCustomer ? ' och på kundkortet' : ''}.
+                  </p>
+                </div>
+              </>
+            )}
+          </aside>
         </div>
       )}
 
-      {/* RIGHT: cart sidebar (desktop only) */}
-      <div style={{ width: 320, borderLeft: '1px solid var(--line)', display: isMobile ? 'none' : 'flex', flexDirection: 'column', background: 'var(--bg2)', flexShrink: 0 }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Varukorg</span>
-          {selectedCustomer && <span style={{ fontSize: 12, color: 'var(--text2)' }}>{selectedCustomer.company}</span>}
-        </div>
-        {cart.length === 0 ? (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: 'var(--text3)' }}>
-            <ShoppingCart size={36} strokeWidth={1.2} />
-            <span style={{ fontSize: 13 }}>Varukorgen är tom</span>
-          </div>
-        ) : (
-          <>
-            <div style={{ flex: 1, overflowY: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                    <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text3)', fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>Produkt</th>
-                    <th style={{ padding: '8px 8px', textAlign: 'center', color: 'var(--text3)', fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>Antal</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'right', color: 'var(--text3)', fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>Summa</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cart.map(i => {
-                    const hasDiscount = linePrice(i) < i.product.list_price
-                    return (
-                      <tr key={i.product.id} style={{ borderBottom: '1px solid var(--border2)' }}>
-                        <td style={{ padding: '10px 12px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <Thumb p={i.product} size={32} />
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: 12 }}>{i.product.name}</div>
-                              {hasDiscount && <div style={{ fontSize: 10, color: 'var(--green)' }}>{fmt(linePrice(i))} kr (ord. {fmt(i.product.list_price)})</div>}
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
-                            <button onClick={() => updateQty(i.product.id, -1)} style={{ width: 22, height: 22, borderRadius: 4, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Minus size={10} /></button>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--gold)', minWidth: 18, textAlign: 'center' }}>{i.qty}</span>
-                            <button onClick={() => addToCart(i.product)} style={{ width: 22, height: 22, borderRadius: 4, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={10} /></button>
-                          </div>
-                        </td>
-                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text)' }}>{fmt(i.qty * linePrice(i))} kr<IncVat net={i.qty * linePrice(i)} /></td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13, color: 'var(--text2)' }}>
-                <span>Summa exkl. moms</span><span>{fmt(subtotal)} kr</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, fontSize: 13, color: 'var(--text2)' }}>
-                <span>Moms (25%)</span><span>{fmt(Math.round(subtotal * 0.25))} kr</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 14, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
-                <span>Totalt inkl. moms</span><span style={{ color: 'var(--gold)' }}>{fmt(subtotal + Math.round(subtotal * 0.25))} kr</span>
-              </div>
-              {!selectedCustomer && <p style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center', marginBottom: 10 }}>Välj en kund för att fortsätta</p>}
-              <button onClick={() => { if (selectedCustomer && cart.length > 0) setView('confirm') }} disabled={!selectedCustomer || cart.length === 0}
-                style={{ width: '100%', padding: '13px 0', background: selectedCustomer && cart.length > 0 ? 'var(--gold)' : 'var(--bg4)', border: 'none', borderRadius: 9, color: selectedCustomer && cart.length > 0 ? '#111' : 'var(--text3)', fontSize: 14, fontWeight: 700, cursor: selectedCustomer && cart.length > 0 ? 'pointer' : 'not-allowed' }}>
-                {editingOrder ? `Fortsätt med #${editingOrder.order_nr}` : 'Gå vidare'}
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-
+      {newCustomerFor !== null && (
+        <NewCustomerModal initialCompany={newCustomerFor} accountManager={myName}
+          onClose={() => setNewCustomerFor(null)}
+          onCreated={c => { setCustomers(cs => [...cs, c].sort((a, b) => a.company.localeCompare(b.company))); selectCustomerAndLoad(c); setNewCustomerFor(null); showToast(`${c.company} skapad`) }} />
+      )}
       {openProduct && (
         <ProductSheet p={openProduct} selectedCustomer={selectedCustomer} qty={getQty(openProduct.id)}
           categoryName={categories.find(c => c.id === openProduct.category_id)?.name || ''}
@@ -1153,7 +1323,7 @@ export default function CrmOrdersPage() {
           onClose={() => setOpenProduct(null)} />
       )}
 
-      {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#fff', padding: '12px 24px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 1001 }}>{toast}</div>}
+      {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#fff', padding: '12px 24px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 1200 }}>{toast}</div>}
     </div>
   )
 }

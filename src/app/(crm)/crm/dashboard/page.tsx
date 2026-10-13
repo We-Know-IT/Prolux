@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt, formatDate, formatDateTime } from '@/lib/utils'
-import { Plus, Users, ShoppingBag, Package, ChevronRight, FileText, GitBranch, Target, Calendar, ChevronLeft, Cake } from 'lucide-react'
+import { Plus, Users, ShoppingBag, Package, ChevronRight, FileText, GitBranch, Target, Calendar, ChevronLeft, Cake, Pencil, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { currentStaff, monthRange, budgetAchieved, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
@@ -73,6 +73,9 @@ export default function CrmDashboardPage() {
   const [meLoaded, setMeLoaded]           = useState(false)
   const [pendingOrders, setPendingOrders] = useState<any[]>([])
   const [confirmingId, setConfirmingId]   = useState<string | null>(null)
+  const [leads, setLeads]                 = useState<any[]>([])
+  const [leadNoteId, setLeadNoteId]       = useState<string | null>(null)
+  const [leadNote, setLeadNote]           = useState('')
 
   useEffect(() => {
     currentStaff(supabase).then(me => {
@@ -97,7 +100,8 @@ export default function CrmDashboardPage() {
       })
     const { start, end } = monthRange()
     Promise.all([
-      supabase.from('deals').select('id,title,value,created_at,customers(company)').eq('stage', 'Offert').order('created_at', { ascending: false }).limit(4),
+      // Open quotes (orders with status quote): each one opens in the order form.
+      supabase.from('orders').select('id,order_nr,subtotal,created_at,customers(company)').eq('status', 'quote').order('created_at', { ascending: false }).limit(5),
       supabase.from('customers').select('id,company,price_list_id').eq('status', 'active').order('created_at', { ascending: false }).limit(5),
       supabase.from('reminders').select('id,customer_id,title,due_date,priority,status,customers(company)').eq('status', 'upcoming').order('due_date'),
       supabase.from('sales_budgets').select('salesperson,budget').eq('year', year).eq('month', month),
@@ -106,7 +110,10 @@ export default function CrmDashboardPage() {
       supabase.from('orders').select('id,order_nr,total,created_at,assigned_to,created_by,customers(id,company)').eq('status', 'pending').order('created_at', { ascending: false }),
       supabase.from('deals').select('id,assigned_to,value').eq('stage', 'Vunnen').gte('updated_at', start).lte('updated_at', end),
       supabase.from('orders').select('deal_id').not('deal_id', 'is', null).not('status', 'in', NOT_LIVE_FILTER),
-    ]).then(([{ data: d }, { data: c }, { data: r }, { data: b }, { data: sold }, { data: ac }, { data: po }, { data: won }, { data: linked }]) => {
+      // Open leads: deals not yet won or lost (web enquiries, quotes, own prospects).
+      supabase.from('deals').select('id,title,value,stage,notes,assigned_to,source,created_at,updated_at,customer_id,customers(id,company)').in('stage', ['Prospekt', 'Kontaktad', 'Offert', 'Förhandling']).order('updated_at', { ascending: false }).limit(8),
+    ]).then(([{ data: d }, { data: c }, { data: r }, { data: b }, { data: sold }, { data: ac }, { data: po }, { data: won }, { data: linked }, { data: ld }]) => {
+      if (ld) setLeads(ld)
       if (d) setDeals(d)
       if (c) setRecentCustomers(c)
       if (r) setReminders(r)
@@ -155,6 +162,14 @@ export default function CrmDashboardPage() {
     setBudgets(newBudgets)
     setSavingBudget(false)
     setEditBudget(false)
+  }
+
+  async function saveLeadNote(id: string) {
+    const notes = leadNote.trim() || null
+    const { error } = await supabase.from('deals').update({ notes, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) return
+    setLeads(ls => ls.map(l => l.id === id ? { ...l, notes } : l))
+    setLeadNoteId(null)
   }
 
   async function markReminderDone(id: string) {
@@ -272,6 +287,46 @@ export default function CrmDashboardPage() {
           </div>
         )
       })()}
+
+      {/* Leads with notes */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 7 }}>
+          <Sparkles size={12} /> Leads
+          <Link href="/crm/pipeline" style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text2)', textDecoration: 'none', textTransform: 'none', letterSpacing: 0 }}>Pipeline →</Link>
+        </div>
+        <div style={{ ...glass, overflow: 'hidden' }}>
+          {leads.length === 0 && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Inga öppna leads. Förfrågningar från webben och offerter (Spara som lead) hamnar här.</div>}
+          {leads.map((l, i) => (
+            <div key={l.id} style={{ padding: '12px 16px', borderBottom: i < leads.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <Link href={l.customers?.id ? `/crm/customers/${l.customers.id}` : '/crm/pipeline'} style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', textDecoration: 'none' }}>
+                  {l.customers?.company || l.title}
+                </Link>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(74,143,212,.14)', color: '#8DBDF0' }}>{l.stage}</span>
+                {l.source === 'web' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(76,175,125,.14)', color: '#6FCB9C' }}>Från webben</span>}
+                <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--gold)' }}>{l.value ? `${fmt(l.value)} kr` : ''}</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text2)', margin: '3px 0 6px' }}>{l.title}{l.assigned_to ? ` · ${l.assigned_to}` : ''} · {formatDate(l.updated_at || l.created_at)}</div>
+              {leadNoteId === l.id ? (
+                <div>
+                  <textarea autoFocus value={leadNote} onChange={e => setLeadNote(e.target.value)} rows={3}
+                    style={{ width: '100%', padding: '8px 10px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text)', fontSize: 13, outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                    <button onClick={() => saveLeadNote(l.id)} style={{ padding: '5px 14px', background: 'var(--gold)', border: 'none', borderRadius: 6, color: '#111', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Spara</button>
+                    <button onClick={() => setLeadNoteId(null)} style={{ padding: '5px 12px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 12, cursor: 'pointer' }}>Avbryt</button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => { setLeadNoteId(l.id); setLeadNote(l.notes || '') }}
+                  style={{ display: 'flex', alignItems: 'flex-start', gap: 6, width: '100%', textAlign: 'left', background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.05)', borderRadius: 7, padding: '7px 10px', cursor: 'pointer', color: l.notes ? 'var(--text)' : 'var(--text2)', fontSize: 13, lineHeight: 1.5 }}>
+                  <Pencil size={12} style={{ marginTop: 3, flexShrink: 0 }} />
+                  <span style={{ whiteSpace: 'pre-line' }}>{l.notes || 'Lägg till anteckning…'}</span>
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Upcoming birthdays — for greetings and offers */}
       {birthdays.length > 0 && (
@@ -512,22 +567,26 @@ export default function CrmDashboardPage() {
             <FileText size={12} /> Skickade offerter
           </div>
           <div style={{ ...glass, overflow: 'hidden' }}>
-            {(deals.length > 0 ? deals : [
-              { id: '1', title: 'Bilservice AB', value: 12400, created_at: '2026-06-10', customers: { company: 'Bilservice AB' } },
-              { id: '2', title: 'Detailing Sthlm', value: 8750, created_at: '2026-06-08', customers: { company: 'Detailing Sthlm' } },
-              { id: '3', title: 'AutoGlans Nordic', value: 22000, created_at: '2026-06-05', customers: { company: 'AutoGlans Nordic' } },
-            ]).map((d: any, i: number, arr: any[]) => (
-              <Link key={d.id} href="/crm/pipeline" style={{ display: 'flex', flexDirection: 'column', padding: '11px 14px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.04)' : 'none', textDecoration: 'none' }}>
-                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', marginBottom: 3 }}>{d.customers?.company || d.title}</div>
+            {deals.length === 0 && (
+              <div style={{ padding: '18px 14px', fontSize: 12, color: 'var(--text3)' }}>Inga öppna offerter just nu.</div>
+            )}
+            {deals.map((d: any, i: number, arr: any[]) => (
+              <Link key={d.id} href={`/crm/orders?edit=${d.id}`} title="Öppna offerten — mejla den eller gör om den till order"
+                style={{ display: 'flex', flexDirection: 'column', padding: '11px 14px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.04)' : 'none', textDecoration: 'none' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.03)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 3 }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{d.customers?.company || 'Kund saknas'}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--font-mono)' }}>#{d.order_nr}</span>
+                </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 11, color: 'var(--text3)' }}>{formatDate(d.created_at)}</span>
-                  <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--gold)' }}>{fmt(d.value)} kr</span>
+                  <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--gold)' }}>{fmt(d.subtotal)} kr</span>
                 </div>
               </Link>
             ))}
             <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,.04)' }}>
-              <Link href="/crm/pipeline" style={{ flex: 1, textAlign: 'center', padding: '10px', fontSize: 11, fontWeight: 600, color: 'var(--gold)', textDecoration: 'none', background: 'rgba(232,184,75,.06)', borderRight: '1px solid rgba(255,255,255,.04)' }}>Följ upp</Link>
-              <Link href="/crm/pipeline" style={{ flex: 1, textAlign: 'center', padding: '10px', fontSize: 11, color: 'var(--text3)', textDecoration: 'none' }}>Se alla</Link>
+              <Link href="/crm/pipeline" style={{ flex: 1, textAlign: 'center', padding: '10px', fontSize: 11, fontWeight: 600, color: 'var(--gold)', textDecoration: 'none', background: 'rgba(232,184,75,.06)', borderRight: '1px solid rgba(255,255,255,.04)' }}>Följ upp i pipeline</Link>
+              <Link href="/crm/orders?view=history" style={{ flex: 1, textAlign: 'center', padding: '10px', fontSize: 11, color: 'var(--text3)', textDecoration: 'none' }}>Se alla</Link>
             </div>
           </div>
         </div>
@@ -539,12 +598,8 @@ export default function CrmDashboardPage() {
           <Users size={12} /> Senaste kunder
         </div>
         <div style={{ ...glass, overflow: 'hidden' }}>
-          {(recentCustomers.length > 0 ? recentCustomers : [
-            { id: '1', company: 'Bilservice AB', price_list_id: 'A' },
-            { id: '2', company: 'Clean Cars GBG', price_list_id: 'B' },
-            { id: '3', company: 'Pro Detailing Malmö', price_list_id: 'C' },
-            { id: '4', company: 'Nordic Auto Care', price_list_id: 'A' },
-          ]).map((c: any, i: number, arr: any[]) => (
+          {recentCustomers.length === 0 && <div style={{ padding: '18px 14px', fontSize: 12, color: 'var(--text3)' }}>Inga kunder ännu.</div>}
+          {recentCustomers.map((c: any, i: number, arr: any[]) => (
             <Link key={c.id} href={`/crm/customers/${c.id}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.04)' : 'none', textDecoration: 'none' }}>
               <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(232,184,75,.1)', border: '1px solid rgba(232,184,75,.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--gold)', flexShrink: 0 }}>
                 {c.company[0]}

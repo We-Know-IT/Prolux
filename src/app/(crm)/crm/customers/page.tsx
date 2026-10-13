@@ -1,4 +1,5 @@
 'use client'
+import { PriceListPicker } from '@/components/crm/NewCustomerModal'
 import { ImportCustomersButton } from '@/components/customers/ImportCustomers'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -217,17 +218,7 @@ export default function CrmCustomersPage() {
 
             <div style={{ marginBottom: 24 }}>
               <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.06em' }}>Prislista</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {['A', 'B', 'C', 'Standard'].map(pl => (
-                  <button key={pl} onClick={() => setNewCustomerForm(f => ({ ...f, price_list_id: pl }))}
-                    style={{ flex: 1, padding: '8px 4px', background: newCustomerForm.price_list_id === pl ? 'rgba(232,184,75,.1)' : 'var(--bg3)', border: `1px solid ${newCustomerForm.price_list_id === pl ? 'var(--gold)' : 'var(--line)'}`, borderRadius: 8, color: newCustomerForm.price_list_id === pl ? 'var(--gold)' : 'var(--text3)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                    {pl}
-                  </button>
-                ))}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>
-                {newCustomerForm.price_list_id === 'A' ? 'Platinum — 40% rabatt' : newCustomerForm.price_list_id === 'B' ? 'Gold — 30% rabatt' : newCustomerForm.price_list_id === 'C' ? 'Silver — 20% rabatt' : 'Utan rabatt (listavis)'}
-              </div>
+              <PriceListPicker value={newCustomerForm.price_list_id} onChange={pl => setNewCustomerForm(f => ({ ...f, price_list_id: pl }))} />
             </div>
 
             <div style={{ marginBottom: 20 }}>

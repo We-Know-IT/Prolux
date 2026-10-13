@@ -1,4 +1,5 @@
 'use client'
+import { ImportProductsButton } from '@/components/products/ImportProducts'
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt } from '@/lib/utils'
@@ -157,9 +158,12 @@ export default function AdminProducts() {
           <p style={{ color: 'var(--text3)', fontSize: 13, marginTop: 6 }}>{products.filter(p => p.active).length} aktiva · {products.length} totalt</p>
         </div>
         {canEdit && (
-          <button onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 20px', background: 'var(--gold)', border: 'none', borderRadius: 8, color: '#111', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-            <Plus size={16} /> Ny produkt
-          </button>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <ImportProductsButton onImported={() => load()} />
+            <button onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 20px', background: 'var(--gold)', border: 'none', borderRadius: 8, color: '#111', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              <Plus size={16} /> Ny produkt
+            </button>
+          </div>
         )}
       </div>
 
@@ -200,13 +204,14 @@ export default function AdminProducts() {
               return (
                 <tr key={p.id} style={{ opacity: p.active ? 1 : 0.5 }}>
                   <td style={{ padding: '13px 0', paddingRight: 16, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text3)', borderBottom: '1px solid var(--line2)', whiteSpace: 'nowrap' }}>{p.sku}</td>
-                  <td style={{ padding: '13px 0', paddingRight: 16, borderBottom: '1px solid var(--line2)', minWidth: 180 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 34, height: 34, borderRadius: 7, background: 'var(--bg3)', border: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
-                        {p.image_url
-                          ? <img src={p.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.target as HTMLImageElement).style.display='none' }} />
-                          : <Package size={15} color="var(--text3)" />
-                        }
+                  <td style={{ padding: '10px 0', paddingRight: 16, borderBottom: '1px solid var(--line2)', minWidth: 220 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <div style={{ position: 'relative', width: 64, height: 64, borderRadius: 10, background: p.image_url ? '#fff' : 'var(--bg3)', border: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                        <Package size={22} color="var(--text3)" style={{ position: 'absolute' }} />
+                        {p.image_url && (
+                          <img src={p.image_url} alt="" loading="lazy" style={{ position: 'relative', width: '100%', height: '100%', objectFit: 'contain', padding: 4, boxSizing: 'border-box', background: '#fff' }}
+                            onError={e => { const el = e.target as HTMLImageElement; el.style.display = 'none'; (el.parentElement as HTMLElement).style.background = 'var(--bg3)' }} />
+                        )}
                       </div>
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>

@@ -7,8 +7,10 @@ import { fmt, formatDate, custPrice } from '@/lib/utils'
 import {
   Plus, Mail, FileText, Bell, Calendar,
   TrendingUp, ShoppingBag, Package, Star,
-  BarChart2, X, Trash2, ChevronLeft, ChevronRight
+  BarChart2, X, Trash2, ChevronLeft, ChevronRight, RefreshCw, Pencil, ShoppingCart, Info
 } from 'lucide-react'
+import { PriceListPicker } from '@/components/crm/NewCustomerModal'
+import IncVat from '@/components/orders/IncVat'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { useTeam, teamOptions } from '@/hooks/useTeam'
@@ -16,6 +18,17 @@ import { nextBirthday, formatBirthday } from '@/lib/birthdays'
 import { useMe } from '@/hooks/useMe'
 
 const supabase = createClient()
+
+const PL_DISCOUNT_TEXT: Record<string, string> = { A: '40 % rabatt', B: '30 % rabatt', C: '20 % rabatt', Standard: 'ingen rabatt' }
+const NOT_SOLD = ['draft', 'quote', 'cancelled']
+
+function ProductPic({ src, size }: { src?: string | null; size: number }) {
+  return (
+    <div style={{ width: size, height: size, borderRadius: 10, background: '#fff', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 4, boxSizing: 'border-box' }}>
+      {src ? <img src={src} alt="" loading="lazy" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <Package size={Math.round(size * 0.4)} color="#999" />}
+    </div>
+  )
+}
 
 const AFFINITY: Record<string, string[]> = {
   'rapidet':  ['magic', 'gommalux', 'green power'],
@@ -80,6 +93,11 @@ export default function CustomerDetailPage() {
   const [editMode, setEditMode]           = useState(false)
   const [editForm, setEditForm]           = useState<Partial<Customer>>({})
   const [editSaving, setEditSaving]       = useState(false)
+  const [productImages, setProductImages] = useState<Record<string, string | null>>({})
+  const [viewOrder, setViewOrder]         = useState<any | null>(null)
+  const [editingActId, setEditingActId]   = useState<string | null>(null)
+  const [editingActText, setEditingActText] = useState('')
+  const [infoEdit, setInfoEdit]           = useState<string | null>(null)   // fast info being edited
 
   useEffect(() => { loadData() }, [id])
   useLiveRefresh(['customers', 'orders', 'order_items', 'activities', 'reminders'], loadData)
@@ -88,16 +106,16 @@ export default function CustomerDetailPage() {
     if (!id) return
     Promise.all([
       supabase.from('customers').select('*').eq('id', id).single(),
-      supabase.from('orders').select('id,order_nr,status,total,subtotal,vat_amount,created_at,delivery_city,order_items(id,product_name,product_sku,qty,unit_price,list_price,total_price)').eq('customer_id', id).order('created_at', { ascending: false }),
+      supabase.from('orders').select('id,order_nr,status,total,subtotal,vat_amount,created_at,delivery_city,notes,deal_id,order_items(id,product_id,product_name,product_sku,qty,unit_price,list_price,total_price)').eq('customer_id', id).order('created_at', { ascending: false }),
       supabase.from('activities').select('id,type,title,body,created_by,created_at').eq('customer_id', id).order('created_at', { ascending: false }),
       supabase.from('reminders').select('*').eq('customer_id', id).order('due_date'),
-      supabase.from('products').select('id,name,brand,list_price,unit').eq('active', true).order('sort_order'),
+      supabase.from('products').select('id,name,brand,list_price,unit,image_url').eq('active', true).order('sort_order'),
     ]).then(([{ data: c }, { data: o }, { data: a }, { data: r }, { data: p }]) => {
       if (c) setCustomer(c as Customer)
-      if (o) { setOrders(o as any); setOrderItems(o.flatMap((x: any) => x.order_items || [])) }
+      if (o) { setOrders(o as any); setOrderItems(o.filter((x: any) => !NOT_SOLD.includes(x.status)).flatMap((x: any) => x.order_items || [])) }
       if (a) setActivities(a as any)
       if (r) setReminders(r)
-      if (p) setAllProductNames(p.map((x: any) => x.name))
+      if (p) { setAllProductNames(p.map((x: any) => x.name)); setProductImages(Object.fromEntries(p.map((x: any) => [x.id, x.image_url]))) }
       setLoading(false)
     })
   }
@@ -112,6 +130,22 @@ export default function CustomerDetailPage() {
       title: titles[noteType], body: noteText, created_by: me.name || 'CRM'
     }).select().single()
     if (!error && data) { setActivities(as => [data, ...as]); setNoteText(''); showToast('Sparad') }
+  }
+
+  async function saveActivityEdit(id: string) {
+    const body = editingActText.trim()
+    const { error } = await supabase.from('activities').update({ body }).eq('id', id)
+    if (error) { showToast('Kunde inte spara: ' + error.message); return }
+    setActivities(as => as.map(a => a.id === id ? { ...a, body } : a))
+    setEditingActId(null); showToast('Anteckningen uppdaterad')
+  }
+
+  async function saveFixedInfo() {
+    if (!customer || infoEdit === null) return
+    const fixed_info = infoEdit.trim() || null
+    const { error } = await supabase.from('customers').update({ fixed_info }).eq('id', customer.id)
+    if (error) { showToast(error.message.includes('fixed_info') ? 'Kör migration 0019 först' : 'Kunde inte spara: ' + error.message); return }
+    setCustomer({ ...customer, fixed_info }); setInfoEdit(null); showToast('Fast info sparad')
   }
 
   async function deleteActivity(id: string) {
@@ -154,14 +188,14 @@ export default function CustomerDetailPage() {
 
   function startEdit() {
     if (!customer) return
-    setEditForm({ company: customer.company, contact_name: customer.contact_name, email: customer.email, phone: customer.phone || '', address: customer.address || '', postal_code: customer.postal_code || '', city: customer.city || '', org_nr: customer.org_nr || '', price_list_id: customer.price_list_id, status: customer.status, account_manager: customer.account_manager || '', birthday: customer.birthday || '', customer_type: customer.customer_type === 'private' ? 'private' : 'business' })
+    setEditForm({ company: customer.company, contact_name: customer.contact_name, email: customer.email, phone: customer.phone || '', address: customer.address || '', postal_code: customer.postal_code || '', city: customer.city || '', org_nr: customer.org_nr || '', price_list_id: customer.price_list_id, status: customer.status, account_manager: customer.account_manager || '', birthday: customer.birthday || '', customer_type: customer.customer_type === 'private' ? 'private' : 'business', fixed_info: customer.fixed_info || '' })
     setEditMode(true)
   }
 
   async function saveEdit() {
     if (!customer) return
     setEditSaving(true)
-    const { data, error } = await supabase.from('customers').update({ ...editForm, account_manager: editForm.account_manager || null, birthday: editForm.birthday || null }).eq('id', customer.id).select().single()
+    const { data, error } = await supabase.from('customers').update({ ...editForm, account_manager: editForm.account_manager || null, birthday: editForm.birthday || null, fixed_info: (editForm.fixed_info || '').trim() || null }).eq('id', customer.id).select().single()
     if (!error && data) { setCustomer(data as Customer); showToast('Kunduppgifter sparade'); setEditMode(false) }
     else showToast('Fel: ' + (error?.message || 'Kunde inte spara'))
     setEditSaving(false)
@@ -182,10 +216,20 @@ export default function CustomerDetailPage() {
   )
 
   // Derived stats
-  const totalSpend     = orders.reduce((s, o) => s + (o.total || 0), 0)
-  const ordersThisYear = orders.filter(o => new Date(o.created_at).getFullYear() === new Date().getFullYear()).length
-  const avgOrderValue  = orders.length ? Math.round(totalSpend / orders.length) : 0
+  const sold           = orders.filter(o => !NOT_SOLD.includes(o.status))
+  const openCarts      = orders.filter(o => o.status === 'draft' || o.status === 'quote')
+  const totalSpend     = sold.reduce((s, o) => s + (o.total || 0), 0)
+  const ordersThisYear = sold.filter(o => new Date(o.created_at).getFullYear() === new Date().getFullYear()).length
+  const avgOrderValue  = sold.length ? Math.round(totalSpend / sold.length) : 0
+  // Latest purchases with pictures: newest first, one tile per product.
+  const recentBuys: { id: string; name: string; qty: number; last: string }[] = []
+  for (const o of sold) for (const it of ((o as any).order_items || []) as OrderItem[]) {
+    const hit = recentBuys.find(r => r.id === it.product_id)
+    if (hit) hit.qty += it.qty
+    else recentBuys.push({ id: it.product_id, name: it.product_name, qty: it.qty, last: o.created_at })
+  }
   const productFreq: Record<string, { name: string; qty: number; total: number }> = {}
+  const lastSold = sold[0]
   for (const item of orderItems) {
     if (!productFreq[item.product_name]) productFreq[item.product_name] = { name: item.product_name, qty: 0, total: 0 }
     productFreq[item.product_name].qty += item.qty
@@ -220,6 +264,54 @@ export default function CustomerDetailPage() {
       </div>
     </div>
   )
+
+  const activityItem = (a: Activity, pad: string) => (
+    <div key={a.id} style={{ ...card, border: `1px solid ${activityColor[a.type]}28`, padding: pad }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: activityColor[a.type], textTransform: 'uppercase' }}>
+          {a.type === 'note' ? '📝' : a.type === 'call' ? '📞' : a.type === 'email' ? '📧' : '🤝'} {a.title}
+        </span>
+        <span style={{ fontSize: 10, color: 'var(--text2)', marginLeft: 'auto' }}>{formatDate(a.created_at)}</span>
+        {editingActId !== a.id && (
+          <button onClick={() => { setEditingActId(a.id); setEditingActText(a.body || '') }} aria-label="Redigera anteckning" title="Redigera"
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text2)', padding: 2 }}><Pencil size={12} /></button>
+        )}
+        <button onClick={() => deleteActivity(a.id)} aria-label="Ta bort anteckning" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text2)', padding: 2 }}><Trash2 size={12} /></button>
+      </div>
+      {editingActId === a.id ? (
+        <div>
+          <textarea autoFocus value={editingActText} onChange={e => setEditingActText(e.target.value)} rows={3}
+            style={{ width: '100%', padding: '8px 10px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 7, color: 'var(--text)', fontSize: 13, outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
+          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+            <button onClick={() => saveActivityEdit(a.id)} style={{ padding: '5px 14px', background: 'var(--gold)', border: 'none', borderRadius: 6, color: '#111', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Spara</button>
+            <button onClick={() => setEditingActId(null)} style={{ padding: '5px 12px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 6, color: 'var(--text)', fontSize: 12, cursor: 'pointer' }}>Avbryt</button>
+          </div>
+        </div>
+      ) : a.body && <p style={{ margin: 0, fontSize: 13, color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{a.body}</p>}
+    </div>
+  )
+
+  const orderRow = (o: Order, big = false) => {
+    const items = ((o as any).order_items || []) as OrderItem[]
+    return (
+      <button key={o.id} type="button" onClick={() => setViewOrder(o)}
+        style={{ ...card, width: '100%', textAlign: 'left', cursor: 'pointer', padding: big ? '14px 18px' : '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}
+        onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(232,184,75,.35)')} onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--line)')}>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {items.slice(0, big ? 5 : 3).map(it => <ProductPic key={it.id} src={productImages[it.product_id]} size={big ? 46 : 36} />)}
+        </div>
+        <div style={{ flex: 1, minWidth: 110 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{o.status === 'quote' ? 'Offert' : o.status === 'draft' ? 'Varukorg' : 'Order'} #{o.order_nr}</div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>{formatDate(o.created_at)} · {items.reduce((n, it) => n + it.qty, 0)} st</div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)' }}>{fmt(o.total)} kr</div>
+          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(76,175,125,.12)', color: 'var(--green)', fontWeight: 700 }}>{ORDER_STATUS_LABEL[o.status as OrderStatus] || o.status}</span>
+        </div>
+        <ChevronRight size={15} color="var(--text2)" />
+      </button>
+    )
+  }
 
   const reminderForm = (
     <div style={{ ...card, padding: 16, marginBottom: 14 }}>
@@ -286,6 +378,12 @@ export default function CustomerDetailPage() {
             <button onClick={sendOffer} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'rgba(232,184,75,.1)', border: '1px solid rgba(232,184,75,.2)', borderRadius: 7, color: 'var(--gold)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
               <FileText size={13} /> Skicka offert
             </button>
+            {lastSold && (
+              <button onClick={() => router.push(`/crm/orders?reorder=${lastSold.id}`)} title={`Samma produkter som order #${lastSold.order_nr}, med dagens priser`}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 7, color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                <RefreshCw size={13} /> Sälj igen
+              </button>
+            )}
             <button onClick={() => router.push(`/crm/orders?customer=${customer.id}`)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--gold)', border: 'none', borderRadius: 7, color: '#111', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
               <Plus size={13} /> Ny order
             </button>
@@ -331,7 +429,7 @@ export default function CustomerDetailPage() {
           <div style={{ ...card, padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px 24px' }}>
             {[
               ['E-post', customer.email], ['Telefon', customer.phone || '—'], ['Adress', [customer.address, [customer.postal_code, customer.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—'],
-              ['Org.nr', customer.org_nr || '—'], ['Status', ({ active: 'Aktiv', inactive: 'Inaktiv', prospect: 'Prospekt' } as Record<string, string>)[customer.status] || customer.status], ['Prislista', customer.price_list_id],
+              ['Org.nr', customer.org_nr || '—'], ['Status', ({ active: 'Aktiv', inactive: 'Inaktiv', prospect: 'Prospekt' } as Record<string, string>)[customer.status] || customer.status], ['Prislista', `${customer.price_list_id} · ${PL_DISCOUNT_TEXT[customer.price_list_id] || ''}`],
               ['Kontaktperson', customer.contact_name || '—'],
               ['Födelsedag', customer.birthday ? (() => {
                 const nb = nextBirthday(customer.birthday)
@@ -344,7 +442,64 @@ export default function CustomerDetailPage() {
                 <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{value}</div>
               </div>
             ))}
+            {/* Fast info: a standing note, e.g. how to find the delivery entrance */}
+            <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <Info size={13} color="var(--gold)" />
+                <span style={{ fontSize: 10, color: 'var(--text2)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>Fast info</span>
+                {infoEdit === null && (
+                  <button onClick={() => setInfoEdit(customer.fixed_info || '')} aria-label="Redigera fast info"
+                    style={{ marginLeft: 6, background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer', padding: 2, display: 'flex' }}><Pencil size={12} /></button>
+                )}
+              </div>
+              {infoEdit === null ? (
+                customer.fixed_info
+                  ? <p style={{ margin: 0, fontSize: 14, color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{customer.fixed_info}</p>
+                  : <button onClick={() => setInfoEdit('')} style={{ background: 'none', border: '1px dashed var(--line)', borderRadius: 8, padding: '8px 12px', color: 'var(--text2)', fontSize: 13, cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+                      + Skriv något som alltid gäller kunden, t.ex. "Leverans en trappa ned till höger"
+                    </button>
+              ) : (
+                <div>
+                  <textarea autoFocus value={infoEdit} onChange={e => setInfoEdit(e.target.value)} rows={2} maxLength={500}
+                    placeholder="T.ex. Kunden befinner sig en trappa ned till höger"
+                    style={{ width: '100%', padding: '9px 12px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontSize: 14, outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <button onClick={saveFixedInfo} style={{ padding: '7px 16px', background: 'var(--gold)', border: 'none', borderRadius: 7, color: '#111', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Spara</button>
+                    <button onClick={() => setInfoEdit(null)} style={{ padding: '7px 14px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 7, color: 'var(--text)', fontSize: 12, cursor: 'pointer' }}>Avbryt</button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* Saved carts (drafts) and quotes */}
+          {openCarts.length > 0 && (
+            <div style={{ ...card, padding: '16px 20px' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <ShoppingCart size={14} color="var(--gold)" /> Påbörjade varukorgar & offerter
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {openCarts.map(o => {
+                  const items = ((o as any).order_items || []) as OrderItem[]
+                  return (
+                    <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 10, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {items.slice(0, 4).map(it => <ProductPic key={it.id} src={productImages[it.product_id]} size={40} />)}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 140 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{o.status === 'quote' ? 'Offert' : 'Varukorg'} #{o.order_nr}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text2)' }}>{formatDate(o.created_at)} · {items.reduce((n, it) => n + it.qty, 0)} st · {fmt(o.subtotal)} kr exkl. moms</div>
+                      </div>
+                      <button onClick={() => router.push(`/crm/orders?edit=${o.id}`)}
+                        style={{ padding: '7px 14px', background: 'var(--gold)', border: 'none', borderRadius: 7, color: '#111', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                        Fortsätt
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Overdue reminders */}
           {overdueReminders.length > 0 && (
@@ -369,18 +524,7 @@ export default function CustomerDetailPage() {
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Senaste ordrar</div>
               {orders.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {orders.slice(0, 4).map(o => (
-                    <div key={o.id} style={{ ...card, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Order #{o.order_nr}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{formatDate(o.created_at)}</div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)' }}>{fmt(o.total)} kr</div>
-                        <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(76,175,125,.12)', color: 'var(--green)', fontWeight: 700 }}>{ORDER_STATUS_LABEL[o.status as OrderStatus] || o.status}</span>
-                      </div>
-                    </div>
-                  ))}
+                  {orders.slice(0, 4).map(o => orderRow(o))}
                   {orders.length > 4 && (
                     <button onClick={() => setTab('orders')} style={{ padding: '9px 0', background: 'transparent', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text2)', fontSize: 12, cursor: 'pointer' }}>
                       Visa alla {orders.length} ordrar →
@@ -395,32 +539,24 @@ export default function CustomerDetailPage() {
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Senaste aktiviteter</div>
               {noteForm}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {activities.slice(0, 4).map(a => (
-                  <div key={a.id} style={{ ...card, border: `1px solid ${activityColor[a.type]}28`, padding: '10px 14px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: activityColor[a.type], textTransform: 'uppercase' }}>
-                        {a.type === 'note' ? '📝' : a.type === 'call' ? '📞' : a.type === 'email' ? '📧' : '🤝'} {a.title}
-                      </span>
-                      <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 'auto' }}>{formatDate(a.created_at)}</span>
-                      <button onClick={() => deleteActivity(a.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 2 }}><Trash2 size={12} /></button>
-                    </div>
-                    {a.body && <p style={{ margin: 0, fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>{a.body}</p>}
-                  </div>
-                ))}
+                {activities.slice(0, 4).map(a => activityItem(a, '10px 14px'))}
                 {activities.length === 0 && <p style={{ color: 'var(--text3)', fontSize: 13 }}>Inga aktiviteter</p>}
               </div>
             </div>
           </div>
 
           {/* Product tags */}
-          {topProducts.length > 0 && (
+          {recentBuys.length > 0 && (
             <div style={{ ...card, padding: '18px 24px' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Senaste köp</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: recommendations.length > 0 ? 14 : 0 }}>
-                {topProducts.slice(0, 5).map(p => (
-                  <Link key={p.name} href={`/crm/orders?customer=${customer.id}&product=${encodeURIComponent(p.name)}`}
-                    style={{ fontSize: 12, padding: '4px 10px', background: 'rgba(76,175,125,.1)', border: '1px solid rgba(76,175,125,.2)', borderRadius: 6, color: 'var(--green)', fontWeight: 600, textDecoration: 'none' }}>
-                    {p.name} ×{p.qty}
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Senaste köp</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10, marginBottom: recommendations.length > 0 ? 16 : 0 }}>
+                {recentBuys.slice(0, 8).map(p => (
+                  <Link key={p.id} href={`/crm/orders?customer=${customer.id}&product=${encodeURIComponent(p.name)}`} title={`Sälj ${p.name} igen`}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: 10, background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 12, textDecoration: 'none' }}>
+                    <ProductPic src={productImages[p.id]} size={96} />
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', textAlign: 'center', lineHeight: 1.3 }}>{p.name}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text2)' }}>{p.qty} st · {formatDate(p.last)}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)' }}>+ Sälj igen</span>
                   </Link>
                 ))}
               </div>
@@ -447,29 +583,7 @@ export default function CustomerDetailPage() {
       {/* ── TAB: Orders ──────────────────────────────────────── */}
       {tab === 'orders' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {orders.map(o => (
-            <div key={o.id} style={{ ...card, padding: '16px 20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: (o as any).order_items?.length ? 12 : 0 }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Order #{o.order_nr}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{formatDate(o.created_at)}</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--gold)', marginBottom: 4 }}>{fmt(o.total)} kr</div>
-                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(76,175,125,.12)', color: 'var(--green)', fontWeight: 700 }}>{ORDER_STATUS_LABEL[o.status as OrderStatus] || o.status}</span>
-                </div>
-              </div>
-              {(o as any).order_items?.length > 0 && (
-                <div style={{ borderTop: '1px solid var(--line)', paddingTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {(o as any).order_items.map((item: OrderItem) => (
-                    <span key={item.id} style={{ fontSize: 11, padding: '3px 8px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 5, color: 'var(--text2)' }}>
-                      {item.product_name} ×{item.qty}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+          {orders.map(o => orderRow(o, true))}
           {orders.length === 0 && <p style={{ color: 'var(--text3)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>Inga ordrar ännu</p>}
         </div>
       )}
@@ -543,18 +657,7 @@ export default function CustomerDetailPage() {
             <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Anteckningar & aktiviteter</h3>
             {noteForm}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {activities.map(a => (
-                <div key={a.id} style={{ ...card, border: `1px solid ${activityColor[a.type]}28`, padding: '12px 14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: activityColor[a.type], textTransform: 'uppercase' }}>
-                      {a.type === 'note' ? '📝' : a.type === 'call' ? '📞' : a.type === 'email' ? '📧' : '🤝'} {a.title}
-                    </span>
-                    <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 'auto' }}>{formatDate(a.created_at)}</span>
-                    <button onClick={() => deleteActivity(a.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 2 }}><Trash2 size={12} /></button>
-                  </div>
-                  {a.body && <p style={{ margin: 0, fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>{a.body}</p>}
-                </div>
-              ))}
+              {activities.map(a => activityItem(a, '12px 14px'))}
               {activities.length === 0 && <p style={{ color: 'var(--text3)', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>Inga aktiviteter</p>}
             </div>
           </div>
@@ -652,14 +755,14 @@ export default function CustomerDetailPage() {
 
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.06em' }}>Prislista</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {(['A', 'B', 'C', 'Standard'] as const).map(pl => (
-                  <button key={pl} onClick={() => setEditForm(f => ({ ...f, price_list_id: pl }))}
-                    style={{ flex: 1, padding: '8px 4px', background: editForm.price_list_id === pl ? 'rgba(232,184,75,.1)' : 'var(--bg3)', border: `1px solid ${editForm.price_list_id === pl ? 'var(--gold)' : 'var(--line)'}`, borderRadius: 8, color: editForm.price_list_id === pl ? 'var(--gold)' : 'var(--text3)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                    {pl}
-                  </button>
-                ))}
-              </div>
+              <PriceListPicker value={editForm.price_list_id || 'Standard'} onChange={pl => setEditForm(f => ({ ...f, price_list_id: pl }))} />
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.06em' }}>Fast info</label>
+              <textarea value={editForm.fixed_info || ''} onChange={e => setEditForm(f => ({ ...f, fixed_info: e.target.value }))} rows={2} maxLength={500}
+                placeholder="T.ex. Kunden befinner sig en trappa ned till höger"
+                style={{ width: '100%', padding: '9px 13px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontSize: 14, outline: 'none', boxSizing: 'border-box', resize: 'vertical' }} />
             </div>
 
             <div style={{ marginBottom: 16 }}>
@@ -695,6 +798,51 @@ export default function CustomerDetailPage() {
         </div>
       )}
 
+
+      {viewOrder && (
+        <div onClick={() => setViewOrder(null)} style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div role="dialog" aria-modal="true" aria-label={`Order #${viewOrder.order_nr}`} onClick={e => e.stopPropagation()}
+            style={{ background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 16, width: '100%', maxWidth: 820, maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 19, fontWeight: 700, color: 'var(--text)' }}>{viewOrder.status === 'quote' ? 'Offert' : viewOrder.status === 'draft' ? 'Varukorg' : 'Order'} #{viewOrder.order_nr}</div>
+                <div style={{ fontSize: 12, color: 'var(--text2)' }}>{formatDate(viewOrder.created_at)} · {ORDER_STATUS_LABEL[viewOrder.status as OrderStatus] || viewOrder.status}</div>
+              </div>
+              <button onClick={() => setViewOrder(null)} aria-label="Stäng" style={{ marginLeft: 'auto', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', padding: 6, display: 'flex' }}><X size={16} /></button>
+            </div>
+            <div style={{ overflowY: 'auto', padding: '6px 22px' }}>
+              {(((viewOrder.order_items || []) as OrderItem[])).map(it => (
+                <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 0', borderBottom: '1px solid var(--line)' }}>
+                  <ProductPic src={productImages[it.product_id]} size={72} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{it.product_name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text2)' }}>{it.qty} × {fmt(it.unit_price)} kr{it.product_sku ? ` · ${it.product_sku}` : ''}</div>
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', textAlign: 'right' }}>{fmt(it.total_price)} kr<IncVat net={it.total_price} /></div>
+                </div>
+              ))}
+              {viewOrder.notes && <p style={{ fontSize: 12, color: 'var(--text2)', margin: '12px 0 0', whiteSpace: 'pre-line' }}>{viewOrder.notes}</p>}
+            </div>
+            <div style={{ padding: '14px 22px', borderTop: '1px solid var(--line)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text)', marginBottom: 4 }}><span>Summa exkl. moms</span><span>{fmt(viewOrder.subtotal)} kr</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text2)', marginBottom: 6 }}><span>Moms</span><span>{fmt(viewOrder.vat_amount)} kr</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 17, fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}><span>Totalt inkl. moms</span><span style={{ color: 'var(--gold)' }}>{fmt(viewOrder.total)} kr</span></div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {(viewOrder.status === 'draft' || viewOrder.status === 'quote') ? (
+                  <button onClick={() => router.push(`/crm/orders?edit=${viewOrder.id}`)} style={{ flex: 1, padding: '12px 0', background: 'var(--gold)', border: 'none', borderRadius: 9, color: '#111', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                    {viewOrder.status === 'quote' ? 'Öppna offerten' : 'Fortsätt med varukorgen'}
+                  </button>
+                ) : (
+                  <button onClick={() => router.push(`/crm/orders?reorder=${viewOrder.id}`)} style={{ flex: 1, padding: '12px 0', background: 'var(--gold)', border: 'none', borderRadius: 9, color: '#111', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <RefreshCw size={15} /> Sälj igen
+                  </button>
+                )}
+                <button onClick={() => setViewOrder(null)} style={{ padding: '12px 20px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 9, color: 'var(--text)', fontSize: 14, cursor: 'pointer' }}>Stäng</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--bg3)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', padding: '12px 20px', fontSize: 13, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 4px 20px rgba(0,0,0,.4)' }}>
