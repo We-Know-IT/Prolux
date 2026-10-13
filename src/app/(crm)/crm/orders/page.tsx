@@ -257,7 +257,10 @@ export default function CrmOrdersPage() {
   const [saveError, setSaveError]         = useState('')
   const [delivery, setDelivery]           = useState('Standard (2-3 dagar)')
   // Per cart line: handed over from the car, or shipped from the warehouse.
-  const [lineFrom, setLineFrom]           = useState<Record<string, 'car' | 'ship'>>({})
+  // Units per line handed over from the car (-1 = all of them); the rest is shipped.
+  const [carQty, setCarQty]               = useState<Record<string, number>>({})
+  const fromCar = (i: CartItem) => { const v = carQty[i.product.id] ?? 0; return v < 0 ? i.qty : Math.min(i.qty, v) }
+  const toShip  = (i: CartItem) => i.qty - fromCar(i)
   // A draft or quote being edited; saving updates it instead of creating a new order.
   const [editingOrder, setEditingOrder]   = useState<{ id: string; order_nr: number; status: string } | null>(null)
   const [historyFilter, setHistoryFilter] = useState<'all' | 'open' | 'orders'>('all')
@@ -450,7 +453,7 @@ export default function CrmOrdersPage() {
   const linePct   = (i: CartItem) => pctOf(lineDisc[i.product.id])
   const linePrice = (i: CartItem) => Math.round(i.unitPrice * (1 - linePct(i) / 100))
 
-  const allFromCar  = cart.length > 0 && cart.every(i => lineFrom[i.product.id] === 'car')
+  const allFromCar  = cart.length > 0 && cart.every(i => toShip(i) === 0)
   const subtotal    = cart.reduce((s, i) => s + i.qty * linePrice(i), 0)
   const discountPct = discountEnabled ? pctOf(discount) : 0
   const discountAmt = Math.round(subtotal * discountPct / 100)
@@ -461,13 +464,13 @@ export default function CrmOrdersPage() {
   function resetOrderForm() {
     editingRef.current = null; setAutoSavedAt('')
     setCart([]); setSelectedCustomer(null); setCustomerSearch(''); setProductSearch('')
-    setDiscount(''); setDiscountEnabled(false); setDelivery('Standard (2-3 dagar)'); setLineFrom({}); setLineDisc({})
+    setDiscount(''); setDiscountEnabled(false); setDelivery('Standard (2-3 dagar)'); setCarQty({}); setLineDisc({})
     setLastBought([]); setSelectedCategory('all'); setCustomerDeals([]); setDealId(''); setEditingOrder(null)
   }
 
   function orderFields(status: OrderStatus) {
-    const carLines  = cart.filter(i => lineFrom[i.product.id] === 'car').length
-    const shipLines = cart.length - carLines
+    const carLines  = cart.filter(i => fromCar(i) > 0).length
+    const shipLines = cart.filter(i => toShip(i) > 0).length
     const deliveryNote = [
       carLines  ? `Från bilen (${carLines} rad${carLines > 1 ? 'er' : ''})` : '',
       shipLines ? `Frakt: ${delivery}` : '',
@@ -507,13 +510,15 @@ export default function CrmOrdersPage() {
       setSaveError(msg); showToast(msg); return null
     }
 
-    const { error: itemsError } = await supabase.from('order_items').insert(cart.map(i => ({
-      order_id: order.id, product_id: i.product.id,
-      product_name: i.product.name, product_sku: i.product.sku,
-      qty: i.qty, unit_price: linePrice(i), list_price: i.product.list_price,
-      total_price: i.qty * linePrice(i),
-      delivery: lineFrom[i.product.id] === 'car' ? 'car' : 'ship',
-    })))
+    // A line split between the car and shipping becomes two rows.
+    const { error: itemsError } = await supabase.from('order_items').insert(cart.flatMap(i =>
+      ([['car', fromCar(i)], ['ship', toShip(i)]] as const).filter(([, q]) => q > 0).map(([delivery, qty]) => ({
+        order_id: order.id, product_id: i.product.id,
+        product_name: i.product.name, product_sku: i.product.sku,
+        qty, unit_price: linePrice(i), list_price: i.product.list_price,
+        total_price: qty * linePrice(i),
+        delivery,
+      }))))
     if (itemsError) {
       if (!editing) await supabase.from('orders').delete().eq('id', order.id)
       const msg = `Orderraderna kunde inte sparas: ${itemsError.message}`
@@ -549,7 +554,7 @@ export default function CrmOrdersPage() {
       autosaveRef.current = run().finally(() => { autosaveRef.current = null })
     }, 1500)
     return () => clearTimeout(t)
-  }, [cart, selectedCustomer, lineDisc, lineFrom, discount, discountEnabled, assignee, delivery, dealId, loading, placing, view]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cart, selectedCustomer, lineDisc, carQty, discount, discountEnabled, assignee, delivery, dealId, loading, placing, view]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Starts an empty cart; the current one stays saved as a draft.
   function newCart() {
@@ -582,7 +587,7 @@ export default function CrmOrdersPage() {
     setPlacing(true)
     if (autosaveRef.current) await autosaveRef.current
     const wasEditing = editingRef.current
-    const shipLines = cart.filter(i => lineFrom[i.product.id] !== 'car').length
+    const shipLines = cart.filter(i => toShip(i) > 0).length
     // Everything handed over from the car: the order is already delivered,
     // no confirmation needed. Anything to ship keeps the normal flow.
     const handedOver = status === 'pending' && shipLines === 0
@@ -635,7 +640,7 @@ export default function CrmOrdersPage() {
     if ((o.customers?.id || o.customer_id) && !customer) { showToast('Kunden hittades inte'); return }
     const { data: items } = await supabase.from('order_items').select('*').eq('order_id', o.id)
     const lines: CartItem[] = []
-    const from: Record<string, 'car' | 'ship'> = {}
+    const from: Record<string, number> = {}
     const disc: Record<string, string> = {}
     const pl = customer?.price_list_id || 'Standard'
     for (const it of items || []) {
@@ -651,11 +656,11 @@ export default function CrmOrdersPage() {
       const same = lines.find(l => l.product.id === product.id)
       if (same) same.qty += it.qty
       else lines.push({ product, qty: it.qty, unitPrice })
-      from[product.id] = it.delivery === 'car' ? 'car' : 'ship'
+      if (it.delivery === 'car') from[product.id] = (from[product.id] ?? 0) + it.qty
     }
     if (copy && lines.length === 0) { showToast('Produkterna i ordern finns inte längre'); return }
     setSelectedCustomer(customer)
-    setCart(lines); setLineFrom(from); setLineDisc(disc)
+    setCart(lines); setCarQty(from); setLineDisc(disc)
     setAssignee(o.assigned_to || '')
     if (customer) loadLastBought(customer)
     else { setLastBought([]); setRecommendations([]) }
@@ -933,18 +938,39 @@ export default function CrmOrdersPage() {
                     </div>
                   </td>
                   <td style={{ padding: '12px 14px' }}>
-                    <div role="group" aria-label={`Leverans för ${i.product.name}`} style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 7, overflow: 'hidden' }}>
-                      {(['car', 'ship'] as const).map(v => {
-                        const on = (lineFrom[i.product.id] || 'ship') === v
-                        return (
-                          <button key={v} type="button" aria-pressed={on} onClick={() => setLineFrom(f => ({ ...f, [i.product.id]: v }))}
-                            style={{ padding: '6px 10px', fontSize: 12, fontWeight: on ? 700 : 500, border: 'none', cursor: 'pointer',
-                              background: on ? 'rgba(232,184,75,.15)' : 'var(--bg4)', color: on ? 'var(--text)' : 'var(--text2)' }}>
-                            {v === 'car' ? 'Bilen' : 'Frakt'}
-                          </button>
-                        )
-                      })}
-                    </div>
+                    {(() => {
+                      const id = i.product.id
+                      const car = fromCar(i), ship = toShip(i)
+                      const mode = car === 0 ? 'ship' : ship === 0 ? 'car' : 'split'
+                      const opts: [string, string][] = [['car', 'Bilen'], ['ship', 'Frakt'], ...(i.qty > 1 ? [['split', 'Dela']] as [string, string][] : [])]
+                      const pick = (m: string) => setCarQty(c => ({ ...c, [id]: m === 'car' ? -1 : m === 'ship' ? 0 : Math.max(1, Math.floor(i.qty / 2)) }))
+                      const setCar = (n: number) => setCarQty(c => ({ ...c, [id]: Math.max(1, Math.min(i.qty - 1, n)) }))
+                      return (
+                        <div>
+                          <div role="group" aria-label={`Leverans för ${i.product.name}`} style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 7, overflow: 'hidden' }}>
+                            {opts.map(([v, label]) => {
+                              const on = mode === v
+                              return (
+                                <button key={v} type="button" aria-pressed={on} onClick={() => pick(v)}
+                                  style={{ padding: '6px 10px', fontSize: 12, fontWeight: on ? 700 : 500, border: 'none', cursor: 'pointer',
+                                    background: on ? 'rgba(232,184,75,.15)' : 'var(--bg4)', color: on ? 'var(--text)' : 'var(--text2)' }}>
+                                  {label}
+                                </button>
+                              )
+                            })}
+                          </div>
+                          {mode === 'split' && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 12, color: 'var(--text2)', whiteSpace: 'nowrap' }}>
+                              <span>Bilen</span>
+                              <button type="button" onClick={() => setCar(car - 1)} disabled={car <= 1} aria-label="Färre från bilen" style={{ ...smallBtn, width: 24, height: 24, opacity: car <= 1 ? .4 : 1 }}><Minus size={11} /></button>
+                              <strong style={{ color: 'var(--text)', minWidth: 14, textAlign: 'center' }}>{car}</strong>
+                              <button type="button" onClick={() => setCar(car + 1)} disabled={ship <= 1} aria-label="Fler från bilen" style={{ ...smallBtn, width: 24, height: 24, opacity: ship <= 1 ? .4 : 1 }}><Plus size={11} /></button>
+                              <span>· <strong style={{ color: 'var(--text)' }}>{ship}</strong> frakt</span>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </td>
                   <td style={{ padding: '12px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1080,15 +1106,15 @@ export default function CrmOrdersPage() {
           <Truck size={15} color="var(--text2)" /> Leverans
         </h3>
         <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 12px' }}>
-          Välj per rad i kassan: <strong style={{ color: 'var(--text)' }}>Bilen</strong> lämnas direkt till kunden och dras inte från lagret, <strong style={{ color: 'var(--text)' }}>Frakt</strong> skickas från lagret.
+          Välj per rad i kassan: <strong style={{ color: 'var(--text)' }}>Bilen</strong> lämnas direkt till kunden och dras inte från lagret, <strong style={{ color: 'var(--text)' }}>Frakt</strong> skickas från lagret. <strong style={{ color: 'var(--text)' }}>Dela</strong> när en del finns i bilen och resten ska fraktas.
         </p>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: cart.some(i => lineFrom[i.product.id] !== 'car') ? 12 : 0 }}>
-          <button type="button" onClick={() => setLineFrom(Object.fromEntries(cart.map(i => [i.product.id, 'car'])))}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: cart.some(i => toShip(i) > 0) ? 12 : 0 }}>
+          <button type="button" onClick={() => setCarQty(Object.fromEntries(cart.map(i => [i.product.id, -1])))}
             style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, cursor: 'pointer' }}>Allt från bilen</button>
-          <button type="button" onClick={() => setLineFrom({})}
+          <button type="button" onClick={() => setCarQty({})}
             style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, cursor: 'pointer' }}>Allt med frakt</button>
         </div>
-        {cart.some(i => lineFrom[i.product.id] !== 'car') && (
+        {cart.some(i => toShip(i) > 0) && (
           <div style={{ position: 'relative' }}>
             <select value={delivery} onChange={e => setDelivery(e.target.value)} aria-label="Fraktsätt" style={selectStyle}>
               <option>Standard (2-3 dagar)</option>
