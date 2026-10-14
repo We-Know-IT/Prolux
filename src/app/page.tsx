@@ -883,11 +883,13 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }} className="cat-grid">
             {siteHome.categories.map((cat, i) => (
               <Reveal key={i} delay={i * 50}>
-                <Link href="/produkter" style={{ display: 'block', position: 'relative', borderRadius: 12, overflow: 'hidden', textDecoration: 'none', aspectRatio: '16/10', background: '#1a1a1a', transition: 'transform .2s' }}
+                <Link href="/produkter" style={{ display: 'block', position: 'relative', borderRadius: 12, overflow: 'hidden', textDecoration: 'none', aspectRatio: '16/10', background: '#1a1a1a', transition: 'transform .2s', containerType: 'inline-size' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'scale(1.02)' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'none' }}>
-                  <img src={cat.img} alt={cat.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.08)', transition: 'background .2s' }} />
+                  {/* The photos carry a small name in the bottom corner: crop it off and write the name large instead. */}
+                  <img src={cat.img} alt="" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '128%', objectFit: 'cover', objectPosition: 'top' }} />
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.72) 0%, rgba(0,0,0,.35) 40%, rgba(0,0,0,0) 70%)' }} />
+                  <span style={{ position: 'absolute', left: '7cqw', right: '6cqw', bottom: '6cqw', color: '#fff', fontSize: 'clamp(15px, 9cqw, 28px)', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-.01em', textShadow: '0 2px 10px rgba(0,0,0,.45)', overflowWrap: 'anywhere' }}>{cat.name}</span>
                   <EditableImage doc="home" path={`categories.${i}.img`} bucket="category-images" />
                 </Link>
               </Reveal>
@@ -1081,7 +1083,7 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
         @keyframes slideIn { from{opacity:0;transform:scale(1.04)} to{opacity:1;transform:scale(1)} }
         @keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:.4} }
         .trust-grid        { grid-template-columns: repeat(4,1fr); }
-        .cat-grid          { grid-template-columns: repeat(6,1fr); }
+        .cat-grid          { grid-template-columns: repeat(4,1fr); }
         .b2b-grid          { grid-template-columns: 420px 1fr; }
         .brand-story-grid  { grid-template-columns: 1fr 1fr; }
         .features-grid     { grid-template-columns: repeat(4,1fr); }
