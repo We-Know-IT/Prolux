@@ -416,6 +416,7 @@ export default function CustomerDetailPage() {
               ['E-post', customer.email], ['Telefon', customer.phone || '—'], ['Adress', [customer.address, [customer.postal_code, customer.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—'],
               ['Org.nr', customer.org_nr || '—'], ['Status', ({ active: 'Aktiv', inactive: 'Inaktiv', prospect: 'Prospekt' } as Record<string, string>)[customer.status] || customer.status], ['Prislista', `${customer.price_list_id} · ${PL_DISCOUNT_TEXT[customer.price_list_id] || ''}`],
               ['Kontaktperson', customer.contact_name || '—'],
+              ['Ort', customer.city || '—'], ['Kundansvarig säljare', customer.account_manager || 'Ingen'],
               ['Födelsedag', customer.birthday ? (() => {
                 const nb = nextBirthday(customer.birthday)
                 const when = nb.daysUntil === 0 ? 'idag 🎉' : nb.daysUntil === 1 ? 'imorgon' : `om ${nb.daysUntil} dagar`
@@ -714,7 +715,7 @@ export default function CustomerDetailPage() {
       {/* ── EDIT CUSTOMER MODAL ─────────────────────────────── */}
       {editMode && customer && (<Portal>
         <div onClick={() => setEditMode(false)} style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 16, padding: '28px 32px', width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 16, padding: '28px 32px', width: '100%', maxWidth: 520, maxHeight: 'calc(90vh / var(--vz, 1))', overflowY: 'auto' }}>
             <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 24, fontFamily: 'var(--font-serif)' }}>Redigera kunduppgifter</div>
 
             {[
@@ -796,7 +797,7 @@ export default function CustomerDetailPage() {
       {viewOrder && (<Portal>
         <div onClick={() => setViewOrder(null)} style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div role="dialog" aria-modal="true" aria-label={`Order #${viewOrder.order_nr}`} onClick={e => e.stopPropagation()}
-            style={{ background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 16, width: '100%', maxWidth: 820, maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+            style={{ background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 16, width: '100%', maxWidth: 820, maxHeight: 'calc(92vh / var(--vz, 1))', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 12 }}>
               <div>
                 <div style={{ fontSize: 19, fontWeight: 700, color: 'var(--text)' }}>{viewOrder.status === 'quote' ? 'Offert' : viewOrder.status === 'draft' ? 'Varukorg' : 'Order'} #{viewOrder.order_nr}</div>

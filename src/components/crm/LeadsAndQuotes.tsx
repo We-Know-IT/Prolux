@@ -2,12 +2,13 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Pencil, Sparkles, FileText, ShoppingCart, BellRing, Trash2 } from 'lucide-react'
+import { Pencil, Sparkles, FileText, ShoppingCart, BellRing, Trash2, Truck } from 'lucide-react'
 import { deleteOpenOrder } from '@/lib/crm-cart'
 import { createClient } from '@/lib/supabase/client'
 import { fmt, formatDate } from '@/lib/utils'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { useMe } from '@/hooks/useMe'
+import { AWAITING_SHIPMENT, SHIP_LINES_SELECT, qtyToShip } from '@/lib/shipping'
 
 // Shared by the CRM and admin overviews.
 
@@ -277,6 +278,53 @@ export function FollowUpPanel({ days = 3, bare = false, onCount }: { days?: numb
             <Link href={orderHref(o.id)} style={{ padding: '5px 12px', borderRadius: 7, background: 'var(--gold)', color: '#111', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>Öppna</Link>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+// Orders with goods still to be sent ("Frakt" lines not shipped yet), so
+// nothing is forgotten after selling part of an order from the car.
+// Shown only when there is something to send.
+export function ToShipPanel({ limit = 8 }: { limit?: number }) {
+  const me = useMe()
+  const admin = useInAdmin() || me.role === 'admin'
+  const [rows, setRows] = useState<any[]>([])
+  function load() {
+    createClient().from('orders').select(`id,order_nr,status,created_at,assigned_to,created_by,customers(company),delivery_name,${SHIP_LINES_SELECT}`)
+      .in('status', [...AWAITING_SHIPMENT]).order('created_at', { ascending: true }).limit(200)
+      .then(({ data }) => setRows((data ?? []).filter((o: any) => qtyToShip(o) > 0)))
+  }
+  useEffect(load, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useLiveRefresh(['orders'], load)
+  if (rows.length === 0) return null
+  const href = (id: string) => admin ? `/admin/orders?order=${id}` : `/crm/orders?view=history&filter=ship&open=${id}`
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={heading}>
+        <Truck size={12} /> Att skicka
+        <span style={{ fontSize: 11, fontWeight: 700, padding: '1px 8px', borderRadius: 10, background: 'rgba(74,143,212,.15)', color: 'var(--blue)', letterSpacing: 0 }}>{rows.length}</span>
+        <Link href={admin ? '/admin/orders?status=ship' : '/crm/orders?view=history&filter=ship'} style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text2)', textDecoration: 'none', textTransform: 'none', letterSpacing: 0 }}>Alla →</Link>
+      </div>
+      <div style={panel}>
+        {rows.slice(0, limit).map((o, i, arr) => {
+          const lines = (o.ship_lines ?? []).filter((l: any) => (l.delivery ?? 'ship') === 'ship')
+          return (
+            <Link key={o.id} href={href(o.id)} style={{ display: 'block', padding: '12px 16px', textDecoration: 'none', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.03)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{o.customers?.company || o.delivery_name || 'Utan kund'}</span>
+                <span style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>#{o.order_nr}</span>
+                <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: 'var(--blue)', whiteSpace: 'nowrap' }}>{qtyToShip(o)} st</span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 3 }}>
+                {lines.map((l: any) => `${l.qty} × ${l.product_name}`).join(', ')}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>{formatDate(o.created_at)}{o.assigned_to ? ` · ${o.assigned_to}` : ''}</div>
+            </Link>
+          )
+        })}
       </div>
     </div>
   )

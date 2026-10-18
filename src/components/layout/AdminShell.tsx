@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import WebshopLink from '@/components/layout/WebshopLink'
 import CartButton from '@/components/layout/CartButton'
+import TextSizeButton from '@/components/layout/TextSizeButton'
 import LeadToast from '@/components/crm/LeadToast'
 import GuideTour, { GuideButton } from '@/components/onboarding/GuideTour'
 import { ADMIN_GUIDE } from '@/components/onboarding/guides'
@@ -181,6 +182,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
             </div>
             <span className="admin-email" style={{ fontSize: 12, color: 'var(--text2)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</span>
           </div>
+          <TextSizeButton />
           <GuideButton />
           <WebshopLink variant="bar" />
           <button onClick={logout} title="Logga ut" aria-label="Logga ut" style={{
@@ -263,6 +265,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
             <div style={{ fontSize: 13, color: 'var(--text2)', fontWeight: 500 }}>{email}</div>
             <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Administratör</div>
           </div>
+          <TextSizeButton variant="menu" />
           <GuideButton variant="menu" />
           <WebshopLink variant="menu" />
           <button onClick={logout} style={{
@@ -301,7 +304,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
         </nav>
       )}
 
-      <main style={{ flex: 1 }}>
+      <main style={{ flex: 1, zoom: 'var(--ui-zoom, 1.1)', ['--vz' as string]: 'var(--ui-zoom, 1.1)' }}>
         {children}
       </main>
 

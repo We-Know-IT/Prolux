@@ -76,7 +76,7 @@ function ProductForm({ onClose, onCreated }: { onClose: () => void; onCreated: (
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 2100, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div role="dialog" aria-modal="true" aria-label="Ny produkt" onClick={e => e.stopPropagation()}
-        style={{ background: '#fff', color: '#111', borderRadius: 16, width: '100%', maxWidth: 640, maxHeight: '94vh', overflowY: 'auto', padding: '22px 24px', boxShadow: '0 24px 70px rgba(0,0,0,.3)' }}>
+        style={{ background: '#fff', color: '#111', borderRadius: 16, width: '100%', maxWidth: 640, maxHeight: 'calc(94vh / var(--vz, 1))', overflowY: 'auto', padding: '22px 24px', boxShadow: '0 24px 70px rgba(0,0,0,.3)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Ny produkt</h2>
           <button onClick={onClose} aria-label="Stäng" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', padding: 4, display: 'flex' }}><X size={20} /></button>

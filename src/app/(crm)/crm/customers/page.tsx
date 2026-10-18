@@ -1,4 +1,6 @@
 'use client'
+import OrgNrLookup from '@/components/crm/OrgNrLookup'
+import { useCustomerFilters } from '@/components/crm/CustomerFilters'
 import { PriceListPicker } from '@/components/crm/NewCustomerModal'
 import { ImportCustomersButton } from '@/components/customers/ImportCustomers'
 import { useEffect, useState } from 'react'
@@ -20,10 +22,9 @@ export default function CrmCustomersPage() {
   const [customers, setCustomers]     = useState<Customer[]>([])
   const [allReminders, setAllReminders] = useState<{ customer_id: string; due_date: string }[]>([])
   const [loading, setLoading]         = useState(true)
-  const [search, setSearch]           = useState('')
   const [showNewCustomer, setShowNewCustomer] = useState(false)
   const [myName, setMyName] = useState('')
-  const [newCustomerForm, setNewCustomerForm] = useState({ company: '', contact_name: '', email: '', phone: '', city: '', org_nr: '', price_list_id: 'Standard', account_manager: '' })
+  const [newCustomerForm, setNewCustomerForm] = useState({ company: '', contact_name: '', email: '', phone: '', address: '', postal_code: '', city: '', org_nr: '', price_list_id: 'Standard', account_manager: '' })
   const [savingCustomer, setSavingCustomer] = useState(false)
   const [toast, setToast]             = useState('')
 
@@ -57,13 +58,15 @@ export default function CrmCustomersPage() {
     setSavingCustomer(true)
     const { data, error } = await supabase.from('customers').insert({
       ...newCustomerForm,
+      address: newCustomerForm.address.trim() || null,
+      postal_code: newCustomerForm.postal_code.trim() || null,
       account_manager: newCustomerForm.account_manager || null,
       status: 'active',
     }).select().single()
     if (!error && data) {
       setCustomers(cs => [...cs, data].sort((a, b) => a.company.localeCompare(b.company)))
       setShowNewCustomer(false)
-      setNewCustomerForm({ company: '', contact_name: '', email: '', phone: '', city: '', org_nr: '', price_list_id: 'Standard', account_manager: myName })
+      setNewCustomerForm({ company: '', contact_name: '', email: '', phone: '', address: '', postal_code: '', city: '', org_nr: '', price_list_id: 'Standard', account_manager: myName })
       showToast('Kund skapad!')
     } else {
       showToast('Fel: ' + (error?.message || 'Kunde inte spara'))
@@ -71,11 +74,7 @@ export default function CrmCustomersPage() {
     setSavingCustomer(false)
   }
 
-  const filtered = customers.filter(c =>
-    !search ||
-    c.company.toLowerCase().includes(search.toLowerCase()) ||
-    c.contact_name.toLowerCase().includes(search.toLowerCase())
-  )
+  const { search, setSearch, filtered, filters, active: filtering } = useCustomerFilters(customers)
 
   const PL_BADGE_COLOR: Record<string, string> = {
     A: 'rgba(76,175,125,.15)', B: 'rgba(74,143,212,.12)', C: 'rgba(155,110,232,.12)', Standard: 'rgba(255,255,255,.06)'
@@ -105,10 +104,14 @@ export default function CrmCustomersPage() {
       <div style={{ position: 'relative', marginBottom: 16 }}>
         <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }} />
         <input
-          placeholder="Sök företag eller kontaktperson..."
+          placeholder="Sök företag, kontaktperson, stad eller org.nr..."
           value={search} onChange={e => setSearch(e.target.value)}
           style={{ width: '100%', padding: '11px 14px 11px 36px', background: 'var(--bg3)', border: '1px solid var(--line)', borderRadius: 9, color: 'var(--text)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
         />
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
+        {filters}
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text2)' }}>{filtered.length} kunder</span>
       </div>
 
       {/* Customer list */}
@@ -127,7 +130,7 @@ export default function CrmCustomersPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text3)', fontSize: 14 }}>
-            {search ? 'Inga kunder matchar sökningen' : 'Inga kunder'}
+            {filtering ? 'Inga kunder matchar sökningen' : 'Inga kunder'}
           </div>
         ) : filtered.map((c, i) => {
           const overdueCount = allReminders.filter(r => r.customer_id === c.id && r.due_date < today).length
@@ -193,16 +196,26 @@ export default function CrmCustomersPage() {
       {/* New customer modal */}
       {showNewCustomer && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
-          <div style={{ background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 16, padding: 32, width: '100%', maxWidth: 520 }}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 16, padding: 32, width: '100%', maxWidth: 520, maxHeight: 'calc(92vh / var(--vz, 1))', overflowY: 'auto', boxSizing: 'border-box' }}>
             <div style={{ fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 500, color: 'var(--text)', marginBottom: 24 }}>Ny kund</div>
+
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 14 }}>
+              <div style={{ flex: '1 1 200px' }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.06em' }} htmlFor="new-org-nr">Org.nr</label>
+                <input id="new-org-nr" value={newCustomerForm.org_nr} onChange={e => setNewCustomerForm(f => ({ ...f, org_nr: e.target.value }))} placeholder="556123-4567"
+                  style={{ width: '100%', padding: '9px 13px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+              <OrgNrLookup orgNr={newCustomerForm.org_nr} onFound={c => setNewCustomerForm(f => ({ ...f, org_nr: c.org_nr, company: c.company, address: c.address || f.address, postal_code: c.postal_code || f.postal_code, city: c.city || f.city }))} />
+            </div>
 
             {[
               { label: 'Företagsnamn *', key: 'company', placeholder: 'AB Bilservice', type: 'text' },
               { label: 'Kontaktperson *', key: 'contact_name', placeholder: 'Erik Lindgren', type: 'text' },
               { label: 'E-post *', key: 'email', placeholder: 'erik@foretag.se', type: 'email' },
               { label: 'Telefon', key: 'phone', placeholder: '08-123 45 67', type: 'tel' },
+              { label: 'Adress', key: 'address', placeholder: 'Industrigatan 4', type: 'text' },
+              { label: 'Postnummer', key: 'postal_code', placeholder: '123 45', type: 'text' },
               { label: 'Stad', key: 'city', placeholder: 'Stockholm', type: 'text' },
-              { label: 'Org.nr', key: 'org_nr', placeholder: '556123-4567', type: 'text' },
             ].map(({ label, key, placeholder, type }) => (
               <div key={key} style={{ marginBottom: 14 }}>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</label>

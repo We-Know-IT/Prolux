@@ -1,4 +1,5 @@
 'use client'
+import { qtyToShip, awaitingShipment, SHIP_LINES_SELECT } from '@/lib/shipping'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
@@ -41,7 +42,7 @@ export default function AdminOrders() {
   function loadOrders() {
     const sb = createClient()
     return sb.from('orders')
-      .select('*,customers(company,contact_name,email)')
+      .select(`*,customers(company,contact_name,email),${SHIP_LINES_SELECT}`)
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         const list = data || []
@@ -51,6 +52,12 @@ export default function AdminOrders() {
         return list
       })
   }
+
+  // ?status=… (e.g. from the overview's boxes) opens the list filtered.
+  useEffect(() => {
+    const st = new URLSearchParams(window.location.search).get('status')
+    if (st) setStatusFilter(st)
+  }, [])
 
   useEffect(() => {
     loadOrders().then(list => {
@@ -70,6 +77,8 @@ export default function AdminOrders() {
       String(o.order_nr).includes(search)
     )
     if (statusFilter === 'unassigned') list = list.filter(o => !o.assigned_to)
+    else if (statusFilter === 'ship') list = list.filter(o => qtyToShip(o) > 0)
+    else if (statusFilter === 'today') list = list.filter(o => new Date(o.created_at).toDateString() === new Date().toDateString())
     else if (statusFilter) list = list.filter(o => o.status === statusFilter)
     setFiltered(list)
   }, [search, statusFilter, orders])
@@ -187,6 +196,8 @@ export default function AdminOrders() {
           <option value="">Alla statusar</option>
           {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           <option value="unassigned">Saknar säljare</option>
+          <option value="ship">Att skicka</option>
+          <option value="today">Lagda idag</option>
         </select>
         <span style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--text3)' }}>{filtered.length} ordrar</span>
       </div>
@@ -209,7 +220,10 @@ export default function AdminOrders() {
                   <td style={{ padding: '16px 0', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--gold)', fontWeight: 500, borderBottom: '1px solid rgba(255,255,255,.04)' }}>#{o.order_nr}</td>
                   <td style={{ padding: '16px 0', fontSize: '13px', color: 'var(--text)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>{formatDateTime(o.created_at)}</td>
                   <td style={{ padding: '16px 0', fontSize: '13px', color: 'var(--text)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>{o.customers?.company || o.delivery_name || '—'}</td>
-                  <td style={{ padding: '16px 0', fontSize: '13px', color: o.assigned_to ? 'var(--text2)' : 'var(--red)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>{o.assigned_to || 'Saknas'}</td>
+                  <td style={{ padding: '16px 0', fontSize: '13px', color: o.assigned_to ? 'var(--text2)' : 'var(--red)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
+                    {o.assigned_to || 'Saknas'}
+                    {o.created_by && o.created_by !== o.assigned_to && <div style={{ fontSize: 11, color: 'var(--text2)' }}>såld av {o.created_by}</div>}
+                  </td>
                   <td style={{ padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
                     <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: 4, background: 'rgba(232,184,75,.15)', color: 'var(--gold)' }}>{o.price_list_id || 'Standard'}</span>
                   </td>
@@ -218,6 +232,7 @@ export default function AdminOrders() {
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: 4, background: sc.bg, color: sc.color }}>
                       {STATUS_LABELS[o.status] || o.status}
                     </span>
+                    {qtyToShip(o) > 0 && <div style={{ marginTop: 4, fontSize: 11, fontWeight: 700, color: 'var(--blue)', whiteSpace: 'nowrap' }}>{qtyToShip(o)} st att skicka</div>}
                   </td>
                   <td style={{ padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
                     <select
@@ -284,7 +299,8 @@ export default function AdminOrders() {
                     </select>
                   )],
                   ['E-post',    selectedOrder.customers?.email || '—'],
-                  ['Säljare', (
+                  ['Såld av',   selectedOrder.created_by || 'Webbshoppen'],
+                  ['Räknas på', (
                     <select key="a" value={selectedOrder.assigned_to || ''} onChange={e => updateAssignee(selectedOrder.id, e.target.value)}
                       style={{ fontSize: 12, padding: '4px 8px', border: `1px solid ${selectedOrder.assigned_to ? 'var(--border)' : 'var(--red)'}`, borderRadius: 4, background: 'var(--bg3)', color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>
                       <option value="">— Ingen —</option>
@@ -323,8 +339,10 @@ export default function AdminOrders() {
                     <div>
                       <div style={{ color: 'var(--text)', fontWeight: 500, marginBottom: 2 }}>
                         {item.product_name}
-                        {item.delivery === 'car' && (
+                        {item.delivery === 'car' ? (
                           <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(76,175,125,.14)', color: 'var(--green)' }}>LEVERERAD FRÅN BILEN</span>
+                        ) : awaitingShipment(selectedOrder.status) && (
+                          <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(74,143,212,.14)', color: 'var(--blue)' }}>ATT SKICKA</span>
                         )}
                       </div>
                       <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text3)' }}>× {item.qty} · {item.product_sku}</div>

@@ -1,4 +1,6 @@
 'use client'
+import OrgNrLookup from '@/components/crm/OrgNrLookup'
+import { useCustomerFilters } from '@/components/crm/CustomerFilters'
 import { ImportCustomersButton } from '@/components/customers/ImportCustomers'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -37,7 +39,6 @@ export default function AdminCustomers() {
   const router = useRouter()
   const [customers, setCustomers] = useState<any[]>([])
   const [orders, setOrders]       = useState<any[]>([])
-  const [search, setSearch]       = useState('')
   const [selectedCust, setSelectedCust] = useState<any>(null)
   const [custOrders, setCustOrders]     = useState<any[]>([])
   const [custActs, setCustActs]         = useState<any[]>([])
@@ -154,11 +155,7 @@ export default function AdminCustomers() {
     setTimeout(() => setToast(''), 3000)
   }
 
-  const filtered = customers.filter(c =>
-    !search ||
-    c.company.toLowerCase().includes(search.toLowerCase()) ||
-    (c.contact_name || '').toLowerCase().includes(search.toLowerCase())
-  )
+  const { search, setSearch, filtered, filters } = useCustomerFilters(customers)
 
   const totalRevenue = (c: any) =>
     orders.filter(o => o.customer_id === c.id && isLiveOrder(o.status)).reduce((s: number, o: any) => s + (o.subtotal || 0), 0)
@@ -181,14 +178,15 @@ export default function AdminCustomers() {
       </div>
 
       {/* Search */}
-      <div style={{ padding: '20px 40px', borderBottom: '1px solid rgba(255,255,255,.04)', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ padding: '20px 40px', borderBottom: '1px solid rgba(255,255,255,.04)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Sök kund, företag…"
-          style={{ width: '100%', maxWidth: 320, padding: '9px 14px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontFamily: 'var(--font-sans)', fontSize: '13px', outline: 'none' }}
+          placeholder="Sök kund, stad, org.nr…"
+          style={{ width: '100%', maxWidth: 280, padding: '9px 14px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontFamily: 'var(--font-sans)', fontSize: '13px', outline: 'none' }}
         />
-        <span style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--text3)' }}>{filtered.length} kunder</span>
+        {filters}
+        <span style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--text2)' }}>{filtered.length} kunder</span>
       </div>
 
       {/* Table */}
@@ -196,7 +194,7 @@ export default function AdminCustomers() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {['Företag', 'Kontakt', 'E-post', 'Prislista', 'Status', 'Ordrar', 'Omsättning'].map(h => (
+              {['Företag', 'Kontakt', 'Ort', 'Säljare', 'Prislista', 'Status', 'Ordrar', 'Omsättning'].map(h => (
                 <th key={h} style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', padding: '14px 0', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>{h}</th>
               ))}
             </tr>
@@ -219,7 +217,8 @@ export default function AdminCustomers() {
                     {c.contact_name}
                     {c.contact_role && <><br /><span style={{ fontSize: 10, color: 'var(--text3)' }}>{c.contact_role}</span></>}
                   </td>
-                  <td style={{ padding: '16px 0', fontSize: 13, color: 'var(--text2)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>{c.email}</td>
+                  <td style={{ padding: '16px 0', fontSize: 13, color: 'var(--text)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>{c.city || '—'}</td>
+                  <td style={{ padding: '16px 0', fontSize: 13, color: c.account_manager ? 'var(--text)' : 'var(--text2)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>{c.account_manager || 'Ingen'}</td>
                   <td style={{ padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
                     <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: 4, background: plc.bg, color: plc.color }}>{c.price_list_id}</span>
                   </td>
@@ -264,6 +263,8 @@ export default function AdminCustomers() {
                   ['Roll',      selectedCust.contact_role || '—'],
                   ['E-post',    selectedCust.email],
                   ['Telefon',   selectedCust.phone || '—'],
+                  ['Ort',       selectedCust.city || '—'],
+                  ['Säljare',   selectedCust.account_manager || 'Ingen kundansvarig'],
                   ['Adress',    [selectedCust.address, [selectedCust.postal_code, selectedCust.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—'],
                   ['Org.nr',    selectedCust.org_nr || '—'],
                   ['Prislista', `${selectedCust.price_list_id} · ${({ A: '40', B: '30', C: '20' } as Record<string, string>)[selectedCust.price_list_id] || '0'} % rabatt`],
@@ -361,7 +362,7 @@ export default function AdminCustomers() {
           onClick={e => { if (e.target === e.currentTarget) { setShowModal(false); setEditMode(false) } }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(6px)', padding: 20 }}
         >
-          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, width: '100%', maxWidth: 480, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, width: '100%', maxWidth: 480, maxHeight: 'calc(90vh / var(--vz, 1))', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
               <div style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>{editMode ? 'Redigera kund' : 'Ny kund'}</div>
               <button onClick={() => { setShowModal(false); setEditMode(false) }} style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--bg3)', border: 'none', color: 'var(--text2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -370,6 +371,14 @@ export default function AdminCustomers() {
             </div>
 
             <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 14 }}>
+                <div style={{ flex: '1 1 200px' }}>
+                  <label htmlFor="adm-org-nr" style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Org.nr</label>
+                  <input id="adm-org-nr" value={form.org_nr} onChange={e => setForm(p => ({ ...p, org_nr: e.target.value }))} placeholder="556123-4567"
+                    style={{ width: '100%', padding: '10px 14px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontFamily: 'var(--font-sans)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+                <OrgNrLookup orgNr={form.org_nr} onFound={c => setForm(p => ({ ...p, org_nr: c.org_nr, company: c.company, address: c.address || p.address, postal_code: c.postal_code || p.postal_code, city: c.city || p.city }))} />
+              </div>
               {[
                 { label: 'Företag *',       key: 'company',      placeholder: 'AB Bolaget' },
                 { label: 'Kontaktperson *', key: 'contact_name', placeholder: 'Anna Lindqvist' },
@@ -379,7 +388,6 @@ export default function AdminCustomers() {
                 { label: 'Adress',          key: 'address',      placeholder: 'Storgatan 1' },
                 { label: 'Postnummer',      key: 'postal_code',  placeholder: '123 45' },
                 { label: 'Stad',            key: 'city',         placeholder: 'Stockholm' },
-                { label: 'Org.nr',          key: 'org_nr',       placeholder: '556123-4567' },
               ].map(f => (
                 <div key={f.key} style={{ marginBottom: 14 }}>
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>{f.label}</label>

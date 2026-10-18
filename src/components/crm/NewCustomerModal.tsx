@@ -1,7 +1,8 @@
 'use client'
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { X, ChevronDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import OrgNrLookup from '@/components/crm/OrgNrLookup'
 import type { Customer, PriceList } from '@/types'
 
 // Price lists with their discount, shown wherever a list is picked.
@@ -63,7 +64,7 @@ export default function NewCustomerModal({ accountManager, initialCompany = '', 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div role="dialog" aria-modal="true" aria-label="Ny kund" onClick={e => e.stopPropagation()}
-        style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 560, maxHeight: '92vh', overflowY: 'auto', padding: '22px 24px' }}>
+        style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 560, maxHeight: 'calc(92vh / var(--vz, 1))', overflowY: 'auto', padding: '22px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
           <h2 style={{ margin: 0, fontSize: 19, fontWeight: 700, color: 'var(--text)' }}>Ny kund</h2>
           <button onClick={onClose} aria-label="Stäng" style={{ background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', padding: 6, display: 'flex' }}><X size={16} /></button>
@@ -78,12 +79,17 @@ export default function NewCustomerModal({ accountManager, initialCompany = '', 
           ))}
         </div>
 
+        {!priv && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 12 }}>
+            <div style={{ flex: '1 1 200px' }}>{field('org_nr', 'Org.nr')}</div>
+            <OrgNrLookup orgNr={form.org_nr} onFound={c => setForm(f => ({ ...f, org_nr: c.org_nr, company: c.company, address: c.address || f.address, postal_code: c.postal_code || f.postal_code, city: c.city || f.city }))} />
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
           {!priv && field('company', 'Företag *', 'text', 'organization')}
           {field('contact_name', priv ? 'Namn *' : 'Kontaktperson', 'text', 'name')}
           {field('email', 'E-post', 'email', 'email')}
           {field('phone', 'Telefon', 'tel', 'tel')}
-          {!priv && field('org_nr', 'Org.nr')}
           {field('address', 'Adress', 'text', 'street-address')}
           {field('postal_code', 'Postnummer', 'text', 'postal-code')}
           {field('city', 'Ort', 'text', 'address-level2')}
@@ -106,14 +112,22 @@ export default function NewCustomerModal({ accountManager, initialCompany = '', 
   )
 }
 
-// A / B / C / Standard with the discount written out.
+// A / B / C / Standard with the discount written out, folded away behind a
+// small button so a customer filling in the form never sees the other lists.
 export function PriceListPicker({ value, onChange }: { value: string; onChange: (v: PriceList) => void }) {
+  const [open, setOpen] = useState(false)
+  if (!open) return (
+    <button type="button" onClick={() => setOpen(true)} aria-expanded={false}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text2)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+      {value || 'Standard'} <ChevronDown size={14} />
+    </button>
+  )
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8 }}>
       {PRICE_LIST_OPTIONS.map(({ id, label }) => {
         const on = value === id
         return (
-          <button key={id} type="button" onClick={() => onChange(id)} aria-pressed={on}
+          <button key={id} type="button" onClick={() => { onChange(id); setOpen(false) }} aria-pressed={on}
             style={{ padding: '9px 4px', background: on ? 'rgba(232,184,75,.1)' : 'var(--bg3)', border: `1px solid ${on ? 'var(--gold)' : 'var(--border)'}`, borderRadius: 8, color: on ? 'var(--gold)' : 'var(--text2)', fontSize: 13, fontWeight: 700, cursor: 'pointer', lineHeight: 1.3 }}>
             {label.split(' · ')[0]}
             <span style={{ display: 'block', fontSize: 11, fontWeight: 600, color: on ? 'var(--gold)' : 'var(--text2)' }}>{label.split(' · ')[1]} rabatt</span>

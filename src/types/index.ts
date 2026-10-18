@@ -127,6 +127,9 @@ export interface CartItem {
   product: Product
   qty: number
   unitPrice: number
+  // A line typed in by hand (not a product in the catalogue); its price is
+  // the one entered and does not follow the price list.
+  manual?: boolean
 }
 
 // ── CONSTANTS ────────────────────────────────────────────────

@@ -36,7 +36,7 @@ export default function QuoteShareModal({ share, onClose }: { share: QuoteShare;
     <Portal>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1300, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
         <div role="dialog" aria-modal="true" aria-label="Mejla offerten" onClick={e => e.stopPropagation()}
-          style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 760, maxHeight: '94vh', display: 'flex', flexDirection: 'column' }}>
+          style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 760, maxHeight: 'calc(94vh / var(--vz, 1))', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
             <Mail size={18} color="var(--gold)" />
             <div style={{ flex: 1, minWidth: 0 }}>

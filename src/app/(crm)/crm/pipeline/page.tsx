@@ -1,4 +1,5 @@
 'use client'
+import { PriceListPicker } from '@/components/crm/NewCustomerModal'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Deal, Customer, DEAL_STAGES, DealStage } from '@/types'
@@ -154,10 +155,10 @@ export default function CrmPipelinePage() {
   const stageDeals = (stage: DealStage) => deals.filter(d => d.stage === stage)
   const stageTotal = (stage: DealStage) => stageDeals(stage).reduce((s, d) => s + (d.value || 0), 0)
 
-  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--text3)' }}>Laddar pipeline...</div>
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(60vh / var(--vz, 1))', color: 'var(--text3)' }}>Laddar pipeline...</div>
 
   return (
-    <div style={{ padding: '16px 14px', height: 'calc(100vh - 58px)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ padding: '16px 14px', height: 'calc(100vh / var(--vz, 1) - 58px)', display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexShrink: 0 }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 400, color: 'var(--text)', margin: 0 }}>Pipeline</h1>
@@ -246,7 +247,7 @@ export default function CrmPipelinePage() {
       {/* ── NY DEAL MODAL ──────────────────────────────────────── */}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div style={{ background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 16, width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 16, width: '100%', maxWidth: 500, maxHeight: 'calc(90vh / var(--vz, 1))', overflowY: 'auto' }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: 'var(--bg2)', zIndex: 1 }}>
               <h2 style={{ margin: 0, fontFamily: 'var(--font-serif)', fontSize: 18, fontWeight: 400, color: 'var(--text)' }}>{editingId ? 'Redigera affär' : 'Ny affär'}</h2>
               <button onClick={closeModal} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
@@ -299,14 +300,7 @@ export default function CrmPipelinePage() {
                       ))}
                       <div>
                         <label style={{ display: 'block', fontSize: 10, color: 'var(--text3)', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Prislista</label>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          {['A','B','C','Standard'].map(pl => (
-                            <button key={pl} onClick={() => setNewCust(f => ({ ...f, price_list_id: pl }))}
-                              style={{ flex: 1, padding: '6px 4px', background: newCust.price_list_id === pl ? 'rgba(232,184,75,.1)' : 'var(--bg4)', border: `1px solid ${newCust.price_list_id === pl ? 'var(--gold)' : 'var(--line)'}`, borderRadius: 6, color: newCust.price_list_id === pl ? 'var(--gold)' : 'var(--text3)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                              {pl}
-                            </button>
-                          ))}
-                        </div>
+                        <PriceListPicker value={newCust.price_list_id} onChange={pl => setNewCust(f => ({ ...f, price_list_id: pl }))} />
                       </div>
                       <button onClick={createCustomerInline} disabled={savingCust}
                         style={{ padding: '8px 0', background: 'var(--gold)', border: 'none', borderRadius: 7, color: '#111', fontSize: 12, fontWeight: 700, cursor: 'pointer', opacity: savingCust ? 0.6 : 1 }}>

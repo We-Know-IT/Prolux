@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import WebshopLink from '@/components/layout/WebshopLink'
 import CartButton from '@/components/layout/CartButton'
+import TextSizeButton from '@/components/layout/TextSizeButton'
 import LeadToast from '@/components/crm/LeadToast'
 import GuideTour, { GuideButton } from '@/components/onboarding/GuideTour'
 import { CRM_GUIDE } from '@/components/onboarding/guides'
@@ -115,6 +116,7 @@ export default function CrmShell({ children }: { children: ReactNode }) {
         {/* Right side */}
         <div className="crm-desktop-right" style={{ display: 'none', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
           <CartButton />
+          <TextSizeButton />
           <GuideButton />
           <WebshopLink variant="bar" />
           <button onClick={logout} title="Logga ut" aria-label="Logga ut" style={{
@@ -175,6 +177,7 @@ export default function CrmShell({ children }: { children: ReactNode }) {
             )
           })}
           <div style={{ flex: 1 }} />
+          <TextSizeButton variant="menu" />
           <GuideButton variant="menu" />
           <WebshopLink variant="menu" />
           <button onClick={logout} style={{
@@ -197,7 +200,7 @@ export default function CrmShell({ children }: { children: ReactNode }) {
           <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{orderToast.name} · tryck för att hantera</div>
         </Link>
       )}
-      <main style={{ flex: 1 }}>
+      <main style={{ flex: 1, zoom: 'var(--ui-zoom, 1.1)', ['--vz' as string]: 'var(--ui-zoom, 1.1)' }}>
         {children}
       </main>
 

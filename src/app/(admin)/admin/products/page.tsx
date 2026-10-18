@@ -268,7 +268,7 @@ export default function AdminProducts() {
       {showModal && (
         <div onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(6px)', padding: 20 }}>
-          <div style={{ background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 14, width: '100%', maxWidth: 580, maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 14, width: '100%', maxWidth: 580, maxHeight: 'calc(92vh / var(--vz, 1))', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
               <div style={{ fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 500, color: 'var(--text)' }}>{editId ? 'Redigera produkt' : 'Ny produkt'}</div>
               <button onClick={() => setShowModal(false)} style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--bg3)', border: 'none', color: 'var(--text2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

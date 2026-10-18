@@ -10,7 +10,7 @@ import { useTeam } from '@/hooks/useTeam'
 import { useBudgetHistory } from '@/hooks/useBudgetHistory'
 import BudgetHistoryChart from '@/components/BudgetHistoryChart'
 import ReminderModal, { type Reminder } from '@/components/crm/ReminderModal'
-import { LeadsPanel, DraftsPanel, FollowUpPanel, QuotesPanel } from '@/components/crm/LeadsAndQuotes'
+import { LeadsPanel, DraftsPanel, FollowUpPanel, QuotesPanel, ToShipPanel } from '@/components/crm/LeadsAndQuotes'
 import { nextBirthday, formatBirthday } from '@/lib/birthdays'
 
 const supabase = createClient()
@@ -258,7 +258,7 @@ export default function CrmDashboardPage() {
                 <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderTop: i > 0 ? '1px solid rgba(255,255,255,.05)' : 'none', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 160 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
-                      #{o.order_nr} · {o.customers?.id
+                      <Link href={`/crm/orders?view=history&open=${o.id}`} style={{ color: 'var(--text)' }}>#{o.order_nr}</Link> · {o.customers?.id
                         ? <Link href={`/crm/customers/${o.customers.id}`} style={{ color: 'var(--text)', textDecoration: 'underline', textUnderlineOffset: 3 }}>{o.customers.company}</Link>
                         : 'Gästorder'}
                     </div>
@@ -277,6 +277,8 @@ export default function CrmDashboardPage() {
           </div>
         )
       })()}
+
+      <ToShipPanel />
 
       {/* Leads with notes, saved carts */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 24, alignItems: 'start' }}>

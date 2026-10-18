@@ -10,7 +10,7 @@ import { useTeam } from '@/hooks/useTeam'
 import { useBudgetHistory } from '@/hooks/useBudgetHistory'
 import BudgetHistoryChart from '@/components/BudgetHistoryChart'
 import ReminderModal, { type Reminder } from '@/components/crm/ReminderModal'
-import { LeadsPanel, QuotesPanel, DraftsPanel, FollowUpPanel } from '@/components/crm/LeadsAndQuotes'
+import { LeadsPanel, QuotesPanel, DraftsPanel, FollowUpPanel, ToShipPanel } from '@/components/crm/LeadsAndQuotes'
 import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, Trophy, ArrowRight, Calendar, ChevronLeft, ChevronRight, Activity } from 'lucide-react'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -251,12 +251,12 @@ export default function AdminDashboard() {
   }
 
   const kpis = [
-    { label: 'Total omsättning',  value: `${fmt(revenue)} kr`,         sub: 'alla ordrar exkl. moms',     icon: TrendingUp, gold: true },
-    { label: 'Aktiva ordrar',     value: pendingCount.toString(),       sub: unassignedCount > 0 ? `${unassignedCount} saknar säljare` : 'väntande behandling',         icon: Clock,      alert: pendingCount > 0 },
-    { label: 'Ordrar idag',       value: todayOrders.toString(),        sub: 'nya ordrar',                  icon: ShoppingBag },
-    { label: 'Aktiva kunder',     value: activeCustomers.toString(),    sub: `av ${customers.length} totalt`, icon: Users },
-    { label: 'Pipeline-värde',    value: `${fmt(pipelineValue)} kr`,   sub: `${deals.length} aktiva deals`, icon: GitBranch, blue: true },
-    { label: 'Stängt denna månad', value: `${fmt(wonThisMonth)} kr`,   sub: monthNames[month],             icon: Trophy,     green: wonThisMonth > 0 },
+    { label: 'Total omsättning',  value: `${fmt(revenue)} kr`,         sub: 'alla ordrar exkl. moms',     icon: TrendingUp, gold: true, href: '/admin/orders' },
+    { label: 'Aktiva ordrar',     value: pendingCount.toString(),       sub: unassignedCount > 0 ? `${unassignedCount} saknar säljare` : 'väntande behandling',         icon: Clock,      alert: pendingCount > 0, href: unassignedCount > 0 ? '/admin/orders?status=unassigned' : '/admin/orders?status=pending' },
+    { label: 'Ordrar idag',       value: todayOrders.toString(),        sub: 'nya ordrar',                  icon: ShoppingBag, href: '/admin/orders?status=today' },
+    { label: 'Aktiva kunder',     value: activeCustomers.toString(),    sub: `av ${customers.length} totalt`, icon: Users, href: '/admin/customers' },
+    { label: 'Pipeline-värde',    value: `${fmt(pipelineValue)} kr`,   sub: `${deals.length} aktiva deals`, icon: GitBranch, blue: true, href: '/admin/crm/pipeline' },
+    { label: 'Stängt denna månad', value: `${fmt(wonThisMonth)} kr`,   sub: monthNames[month],             icon: Trophy,     green: wonThisMonth > 0, href: '/admin/crm/pipeline' },
   ]
 
   return (
@@ -289,7 +289,7 @@ export default function AdminDashboard() {
           const iconBg   = k.gold ? 'rgba(232,184,75,.1)' : k.alert ? 'rgba(212,138,58,.1)' : k.blue ? 'rgba(74,143,212,.1)' : k.green ? 'rgba(76,175,125,.1)' : 'rgba(255,255,255,.04)'
           const iconColor = k.gold ? 'var(--gold)' : k.alert ? '#D48A3A' : k.blue ? '#6AAFF0' : k.green ? 'var(--green)' : 'var(--text3)'
           return (
-            <div key={i} style={{ ...card, padding: '20px 22px', borderColor, boxShadow: k.gold ? `${card.boxShadow}, var(--gold-glow)` : card.boxShadow as string }}>
+            <Link key={i} href={k.href} className="kpi-link" style={{ ...card, display: 'block', textDecoration: 'none', padding: '20px 22px', borderColor, boxShadow: k.gold ? `${card.boxShadow}, var(--gold-glow)` : card.boxShadow as string }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
                 <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.09em' }}>{k.label}</span>
                 <div style={{ width: 28, height: 28, borderRadius: 7, background: iconBg, border: `1px solid ${borderColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -304,13 +304,14 @@ export default function AdminDashboard() {
                 color: k.alert ? '#D48A3A' : k.blue ? '#6AAFF0' : k.green ? 'var(--green)' : 'var(--text)',
               }}>{k.value}</div>
               <div style={{ fontSize: 11, color: 'var(--text3)' }}>{k.sub}</div>
-            </div>
+            </Link>
           )
         })}
       </div>
 
       {/* Att göra: quotes and carts to follow up (shown only when there are any) */}
       <div style={{ marginBottom: 16 }}><FollowUpPanel /></div>
+      <ToShipPanel />
 
       {/* Leads with notes, open quotes and saved carts */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 24 }}>
