@@ -7,7 +7,7 @@ import { fmt, formatDate, custPrice } from '@/lib/utils'
 import {
   Plus, Mail, FileText, Bell, Calendar,
   TrendingUp, ShoppingBag, Package, Star,
-  BarChart2, X, Trash2, ChevronLeft, ChevronRight, RefreshCw, Pencil, ShoppingCart, Info
+  BarChart2, X, Trash2, ChevronLeft, ChevronRight, RefreshCw, Pencil, ShoppingCart, Info, MapPin
 } from 'lucide-react'
 import { PriceListPicker } from '@/components/crm/NewCustomerModal'
 import IncVat from '@/components/orders/IncVat'
@@ -19,10 +19,10 @@ import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { useTeam, teamOptions } from '@/hooks/useTeam'
 import { nextBirthday, formatBirthday } from '@/lib/birthdays'
 import { useMe } from '@/hooks/useMe'
+import { isoDay } from '@/lib/visits'
 
 const supabase = createClient()
 
-const PL_DISCOUNT_TEXT: Record<string, string> = { A: '40 % rabatt', B: '30 % rabatt', C: '20 % rabatt', Standard: 'ingen rabatt' }
 const NOT_SOLD = ['draft', 'quote', 'cancelled']
 
 function ProductPic({ src, size }: { src?: string | null; size: number }) {
@@ -175,6 +175,14 @@ export default function CustomerDetailPage() {
 
 
 
+
+  // Besökslista: add this customer to today's visits.
+  async function planVisit() {
+    if (!customer || !me.name) return
+    const { error } = await supabase.from('visit_plans').upsert({ salesperson: me.name, customer_id: customer.id, visit_date: isoDay(0), position: 99 },
+      { onConflict: 'salesperson,customer_id,visit_date', ignoreDuplicates: true })
+    showToast(error ? (error.message.includes('visit_plans') ? 'Kör migration 0023 först' : 'Kunde inte spara: ' + error.message) : 'Tillagd i dagens besökslista')
+  }
 
   function startEdit() {
     if (!customer) return
@@ -363,6 +371,9 @@ export default function CustomerDetailPage() {
             <a href={`mailto:${customer.email}`} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 7, color: 'var(--text)', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
               <Mail size={13} /> Mail
             </a>
+            <button onClick={planVisit} title="Lägg kunden i dagens besökslista" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--bg4)', border: '1px solid rgba(94,196,154,.4)', borderRadius: 7, color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+              <MapPin size={13} color="#5EC49A" /> Besök idag
+            </button>
             {lastSold && (
               <button onClick={() => router.push(`/crm/orders?reorder=${lastSold.id}`)} title={`Samma produkter som order #${lastSold.order_nr}, med dagens priser`}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 7, color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
@@ -414,7 +425,7 @@ export default function CustomerDetailPage() {
           <div style={{ ...card, padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px 24px' }}>
             {[
               ['E-post', customer.email], ['Telefon', customer.phone || '—'], ['Adress', [customer.address, [customer.postal_code, customer.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—'],
-              ['Org.nr', customer.org_nr || '—'], ['Status', ({ active: 'Aktiv', inactive: 'Inaktiv', prospect: 'Prospekt' } as Record<string, string>)[customer.status] || customer.status], ['Prislista', `${customer.price_list_id} · ${PL_DISCOUNT_TEXT[customer.price_list_id] || ''}`],
+              ['Org.nr', customer.org_nr || '—'], ['Status', ({ active: 'Aktiv', inactive: 'Inaktiv', prospect: 'Prospekt' } as Record<string, string>)[customer.status] || customer.status], ['Prislista', customer.price_list_id],
               ['Kontaktperson', customer.contact_name || '—'],
               ['Ort', customer.city || '—'], ['Kundansvarig säljare', customer.account_manager || 'Ingen'],
               ['Födelsedag', customer.birthday ? (() => {

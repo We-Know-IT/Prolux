@@ -68,6 +68,8 @@ export default function CrmPipelinePage() {
           document.getElementById(`deal-${wantedId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
         }, 100)
         setTimeout(() => setHighlightDeal(null), 3000)
+        // ?deal=<id> (e.g. a lead on the overview) opens the lead itself.
+        supabase.from('deals').select('*').eq('id', wantedId).maybeSingle().then(({ data }) => { if (data) openEdit(data) })
       }
     })
   }, [])

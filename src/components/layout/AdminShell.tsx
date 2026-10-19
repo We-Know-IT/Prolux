@@ -103,13 +103,13 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
                 display: 'flex', alignItems: 'center', gap: 5,
                 padding: '6px 9px', borderRadius: 7,
                 background: active ? 'rgba(232,184,75,.09)' : 'transparent',
-                color: active ? 'var(--gold)' : 'var(--text3)',
-                fontSize: 13, fontWeight: active ? 600 : 400,
+                color: active ? 'var(--gold)' : 'var(--text)',
+                fontSize: 13, fontWeight: active ? 700 : 500,
                 textDecoration: 'none',
                 border: `1px solid ${active ? 'var(--line-gold)' : 'transparent'}`,
                 transition: 'all .15s',
               }}>
-                <Icon size={14} style={{ opacity: active ? 1 : 0.6 }} />
+                <Icon size={14} style={{ opacity: active ? 1 : 0.75 }} />
                 {label}
               </Link>
             )
@@ -124,13 +124,13 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
                 display: 'flex', alignItems: 'center', gap: 5,
                 padding: '6px 9px', borderRadius: 7,
                 background: crmActive ? 'rgba(74,143,212,.1)' : 'transparent',
-                color: crmActive ? '#6AAFF0' : 'var(--text3)',
-                fontSize: 13, fontWeight: crmActive ? 600 : 400,
+                color: crmActive ? '#6AAFF0' : 'var(--text)',
+                fontSize: 13, fontWeight: crmActive ? 700 : 500,
                 textDecoration: 'none',
                 border: `1px solid ${crmActive ? 'rgba(74,143,212,.25)' : 'transparent'}`,
                 transition: 'all .15s',
               }}>
-                <GitBranch size={14} style={{ opacity: crmActive ? 1 : 0.5 }} />
+                <GitBranch size={14} style={{ opacity: crmActive ? 1 : 0.75 }} />
                 CRM
               </Link>
             )

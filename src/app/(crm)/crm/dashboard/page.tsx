@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt, formatDate, formatDateTime } from '@/lib/utils'
-import { Plus, Users, ShoppingBag, Package, ChevronRight, FileText, GitBranch, Target, Calendar, ChevronLeft, Cake } from 'lucide-react'
+import { Plus, Users, ShoppingBag, Package, ChevronRight, FileText, GitBranch, Target, Calendar, ChevronLeft, Cake, Bell } from 'lucide-react'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { currentStaff, monthRange, budgetAchieved, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
@@ -12,6 +12,7 @@ import BudgetHistoryChart from '@/components/BudgetHistoryChart'
 import ReminderModal, { type Reminder } from '@/components/crm/ReminderModal'
 import { LeadsPanel, DraftsPanel, FollowUpPanel, QuotesPanel, ToShipPanel } from '@/components/crm/LeadsAndQuotes'
 import { nextBirthday, formatBirthday } from '@/lib/birthdays'
+import VisitList from '@/components/crm/VisitList'
 
 const supabase = createClient()
 
@@ -93,6 +94,7 @@ export default function CrmDashboardPage() {
       .then(({ data }) => {
         if (!data) return
         setBirthdays(data
+          .filter((c: any) => c.birthday)
           .map((c: any) => ({ ...c, ...nextBirthday(c.birthday) }))
           .filter(c => c.daysUntil <= 30)
           .sort((a, b) => a.daysUntil - b.daysUntil))
@@ -241,47 +243,69 @@ export default function CrmDashboardPage() {
         ))}
       </div>
 
-      {/* Orders this user placed or received (admins also see unassigned ones) */}
+      {/* Att göra: orders to confirm, reminders due and quotes/carts to follow up */}
       {(() => {
         const mine = meLoaded ? pendingOrders.filter(o => canConfirmOrder(o, firstName, isAdmin)) : []
-        // "Att göra": orders to confirm and quotes/carts to follow up, in one box.
+        const due = reminders.filter(r => (r.due_date || '').slice(0, 10) <= todayStr)
+        const count = mine.length + due.length + followCount
+        const sub: React.CSSProperties = { fontSize: 12, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '12px 0 4px' }
         return (
-          <div style={{ ...glass, padding: '18px 22px', marginBottom: 24, border: '1px solid rgba(232,184,75,.25)', display: mine.length || followCount ? 'block' : 'none' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <ShoppingBag size={15} color="var(--gold)" />
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Att göra</span>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '1px 8px', borderRadius: 10, background: 'rgba(232,184,75,.15)', color: 'var(--gold)' }}>{mine.length + followCount}</span>
+          <section style={{ marginBottom: 20, background: 'var(--bg3)', border: `1px solid ${count ? 'rgba(232,184,75,.45)' : 'rgba(255,255,255,.08)'}`, borderRadius: 14, padding: '16px 20px', boxShadow: count ? '0 0 0 1px rgba(232,184,75,.08), 0 6px 28px rgba(0,0,0,.3)' : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(232,184,75,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Bell size={17} color="var(--gold)" /></span>
+              <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Att göra</span>
+              {count > 0
+                ? <span style={{ fontSize: 13, fontWeight: 800, padding: '2px 10px', borderRadius: 12, background: 'var(--gold)', color: '#111' }}>{count}</span>
+                : <span style={{ fontSize: 14, color: 'var(--green)', fontWeight: 600 }}>✓ Inget som väntar just nu</span>}
+              <button onClick={() => setRemModal({ reminder: null })} style={{ marginLeft: 'auto', fontSize: 13, padding: '7px 12px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>+ Påminnelse</button>
             </div>
-            {mine.length > 0 && <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', margin: '6px 0 2px' }}>Ordrar att bekräfta</div>}
+            {mine.length > 0 && <div style={sub}>Ordrar att bekräfta</div>}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {mine.map((o, i) => (
-                <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderTop: i > 0 ? '1px solid rgba(255,255,255,.05)' : 'none', flexWrap: 'wrap' }}>
+                <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderTop: i > 0 ? '1px solid rgba(255,255,255,.06)' : 'none', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 160 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
                       <Link href={`/crm/orders?view=history&open=${o.id}`} style={{ color: 'var(--text)' }}>#{o.order_nr}</Link> · {o.customers?.id
                         ? <Link href={`/crm/customers/${o.customers.id}`} style={{ color: 'var(--text)', textDecoration: 'underline', textUnderlineOffset: 3 }}>{o.customers.company}</Link>
                         : 'Gästorder'}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>
                       {formatDateTime(o.created_at)} · {fmt(o.total)} kr{!o.assigned_to ? ' · saknar säljare' : ''}
                     </div>
                   </div>
                   <button onClick={() => confirmOrder(o.id)} disabled={confirmingId === o.id}
-                    style={{ padding: '7px 14px', background: 'var(--gold)', border: 'none', borderRadius: 7, color: '#111', fontSize: 12, fontWeight: 700, cursor: 'pointer', opacity: confirmingId === o.id ? .6 : 1 }}>
+                    style={{ padding: '8px 14px', background: 'var(--gold)', border: 'none', borderRadius: 8, color: '#111', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: confirmingId === o.id ? .6 : 1 }}>
                     {confirmingId === o.id ? 'Bekräftar…' : 'Bekräfta order'}
                   </button>
                 </div>
               ))}
             </div>
+            {due.length > 0 && <div style={sub}>Påminnelser idag och försenade</div>}
+            {due.map((r, i) => {
+              const late = (r.due_date || '').slice(0, 10) < todayStr
+              return (
+                <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: i > 0 ? '1px solid rgba(255,255,255,.06)' : 'none' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: PRIORITY_DOT[r.priority] || 'var(--blue)', flexShrink: 0 }} />
+                  <button type="button" onClick={() => setRemModal({ reminder: r })} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{r.title}</div>
+                    <div style={{ fontSize: 12, color: late ? '#E0A85A' : 'var(--text2)' }}>{r.customers?.company ? `${r.customers.company} · ` : ''}{late ? `försenad sedan ${formatDate(r.due_date)}` : 'idag'}</div>
+                  </button>
+                  <button onClick={() => markReminderDone(r.id)} style={{ padding: '6px 12px', background: 'rgba(76,175,125,.12)', border: '1px solid rgba(76,175,125,.35)', borderRadius: 7, color: 'var(--green)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Klar</button>
+                </div>
+              )
+            })}
             <FollowUpPanel bare onCount={setFollowCount} />
-          </div>
+          </section>
         )
       })()}
 
+      <VisitList />
+
       <ToShipPanel />
 
-      {/* Leads with notes, saved carts */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 24, alignItems: 'start' }}>
+      {/* Quotes, leads and saved carts */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginBottom: 24, alignItems: 'start' }}>
+        <QuotesPanel limit={5} />
         <LeadsPanel />
         <DraftsPanel limit={6} />
       </div>
@@ -310,6 +334,120 @@ export default function CrmDashboardPage() {
           ))}
         </div>
       )}
+
+      {/* Calendar + recent customers */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 24, alignItems: 'start' }}>
+
+        {/* Calendar */}
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 7 }}>
+            <Calendar size={15} color="#E07BA8" /> Kalender & påminnelser
+          </div>
+          <div style={{ ...glass, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
+              <button onClick={() => { const d = new Date(calYear, calMonth - 1); setCalMonth(d.getMonth()); setCalYear(d.getFullYear()) }}
+                style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 4 }}><ChevronLeft size={14} /></button>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{monthNames[calMonth]} {calYear}</span>
+              <button onClick={() => { const d = new Date(calYear, calMonth + 1); setCalMonth(d.getMonth()); setCalYear(d.getFullYear()) }}
+                style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 4 }}><ChevronRight size={14} /></button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', padding: '6px 8px 0' }}>
+              {['M','T','O','T','F','L','S'].map((d, i) => (
+                <div key={i} style={{ textAlign: 'center', fontSize: 10, fontWeight: 600, color: 'var(--text3)', padding: '2px 0' }}>{d}</div>
+              ))}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', padding: '2px 8px 10px', gap: 2 }}>
+              {calCells.map((day, idx) => {
+                if (!day) return <div key={idx} />
+                const dateStr = `${calYear}-${String(calMonth + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+                const dayRems = remindersByDate[dateStr] || []
+                const isToday = dateStr === todayStr
+                const isPast  = dateStr < todayStr
+                const isSelected = dateStr === selectedDay
+                return (
+                  <button key={idx} onClick={() => setSelectedDay(isSelected ? null : dateStr)} title={dayRems.map(r => r.title).join(', ')}
+                    style={{ borderRadius: 5, padding: '3px 2px', textAlign: 'center', cursor: 'pointer', background: isSelected ? 'rgba(232,184,75,.2)' : isToday ? 'rgba(232,184,75,.12)' : 'transparent', border: isSelected ? '1px solid rgba(232,184,75,.5)' : isToday ? '1px solid rgba(232,184,75,.25)' : '1px solid transparent', fontFamily: 'inherit' }}>
+                    <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--gold)' : isPast ? 'var(--text3)' : 'var(--text)' }}>{day}</div>
+                    {dayRems.length > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: 2, marginTop: 1 }}>
+                        {dayRems.slice(0, 2).map((r, i) => (
+                          <div key={i} style={{ width: 4, height: 4, borderRadius: '50%', background: PRIORITY_DOT[r.priority] || 'var(--blue)' }} />
+                        ))}
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Selected day detail */}
+            {selectedDay && (
+              <div style={{ borderTop: '1px solid rgba(255,255,255,.05)', padding: '10px 14px 12px' }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 8 }}>
+                  {new Date(selectedDay + 'T12:00:00').toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </div>
+                {(remindersByDate[selectedDay] || []).length === 0 ? (
+                  <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 8 }}>Inga påminnelser denna dag</div>
+                ) : (remindersByDate[selectedDay] || []).map((r: any) => (
+                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0' }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: PRIORITY_DOT[r.priority], flexShrink: 0 }} />
+                    <button type="button" onClick={() => setRemModal({ reminder: r })} title="Redigera"
+                      style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+                      <div style={{ fontSize: 12, color: 'var(--text)', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.2)', textUnderlineOffset: 3 }}>{r.title}</div>
+                      {r.customers?.company && <div style={{ fontSize: 10, color: 'var(--text2)' }}>{r.customers.company}</div>}
+                    </button>
+                    <button onClick={() => markReminderDone(r.id)} style={{ fontSize: 10, padding: '3px 8px', background: 'rgba(76,175,125,.1)', border: '1px solid rgba(76,175,125,.2)', borderRadius: 5, color: 'var(--green)', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>Klar</button>
+                    <button onClick={() => deleteReminder(r.id)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 2, flexShrink: 0 }}>×</button>
+                  </div>
+                ))}
+                <button onClick={() => setRemModal({ reminder: null })}
+                  style={{ marginTop: 8, fontSize: 11, padding: '5px 12px', background: 'rgba(232,184,75,.1)', border: '1px solid rgba(232,184,75,.2)', borderRadius: 6, color: 'var(--gold)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                  + Lägg till aktivitet
+                </button>
+              </div>
+            )}
+            {reminders.filter(r => r.due_date >= todayStr).slice(0, 4).map((r) => (
+              <div key={r.id} role="button" tabIndex={0} onClick={() => setRemModal({ reminder: r })} onKeyDown={e => { if (e.key === 'Enter') setRemModal({ reminder: r }) }}
+                style={{ padding: '8px 14px', borderTop: '1px solid rgba(255,255,255,.04)', display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: PRIORITY_DOT[r.priority], flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text3)' }}>{r.customers?.company} · {formatDate(r.due_date)}</div>
+                </div>
+              </div>
+            ))}
+            {reminders.filter(r => r.due_date >= todayStr).length === 0 && (
+              <div style={{ padding: '10px 14px', borderTop: '1px solid rgba(255,255,255,.04)', fontSize: 12, color: 'var(--text3)', textAlign: 'center' }}>Inga kommande påminnelser</div>
+            )}
+          </div>
+        </div>
+
+        {/* Senaste kunder */}
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 7 }}>
+            <Users size={15} color="var(--gold)" /> Senaste kunder
+          </div>
+          <div style={{ ...glass, overflow: 'hidden' }}>
+            {recentCustomers.length === 0 && <div style={{ padding: '18px 14px', fontSize: 12, color: 'var(--text3)' }}>Inga kunder ännu.</div>}
+            {recentCustomers.map((c: any, i: number, arr: any[]) => (
+              <Link key={c.id} href={`/crm/customers/${c.id}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.04)' : 'none', textDecoration: 'none' }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(232,184,75,.1)', border: '1px solid rgba(232,184,75,.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--gold)', flexShrink: 0 }}>
+                  {c.company[0]}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.company}</div>
+                </div>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.06)', color: PL_COLOR[c.price_list_id] || 'var(--text3)' }}>
+                  {c.price_list_id}
+                </span>
+              </Link>
+            ))}
+            <div style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}>
+              <Link href="/crm/customers" style={{ display: 'block', textAlign: 'center', padding: '10px', fontSize: 11, color: 'var(--text3)', textDecoration: 'none' }}>Se alla kunder</Link>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Budget Widget */}
       <div style={{ ...glass, padding: '20px 24px', marginBottom: 24 }}>
@@ -431,123 +569,6 @@ export default function CrmDashboardPage() {
           </div>
         )
       })()}
-
-      {/* Calendar + Offerter */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 24 }}>
-
-        {/* Calendar */}
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 7 }}>
-            <Calendar size={12} /> Kalender & påminnelser
-          </div>
-          <div style={{ ...glass, overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
-              <button onClick={() => { const d = new Date(calYear, calMonth - 1); setCalMonth(d.getMonth()); setCalYear(d.getFullYear()) }}
-                style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 4 }}><ChevronLeft size={14} /></button>
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{monthNames[calMonth]} {calYear}</span>
-              <button onClick={() => { const d = new Date(calYear, calMonth + 1); setCalMonth(d.getMonth()); setCalYear(d.getFullYear()) }}
-                style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 4 }}><ChevronRight size={14} /></button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', padding: '6px 8px 0' }}>
-              {['M','T','O','T','F','L','S'].map((d, i) => (
-                <div key={i} style={{ textAlign: 'center', fontSize: 10, fontWeight: 600, color: 'var(--text3)', padding: '2px 0' }}>{d}</div>
-              ))}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', padding: '2px 8px 10px', gap: 2 }}>
-              {calCells.map((day, idx) => {
-                if (!day) return <div key={idx} />
-                const dateStr = `${calYear}-${String(calMonth + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
-                const dayRems = remindersByDate[dateStr] || []
-                const isToday = dateStr === todayStr
-                const isPast  = dateStr < todayStr
-                const isSelected = dateStr === selectedDay
-                return (
-                  <button key={idx} onClick={() => setSelectedDay(isSelected ? null : dateStr)} title={dayRems.map(r => r.title).join(', ')}
-                    style={{ borderRadius: 5, padding: '3px 2px', textAlign: 'center', cursor: 'pointer', background: isSelected ? 'rgba(232,184,75,.2)' : isToday ? 'rgba(232,184,75,.12)' : 'transparent', border: isSelected ? '1px solid rgba(232,184,75,.5)' : isToday ? '1px solid rgba(232,184,75,.25)' : '1px solid transparent', fontFamily: 'inherit' }}>
-                    <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--gold)' : isPast ? 'var(--text3)' : 'var(--text)' }}>{day}</div>
-                    {dayRems.length > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: 2, marginTop: 1 }}>
-                        {dayRems.slice(0, 2).map((r, i) => (
-                          <div key={i} style={{ width: 4, height: 4, borderRadius: '50%', background: PRIORITY_DOT[r.priority] || 'var(--blue)' }} />
-                        ))}
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Selected day detail */}
-            {selectedDay && (
-              <div style={{ borderTop: '1px solid rgba(255,255,255,.05)', padding: '10px 14px 12px' }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 8 }}>
-                  {new Date(selectedDay + 'T12:00:00').toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
-                </div>
-                {(remindersByDate[selectedDay] || []).length === 0 ? (
-                  <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 8 }}>Inga påminnelser denna dag</div>
-                ) : (remindersByDate[selectedDay] || []).map((r: any) => (
-                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0' }}>
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: PRIORITY_DOT[r.priority], flexShrink: 0 }} />
-                    <button type="button" onClick={() => setRemModal({ reminder: r })} title="Redigera"
-                      style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
-                      <div style={{ fontSize: 12, color: 'var(--text)', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.2)', textUnderlineOffset: 3 }}>{r.title}</div>
-                      {r.customers?.company && <div style={{ fontSize: 10, color: 'var(--text2)' }}>{r.customers.company}</div>}
-                    </button>
-                    <button onClick={() => markReminderDone(r.id)} style={{ fontSize: 10, padding: '3px 8px', background: 'rgba(76,175,125,.1)', border: '1px solid rgba(76,175,125,.2)', borderRadius: 5, color: 'var(--green)', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>Klar</button>
-                    <button onClick={() => deleteReminder(r.id)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 2, flexShrink: 0 }}>×</button>
-                  </div>
-                ))}
-                <button onClick={() => setRemModal({ reminder: null })}
-                  style={{ marginTop: 8, fontSize: 11, padding: '5px 12px', background: 'rgba(232,184,75,.1)', border: '1px solid rgba(232,184,75,.2)', borderRadius: 6, color: 'var(--gold)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                  + Lägg till aktivitet
-                </button>
-              </div>
-            )}
-            {reminders.filter(r => r.due_date >= todayStr).slice(0, 4).map((r) => (
-              <div key={r.id} role="button" tabIndex={0} onClick={() => setRemModal({ reminder: r })} onKeyDown={e => { if (e.key === 'Enter') setRemModal({ reminder: r }) }}
-                style={{ padding: '8px 14px', borderTop: '1px solid rgba(255,255,255,.04)', display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: PRIORITY_DOT[r.priority], flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text3)' }}>{r.customers?.company} · {formatDate(r.due_date)}</div>
-                </div>
-              </div>
-            ))}
-            {reminders.filter(r => r.due_date >= todayStr).length === 0 && (
-              <div style={{ padding: '10px 14px', borderTop: '1px solid rgba(255,255,255,.04)', fontSize: 12, color: 'var(--text3)', textAlign: 'center' }}>Inga kommande påminnelser</div>
-            )}
-          </div>
-        </div>
-
-        {/* Open quotes */}
-        <QuotesPanel limit={5} />
-      </div>
-
-      {/* Senaste kunder */}
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 7 }}>
-          <Users size={12} /> Senaste kunder
-        </div>
-        <div style={{ ...glass, overflow: 'hidden' }}>
-          {recentCustomers.length === 0 && <div style={{ padding: '18px 14px', fontSize: 12, color: 'var(--text3)' }}>Inga kunder ännu.</div>}
-          {recentCustomers.map((c: any, i: number, arr: any[]) => (
-            <Link key={c.id} href={`/crm/customers/${c.id}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.04)' : 'none', textDecoration: 'none' }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(232,184,75,.1)', border: '1px solid rgba(232,184,75,.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--gold)', flexShrink: 0 }}>
-                {c.company[0]}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.company}</div>
-              </div>
-              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.06)', color: PL_COLOR[c.price_list_id] || 'var(--text3)' }}>
-                {c.price_list_id}
-              </span>
-            </Link>
-          ))}
-          <div style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}>
-            <Link href="/crm/customers" style={{ display: 'block', textAlign: 'center', padding: '10px', fontSize: 11, color: 'var(--text3)', textDecoration: 'none' }}>Se alla kunder</Link>
-          </div>
-        </div>
-      </div>
 
       {/* Create / edit calendar activity */}
       {remModal && (

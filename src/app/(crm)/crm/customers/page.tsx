@@ -8,7 +8,8 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Customer } from '@/types'
 import { formatDate } from '@/lib/utils'
-import { Plus, Search, Bell, Mail, ChevronRight, Phone } from 'lucide-react'
+import { Plus, Search, Bell, Mail, ChevronRight, Phone, MapPin, Check } from 'lucide-react'
+import { isoDay } from '@/lib/visits'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { currentStaff } from '@/lib/team'
@@ -27,6 +28,33 @@ export default function CrmCustomersPage() {
   const [newCustomerForm, setNewCustomerForm] = useState({ company: '', contact_name: '', email: '', phone: '', address: '', postal_code: '', city: '', org_nr: '', price_list_id: 'Standard', account_manager: '' })
   const [savingCustomer, setSavingCustomer] = useState(false)
   const [toast, setToast]             = useState('')
+  // Planera besök: pick customers (e.g. filtered on a city) for the besökslista.
+  const [planMode, setPlanMode]       = useState(false)
+  const [planDay, setPlanDay]         = useState(() => isoDay(0))
+  const [picked, setPicked]           = useState<Set<string>>(new Set())
+  const [planned, setPlanned]         = useState<Set<string>>(new Set())
+  const [savingPlan, setSavingPlan]   = useState(false)
+  useEffect(() => { if (new URLSearchParams(window.location.search).get('plan') === '1') setPlanMode(true) }, [])
+  function loadPlanned() {
+    if (!myName) return
+    supabase.from('visit_plans').select('customer_id').eq('salesperson', myName).eq('visit_date', planDay)
+      .then(({ data }) => setPlanned(new Set((data ?? []).map((r: any) => r.customer_id))))
+  }
+  useEffect(loadPlanned, [myName, planDay]) // eslint-disable-line react-hooks/exhaustive-deps
+  useLiveRefresh(['visit_plans'], loadPlanned)
+  function togglePick(id: string) {
+    setPicked(p => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  }
+  async function savePlan() {
+    if (!picked.size || !myName) return
+    setSavingPlan(true)
+    const rows = [...picked].map((customer_id, i) => ({ salesperson: myName, customer_id, visit_date: planDay, position: planned.size + i }))
+    const { error } = await supabase.from('visit_plans').upsert(rows, { onConflict: 'salesperson,customer_id,visit_date', ignoreDuplicates: true })
+    setSavingPlan(false)
+    if (error) { showToast(error.message.includes('visit_plans') ? 'Kör migration 0023 först' : `Fel: ${error.message}`); return }
+    showToast(`${rows.length} ${rows.length === 1 ? 'kund' : 'kunder'} i besökslistan ${planDay === isoDay(0) ? 'idag' : planDay === isoDay(1) ? 'imorgon' : planDay}`)
+    setPicked(new Set()); loadPlanned()
+  }
 
   const today = new Date().toISOString().slice(0, 10)
 
@@ -92,7 +120,11 @@ export default function CrmCustomersPage() {
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>Kunder</h1>
           {!loading && <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text3)' }}>{customers.length} kunder totalt</p>}
         </div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <button onClick={() => { setPlanMode(m => !m); setPicked(new Set()) }} aria-pressed={planMode}
+          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 14px', background: planMode ? 'rgba(94,196,154,.16)' : 'var(--bg3)', border: `1px solid ${planMode ? 'rgba(94,196,154,.5)' : 'var(--line)'}`, borderRadius: 8, color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          <MapPin size={14} color="#5EC49A" /> {planMode ? 'Klar med planeringen' : 'Planera besök'}
+        </button>
         <ImportCustomersButton onImported={() => loadData()} />
         <button onClick={() => setShowNewCustomer(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', background: 'var(--gold)', border: 'none', borderRadius: 8, color: '#111', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
           <Plus size={14} /> Ny kund
@@ -113,6 +145,18 @@ export default function CrmCustomersPage() {
         {filters}
         <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text2)' }}>{filtered.length} kunder</span>
       </div>
+
+      {planMode && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '12px 16px', marginBottom: 12, borderRadius: 10, background: 'rgba(94,196,154,.08)', border: '1px solid rgba(94,196,154,.3)', fontSize: 13, color: 'var(--text)' }}>
+          <MapPin size={15} color="#5EC49A" />
+          <span style={{ flex: '1 1 260px' }}>Filtrera på stad och markera kunderna du ska besöka. De hamnar i <strong>Besökslistan</strong> på översikten.</span>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text2)' }}>Dag
+            <input type="date" value={planDay} min={isoDay(0)} onChange={e => e.target.value && setPlanDay(e.target.value)}
+              style={{ padding: '6px 8px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text)', fontSize: 13, colorScheme: 'dark' }} />
+          </label>
+          <button onClick={() => setPicked(new Set(filtered.filter(c => !planned.has(c.id)).map(c => c.id)))} style={{ padding: '6px 10px', background: 'transparent', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text)', fontSize: 12, cursor: 'pointer' }}>Markera alla i listan</button>
+        </div>
+      )}
 
       {/* Customer list */}
       <div style={{ background: 'var(--bg3)', border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden' }}>
@@ -135,7 +179,7 @@ export default function CrmCustomersPage() {
         ) : filtered.map((c, i) => {
           const overdueCount = allReminders.filter(r => r.customer_id === c.id && r.due_date < today).length
           return (
-            <div key={c.id} onClick={() => router.push(`/crm/customers/${c.id}`)} style={{
+            <div key={c.id} onClick={() => planMode ? (!planned.has(c.id) && togglePick(c.id)) : router.push(`/crm/customers/${c.id}`)} style={{
               display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px',
               borderBottom: i < filtered.length - 1 ? '1px solid var(--line)' : 'none',
               background: 'transparent', transition: 'background .1s', cursor: 'pointer',
@@ -143,6 +187,14 @@ export default function CrmCustomersPage() {
               onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,.03)'}
               onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
             >
+              {planMode && (
+                <span role="checkbox" aria-checked={planned.has(c.id) || picked.has(c.id)} aria-label={`Besök ${c.company}`}
+                  style={{ width: 26, height: 26, flexShrink: 0, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: planned.has(c.id) ? 'rgba(94,196,154,.25)' : picked.has(c.id) ? '#5EC49A' : 'transparent',
+                    border: `2px solid ${planned.has(c.id) || picked.has(c.id) ? '#5EC49A' : 'rgba(255,255,255,.3)'}` }}>
+                  {(planned.has(c.id) || picked.has(c.id)) && <Check size={15} color={planned.has(c.id) ? '#5EC49A' : '#0F1115'} strokeWidth={3} />}
+                </span>
+              )}
               {/* Avatar */}
               <div style={{ width: 40, height: 40, borderRadius: '50%', background: PL_BADGE_COLOR[c.price_list_id], border: `1px solid ${PL_TEXT_COLOR[c.price_list_id]}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: PL_TEXT_COLOR[c.price_list_id], flexShrink: 0 }}>
                 {c.company[0]}
@@ -153,6 +205,7 @@ export default function CrmCustomersPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
                   <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.company}</span>
                   <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 4, background: PL_BADGE_COLOR[c.price_list_id], color: PL_TEXT_COLOR[c.price_list_id], fontWeight: 700, flexShrink: 0 }}>{c.price_list_id}</span>
+                  {planMode && planned.has(c.id) && <span style={{ fontSize: 11, fontWeight: 700, color: '#5EC49A', flexShrink: 0 }}>I besökslistan</span>}
                   {overdueCount > 0 && (
                     <span style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(224,82,82,.15)', border: '1px solid rgba(224,82,82,.25)', borderRadius: 10, padding: '1px 6px', fontSize: 10, fontWeight: 700, color: 'var(--red)', flexShrink: 0 }}>
                       <Bell size={9} /> {overdueCount}
@@ -185,6 +238,17 @@ export default function CrmCustomersPage() {
           )
         })}
       </div>
+
+      {planMode && picked.size > 0 && (
+        <div style={{ position: 'fixed', left: '50%', bottom: 20, transform: 'translateX(-50%)', zIndex: 600, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px 10px 18px', background: 'var(--bg2)', border: '1px solid rgba(94,196,154,.5)', borderRadius: 14, boxShadow: '0 10px 32px rgba(0,0,0,.5)', maxWidth: 'calc(100vw - 32px)' }}>
+          <span style={{ fontSize: 14, color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap' }}>{picked.size} valda</span>
+          <button onClick={() => setPicked(new Set())} style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: 13, cursor: 'pointer' }}>Rensa</button>
+          <button onClick={savePlan} disabled={savingPlan}
+            style={{ padding: '10px 16px', background: '#5EC49A', border: 'none', borderRadius: 9, color: '#0F1115', fontSize: 14, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', opacity: savingPlan ? .7 : 1 }}>
+            {savingPlan ? 'Sparar…' : 'Lägg i besökslistan'}
+          </button>
+        </div>
+      )}
 
       {toast && (
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--bg3)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', padding: '12px 20px', fontSize: 13, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 4px 20px rgba(0,0,0,.4)' }}>

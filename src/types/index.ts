@@ -138,10 +138,10 @@ export const DISCOUNT: Record<PriceList, number> = {
 }
 
 export const PRICE_LIST_LABEL: Record<PriceList, string> = {
-  A: 'Strategisk partner (–40%)',
-  B: 'Återförsäljare (–30%)',
-  C: 'Volymkund (–20%)',
-  Standard: 'Standard (0%)',
+  A: 'Prislista A',
+  B: 'Prislista B',
+  C: 'Prislista C',
+  Standard: 'Standard',
 }
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {

@@ -2,11 +2,12 @@
 import { Fragment, useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Product, Customer, Category, CartItem, Order, OrderItem, OrderStatus, ORDER_STATUS_LABEL } from '@/types'
+import { Product, Customer, Category, CartItem, Order, OrderItem, OrderStatus, ORDER_STATUS_LABEL, DISCOUNT } from '@/types'
 import { custPrice, fmt, formatDateTime } from '@/lib/utils'
 import IncVat from '@/components/orders/IncVat'
 import { withVat } from '@/lib/pricing'
 import { invoiceInVismaInBackground } from '@/lib/visma'
+import { sendOrderConfirmation } from '@/lib/order-confirmation'
 import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star, X, RefreshCw, Trash2, UserPlus, Check, FileDown, Mail, Copy } from 'lucide-react'
 import NewCustomerModal from '@/components/crm/NewCustomerModal'
 import Portal from '@/components/ui/Portal'
@@ -88,6 +89,7 @@ export default function CrmOrdersPage() {
   const [confirmingId, setConfirmingId]   = useState<string | null>(null)
   const [onlyMine, setOnlyMine]           = useState(false)
   const [placing, setPlacing]             = useState(false)
+  const [sendConfirmation, setSendConfirmation] = useState(false)
   // The cart is saved as a draft automatically; these keep saves in order.
   const editingRef  = useRef<typeof editingOrder>(null)
   const autosaveRef = useRef<Promise<void> | null>(null)
@@ -344,7 +346,7 @@ export default function CrmOrdersPage() {
   function resetOrderForm() {
     editingRef.current = null; setAutoSavedAt('')
     setCart([]); setSelectedCustomer(null); setCustomerSearch(''); setProductSearch('')
-    setDiscount(''); setDiscountEnabled(false); setDelivery('Standard (2-3 dagar)'); setCarQty({}); setLineDisc({})
+    setDiscount(''); setDiscountEnabled(false); setDelivery('Standard (2-3 dagar)'); setCarQty({}); setLineDisc({}); setSendConfirmation(false)
     setLastBought([]); setSelectedCategory('all'); setCustomerDeals([]); setDealId(''); setEditingOrder(null)
   }
 
@@ -447,16 +449,23 @@ export default function CrmOrdersPage() {
     return () => clearTimeout(t)
   }, [cart, selectedCustomer, lineDisc, carQty, discount, discountEnabled, assignee, delivery, dealId, loading, placing, view]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Starts an empty cart. With something in the current one, ask first:
-  // keep it under Sparade varukorgar, or empty it.
-  const [askNewCart, setAskNewCart] = useState(false)
+  // "Spara & ny varukorg": the current cart is kept under Sparade varukorgar
+  // and an empty one is opened, e.g. for the next customer.
   function newCart() {
-    if (cart.length > 0 && editingRef.current?.status !== 'quote') { setAskNewCart(true); return }
+    if (cart.length > 0 && editingRef.current?.status !== 'quote') { finishNewCart(true); return }
     resetOrderForm(); setShowCart(false); setView('new')
   }
   async function finishNewCart(keep: boolean) {
-    setAskNewCart(false)
     if (autosaveRef.current) await autosaveRef.current
+    // Keep: save the cart now, so nothing is lost even if the automatic save
+    // has not run yet.
+    if (keep && cart.length > 0 && (!editingRef.current || editingRef.current.status === 'draft')) {
+      const saved = await writeOrder('draft')
+      if (!saved) return
+      if (!editingRef.current) editingRef.current = { id: saved.id, order_nr: saved.order_nr, status: 'draft' }
+      const row = { ...saved, customers: selectedCustomer }
+      setOrders(os => os.some(o => o.id === saved.id) ? os.map(o => o.id === saved.id ? row : o) : [row, ...os])
+    }
     const e = editingRef.current
     if (!keep && e && e.status === 'draft') {
       await removeOpenOrder(supabase, e.id)
@@ -532,9 +541,16 @@ export default function CrmOrdersPage() {
       showToast(`Offert #${order.order_nr} sparad${leadNote}`)
       return saved
     }
+    const confirmTo = status === 'pending' && sendConfirmation ? selectedCustomer?.email : null
     resetOrderForm()
     setPlacing(false); setView('history')
     if (handedOver) invoiceInVismaInBackground(order.id)   // delivered at once: invoice now
+    if (status === 'pending' && sendConfirmation) {
+      if (!confirmTo) setTimeout(() => showToast('Ingen orderbekräftelse skickad – kunden saknar e-postadress'), 3200)
+      else sendOrderConfirmation(order.id)
+        .then(() => showToast(`Orderbekräftelse skickad till ${confirmTo}`))
+        .catch(e => showToast(`Orderbekräftelsen kunde inte skickas: ${e.message}`))
+    }
     showToast(status === 'draft' ? `Varukorg #${order.order_nr} sparad${selectedCustomer ? '' : ' utan kund'}`
       : handedOver ? `Order #${order.order_nr} levererad från bilen`
       : `Order #${order.order_nr} ${wasEditing?.status === 'quote' ? 'skapad från offerten' : 'skapad'} — bekräfta den när den är klar`)
@@ -704,10 +720,11 @@ export default function CrmOrdersPage() {
     !customerSearch || c.company.toLowerCase().includes(customerSearch.toLowerCase())
   )
 
+  // Every word must match the name, brand, article number, category or description.
+  const searchWords = productSearch.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const filteredProducts = products.filter(p => {
-    const matchSearch = !productSearch ||
-      p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-      p.brand.toLowerCase().includes(productSearch.toLowerCase())
+    const hay = [p.name, p.brand, p.sku, p.description, categories.find(c => c.id === p.category_id)?.name].map(v => (v || '').toLowerCase()).join(' ')
+    const matchSearch = searchWords.every(w => hay.includes(w))
     const matchCat = selectedCategory === 'all' || p.category_id === selectedCategory
     return matchSearch && matchCat
   })
@@ -722,26 +739,9 @@ export default function CrmOrdersPage() {
     ...lastBoughtProducts.map(p => p.id),
     ...recommendations.map(p => p.id),
   ])
-  const mainProducts = filteredProducts.filter(p => !pinnedIds.has(p.id))
-
-  const newCartModal = askNewCart && (
-    <Portal>
-      <div onClick={() => setAskNewCart(false)} style={{ position: 'fixed', inset: 0, zIndex: 1250, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-        <div role="dialog" aria-modal="true" aria-label="Ny varukorg" onClick={e => e.stopPropagation()}
-          style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 440, padding: '22px 22px 18px' }}>
-          <h2 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Ny varukorg</h2>
-          <p style={{ margin: '0 0 18px', fontSize: 14, color: 'var(--text2)', lineHeight: 1.5 }}>
-            Vad ska hända med den nuvarande varukorgen ({cart.reduce((n, i) => n + i.qty, 0)} st{selectedCustomer ? `, ${selectedCustomer.company}` : ''})?
-          </p>
-          <div style={{ display: 'grid', gap: 8 }}>
-            <button onClick={() => finishNewCart(true)} style={{ padding: '13px 0', borderRadius: 10, background: 'var(--gold)', border: 'none', color: '#111', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Spara till senare</button>
-            <button onClick={() => finishNewCart(false)} style={{ padding: '13px 0', borderRadius: 10, background: 'transparent', border: '1px solid rgba(224,82,82,.4)', color: 'var(--red)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Töm varukorgen</button>
-            <button onClick={() => setAskNewCart(false)} style={{ padding: '10px 0', borderRadius: 10, background: 'transparent', border: 'none', color: 'var(--text2)', fontSize: 13, cursor: 'pointer' }}>Avbryt</button>
-          </div>
-        </div>
-      </div>
-    </Portal>
-  )
+  // While searching, every match is listed (the pinned rows are hidden).
+  const searching = searchWords.length > 0
+  const mainProducts = searching ? filteredProducts : filteredProducts.filter(p => !pinnedIds.has(p.id))
 
   const customerNeeded = afterCustomer && !selectedCustomer && newCustomerFor === null && (
     <Portal>
@@ -900,7 +900,7 @@ export default function CrmOrdersPage() {
       </div>
       {shareModal}
       {customerNeeded}
-      {newCartModal}
+      
       {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#fff', padding: '12px 24px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 999 }}>{toast}</div>}
     </div>
   )
@@ -1112,7 +1112,7 @@ export default function CrmOrdersPage() {
         {selectedCustomer ? (
           <>
             <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>{selectedCustomer.company}</div>
-            <div style={{ fontSize: 12, color: 'var(--text2)', margin: '2px 0 14px' }}>Org.nr: {selectedCustomer.org_nr || '—'} · Prislista {selectedCustomer.price_list_id}</div>
+            <div style={{ fontSize: 12, color: 'var(--text2)', margin: '2px 0 14px' }}>Org.nr: {selectedCustomer.org_nr || '—'} · Prislista {selectedCustomer.price_list_id}{DISCOUNT[selectedCustomer.price_list_id] ? <> · <strong style={{ color: 'var(--green)' }}>{Math.round(DISCOUNT[selectedCustomer.price_list_id] * 100)} % rabatt</strong></> : ''}</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px 28px' }}>
               {[
                 { label: 'Kontaktperson', value: selectedCustomer.contact_name || '—' },
@@ -1189,24 +1189,34 @@ export default function CrmOrdersPage() {
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
+      {/* The order is the usual outcome: the big button. Quotes and saving below. */}
+      <label style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 0 10px', padding: '12px 14px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, cursor: 'pointer', fontSize: 14, color: 'var(--text)' }}>
+        <input type="checkbox" checked={sendConfirmation} onChange={e => setSendConfirmation(e.target.checked)} style={{ width: 18, height: 18, accentColor: 'var(--gold)', cursor: 'pointer' }} />
+        <Mail size={15} color="var(--text2)" />
+        <span>Skicka orderbekräftelse till kunden via e-post
+          <span style={{ display: 'block', fontSize: 12, color: 'var(--text2)' }}>
+            {selectedCustomer ? (selectedCustomer.email ? `Till ${selectedCustomer.email}` : 'Kunden saknar e-postadress') : 'Till kundens e-post när du valt kund'}
+          </span>
+        </span>
+      </label>
+      <button onClick={() => noCustomer ? setAfterCustomer('pending') : saveOrder('pending')} disabled={placing || cart.length === 0}
+        title={noCustomer ? 'Du väljer eller skapar kunden i nästa steg' : undefined}
+        style={{ width: '100%', padding: '18px 0', background: 'var(--gold)', border: 'none', borderRadius: 12, color: '#111', fontSize: 17, fontWeight: 800, cursor: placing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, boxShadow: '0 6px 22px rgba(232,184,75,.25)', opacity: cart.length === 0 ? .5 : 1 }}>
+        <Check size={19} /> {placing ? 'Sparar…' : allFromCar ? 'Lägg order · levererad' : 'Lägg order'}
+      </button>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, marginTop: 10 }}>
         <button onClick={() => makeQuote('pdf')} disabled={placing || cart.length === 0}
           title="Sparar offerten (och lead i pipelinen) och laddar ner den som PDF"
-          style={{ padding: '14px 0', background: 'var(--gold)', border: 'none', borderRadius: 10, color: '#111', fontSize: 14, fontWeight: 700, cursor: placing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          style={{ padding: '12px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: placing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <FileDown size={16} /> {editingOrder?.status === 'quote' ? 'Uppdatera offert (PDF)' : 'Offert som PDF'}
         </button>
         <button onClick={() => makeQuote('mail')} disabled={placing || cart.length === 0}
           title={noCustomer ? 'Du väljer eller skapar kunden i nästa steg' : 'Sparar offerten och visar den färdig att klistra in i mejlet'}
-          style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid rgba(232,184,75,.5)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 700, cursor: placing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          style={{ padding: '12px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: placing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <Mail size={16} /> Mejla offert
         </button>
-        <button onClick={() => noCustomer ? setAfterCustomer('pending') : saveOrder('pending')} disabled={placing || cart.length === 0}
-          title={noCustomer ? 'Du väljer eller skapar kunden i nästa steg' : undefined}
-          style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 700, cursor: placing ? 'not-allowed' : 'pointer' }}>
-          {placing ? 'Sparar…' : allFromCar ? 'Lägg order · levererad' : 'Lägg order'}
-        </button>
         <button onClick={() => saveOrder('draft')} disabled={placing || cart.length === 0}
-          style={{ padding: '14px 0', background: 'transparent', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text2)', fontSize: 14, fontWeight: 600, cursor: placing ? 'not-allowed' : 'pointer' }}>
+          style={{ padding: '12px 0', background: 'transparent', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text2)', fontSize: 14, fontWeight: 600, cursor: placing ? 'not-allowed' : 'pointer' }}>
           {noCustomer ? 'Spara varukorg utan kund' : 'Spara varukorg'}
         </button>
       </div>
@@ -1228,7 +1238,7 @@ export default function CrmOrdersPage() {
       </Portal>)}
       {shareModal}
       {customerNeeded}
-      {newCartModal}
+      
       {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#fff', padding: '12px 24px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 1200 }}>{toast}</div>}
     </div>
   )
@@ -1251,9 +1261,15 @@ export default function CrmOrdersPage() {
             </span>
           )}
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-            {editingOrder && (
-              <button onClick={newCart} style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>
-                Ny varukorg
+            {cart.length > 0 && (
+              <button onClick={newCart} title="Sparar den här varukorgen och öppnar en tom för nästa kund"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 9, background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                <Plus size={14} /> Spara &amp; ny varukorg
+              </button>
+            )}
+            {orders.some(o => o.status === 'draft' && o.id !== editingOrder?.id) && (
+              <button onClick={() => { setHistoryFilter('carts'); setView('history') }} style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>
+                Sparade varukorgar ({orders.filter(o => o.status === 'draft' && o.id !== editingOrder?.id).length})
               </button>
             )}
             <button onClick={() => setView('history')} style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer' }}>
@@ -1375,12 +1391,12 @@ export default function CrmOrdersPage() {
             : []
           return (
             <>
-              {lastBoughtProducts.length > 0 && section('bought', <><Star size={14} color="var(--gold)" /> Köpt tidigare av {selectedCustomer?.company}</>, lastBoughtProducts.map(p => card(p, 'köpt')))}
-              {recommendations.length > 0 && section('rec', <><Tag size={14} color="#6AAFF0" /> Rekommenderas</>, recommendations.map(p => card(p, 'rec')))}
+              {!searching && lastBoughtProducts.length > 0 && section('bought', <><Star size={14} color="var(--gold)" /> Köpt tidigare av {selectedCustomer?.company}</>, lastBoughtProducts.map(p => card(p, 'köpt')))}
+              {!searching && recommendations.length > 0 && section('rec', <><Tag size={14} color="#6AAFF0" /> Rekommenderas</>, recommendations.map(p => card(p, 'rec')))}
               {byCategory
                 ? groups.map(g => section(g.key, <>{g.name} <span style={{ fontWeight: 500, color: 'var(--text2)' }}>· {g.items.length}</span></>, g.items.map(p => card(p))))
                 : mainProducts.length > 0 && grid(mainProducts.map(p => card(p)))}
-              {mainProducts.length === 0 && lastBoughtProducts.length === 0 && recommendations.length === 0 && (
+              {mainProducts.length === 0 && (searching || (lastBoughtProducts.length === 0 && recommendations.length === 0)) && (
                 <div style={{ padding: 40, textAlign: 'center', color: 'var(--text2)', fontSize: 13 }}>Inga produkter hittades</div>
               )}
             </>
@@ -1466,7 +1482,7 @@ export default function CrmOrdersPage() {
                   </div>
                   {!selectedCustomer && <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--text2)', textAlign: 'center' }}>Ingen kund vald – du väljer eller skapar kunden i nästa steg.</p>}
                   <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginTop: 12 }}>
-                    <button onClick={newCart} style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: 13, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3 }}>Ny varukorg</button>
+                    <button onClick={newCart} style={{ background: 'none', border: 'none', color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3 }}>Spara &amp; ny varukorg</button>
                     <button onClick={discardCart} style={{ background: 'none', border: 'none', color: '#E08080', fontSize: 13, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3 }}>Töm varukorgen</button>
                   </div>
                   <p style={{ margin: '10px 0 0', fontSize: 11, color: 'var(--text2)', textAlign: 'center' }}>
@@ -1493,7 +1509,7 @@ export default function CrmOrdersPage() {
 
       {shareModal}
       {customerNeeded}
-      {newCartModal}
+      
       {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#fff', padding: '12px 24px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 1200 }}>{toast}</div>}
     </div>
   )

@@ -34,19 +34,19 @@
   --blur:        saturate(180%) blur(20px);
 
   /* ── Borders ── */
-  --line:        rgba(255,255,255,.06);
-  --line2:       rgba(255,255,255,.03);
+  --line:        rgba(255,255,255,.10);
+  --line2:       rgba(255,255,255,.06);
   --line-gold:   rgba(232,184,75,.22);
   --line-hi:     rgba(255,255,255,.14);
 
   /* legacy aliases */
-  --border:  rgba(255,255,255,.06);
-  --border2: rgba(255,255,255,.03);
+  --border:  rgba(255,255,255,.11);
+  --border2: rgba(255,255,255,.06);
 
   /* ── Text ── */
   --text:  #F0EDE8;
-  --text2: #9BA0AB;
-  --text3: #4E5566;
+  --text2: #AEB3BD;
+  --text3: #858C9B;   /* muted, but still readable on the dark background */
 
   /* ── Gold — chromed liquid metal ── */
   --gold:    #E8B84B;

@@ -2,15 +2,13 @@
 // What an order holds, shown when a row in the order list is opened: who it
 // belongs to, every line with its price and how it is delivered, and the sums.
 import Link from 'next/link'
-import { Truck, Car, Check, PenLine } from 'lucide-react'
+import { PenLine } from 'lucide-react'
 import type { OrderItem, Product } from '@/types'
-import { fmt } from '@/lib/utils'
-import { awaitingShipment } from '@/lib/shipping'
+import { fmt, formatDateTime } from '@/lib/utils'
+import DeliveryTag from '@/components/orders/DeliveryTag'
 import { Thumb } from '@/components/crm/order/parts'
 
 export default function OrderDetails({ o, items, products }: { o: any; items?: OrderItem[]; products: Product[] }) {
-  const sent = o.status === 'shipped' || o.status === 'delivered'
-  const waiting = awaitingShipment(o.status)
   const label: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 2 }
   const value: React.CSSProperties = { fontSize: 13, color: 'var(--text)', fontWeight: 600 }
 
@@ -25,8 +23,11 @@ export default function OrderDetails({ o, items, products }: { o: any; items?: O
         </div>
         <div><div style={label}>Räknas på</div><div style={value}>{o.assigned_to || '—'}</div></div>
         <div><div style={label}>Såld av</div><div style={value}>{o.created_by || 'Webbshoppen'}</div></div>
-        {(o.carrier || o.transport_order_id) && (
-          <div><div style={label}>Frakt</div><div style={value}>{[o.carrier, o.transport_order_id].filter(Boolean).join(' · ')}</div></div>
+        {o.packed_at && (
+          <div><div style={label}>Packad</div><div style={value}>{formatDateTime(o.packed_at)}{o.packed_by ? ` · ${o.packed_by}` : ''}</div></div>
+        )}
+        {(o.shipped_at || o.carrier || o.transport_order_id) && (
+          <div><div style={label}>Hämtad av transportör</div><div style={value}>{[o.shipped_at && formatDateTime(o.shipped_at), o.carrier, o.transport_order_id].filter(Boolean).join(' · ')}</div></div>
         )}
       </div>
 
@@ -38,7 +39,6 @@ export default function OrderDetails({ o, items, products }: { o: any; items?: O
         <div style={{ border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden' }}>
           {items.map((it, i) => {
             const p = products.find(x => x.id === it.product_id)
-            const car = (it as any).delivery === 'car'
             return (
               <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderTop: i ? '1px solid var(--border2)' : 'none', background: 'var(--bg2)' }}>
                 {p ? <Thumb p={p} size={44} /> : (
@@ -46,13 +46,7 @@ export default function OrderDetails({ o, items, products }: { o: any; items?: O
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{it.product_name}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, marginTop: 2,
-                    color: car || sent ? 'var(--green)' : waiting ? 'var(--blue)' : 'var(--text2)' }}>
-                    {car ? <><Car size={12} /> Lämnad från bilen</>
-                      : sent ? <><Check size={12} /> Skickad</>
-                      : waiting ? <><Truck size={12} /> Att skicka</>
-                      : <><Truck size={12} /> Frakt</>}
-                  </div>
+                  <DeliveryTag line={it as any} order={o} />
                 </div>
                 <div style={{ textAlign: 'right', fontSize: 12, color: 'var(--text2)', whiteSpace: 'nowrap' }}>
                   {it.qty} × {fmt(Number(it.unit_price))} kr

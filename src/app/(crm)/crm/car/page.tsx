@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Truck, Plus, Minus, Search, Package, PackagePlus, Undo2 } from 'lucide-react'
+import { Truck, Plus, Minus, Search, Package, PackagePlus, Undo2, Check } from 'lucide-react'
 import { useMe } from '@/hooks/useMe'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 
@@ -32,7 +32,8 @@ export default function CarStockPage() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [missing, setMissing] = useState(false)
   const [sold, setSold] = useState<Sold[]>([])
-  const [days, setDays] = useState(30)
+  const [days, setDays] = useState(1)   // 1 = today (since midnight)
+  const [refilled, setRefilled] = useState<Record<string, number>>({})
 
   function load() {
     Promise.all([
@@ -48,7 +49,8 @@ export default function CarStockPage() {
 
   // Handed over from the car on live orders in the period, per seller.
   function loadSold() {
-    const since = new Date(Date.now() - days * 86_400_000).toISOString()
+    const midnight = new Date(); midnight.setHours(0, 0, 0, 0)
+    const since = days === 1 ? midnight.toISOString() : new Date(Date.now() - days * 86_400_000).toISOString()
     supabase.from('order_items').select('product_id,product_name,qty,orders!inner(status,created_by,assigned_to,created_at)')
       .eq('delivery', 'car').gte('orders.created_at', since).limit(5000)
       .then(({ data }) => setSold(((data ?? []) as any[])
@@ -72,6 +74,15 @@ export default function CarStockPage() {
     return m.set(k, e)
   }, new Map<string, { key: string; product_id: string | null; name: string; qty: number }>()).values()].sort((a, b) => b.qty - a.qty)
   const soldTotal = soldRows.reduce((n, r) => n + r.qty, 0)
+  // Refilled today, remembered per seller and day in this browser.
+  const refillKey = `prolux-car-refill-${who}-${new Date().toISOString().slice(0, 10)}`
+  useEffect(() => { try { setRefilled(JSON.parse(localStorage.getItem(refillKey) || '{}')) } catch { setRefilled({}) } }, [refillKey])
+  async function refill(productId: string, qty: number, name: string) {
+    await call('car_load', productId, qty, true, `${qty} st ${name} påfyllda i bilen`)
+    const next = { ...refilled, [productId]: qty }
+    setRefilled(next)
+    try { localStorage.setItem(refillKey, JSON.stringify(next)) } catch { /* private mode */ }
+  }
   const leftOf = (id: string | null) => (id ? rows.find(r => r.salesperson === who && r.product_id === id)?.qty : 0) ?? 0
 
   async function call(fn: 'car_load' | 'car_set', productId: string, qty: number, fromWarehouse = true, done?: string) {
@@ -166,20 +177,25 @@ export default function CarStockPage() {
       <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 10 }}>− och + justerar efter inventering utan att ändra lagret. &quot;Lasta av&quot; lägger tillbaka varorna i lagret.</p>
 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, margin: '28px 0 10px', flexWrap: 'wrap' }}>
-        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Sålt från bilen</h2>
+        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{days === 1 ? 'Sålt från bilen idag' : 'Sålt från bilen'}</h2>
         <span style={{ fontSize: 13, color: 'var(--text2)' }}>{soldTotal} st</span>
         <div role="group" aria-label="Period" style={{ marginLeft: 'auto', display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-          {[[7, '7 dagar'], [30, '30 dagar'], [90, '90 dagar']].map(([d, l]) => (
+          {[[1, 'Idag'], [7, '7 dagar'], [30, '30 dagar'], [90, '90 dagar']].map(([d, l]) => (
             <button key={d} type="button" aria-pressed={days === d} onClick={() => setDays(d as number)}
               style={{ padding: '6px 12px', fontSize: 12, fontWeight: days === d ? 700 : 500, border: 'none', cursor: 'pointer', background: days === d ? 'rgba(232,184,75,.15)' : 'var(--bg4)', color: days === d ? 'var(--text)' : 'var(--text2)' }}>{l}</button>
           ))}
         </div>
       </div>
       <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-        {soldRows.length === 0 && <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: 'var(--text2)' }}>Inget sålt från bilen de senaste {days} dagarna.</div>}
+        {soldRows.length === 0 && <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: 'var(--text2)' }}>{days === 1 ? 'Inget sålt från bilen idag.' : `Inget sålt från bilen de senaste ${days} dagarna.`}</div>}
+        {days === 1 && mine && soldRows.length > 0 && (
+          <div style={{ padding: '10px 16px', fontSize: 13, color: 'var(--text2)', borderBottom: '1px solid var(--border2)', background: 'rgba(232,184,75,.05)' }}>
+            Tillbaka på lagret? Tryck <strong style={{ color: 'var(--text)' }}>Fyll på</strong> när du lagt tillbaka varorna i bilen – de dras från lagret och bockas av.
+          </div>
+        )}
         {soldRows.length > 0 && (
           <div style={{ display: 'flex', padding: '10px 16px', fontSize: 11, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.06em', borderBottom: '1px solid var(--border2)' }}>
-            <span style={{ flex: 1 }}>Produkt</span><span style={{ width: 70, textAlign: 'right' }}>Sålt</span><span style={{ width: 90, textAlign: 'right' }}>Kvar i bilen</span>
+            <span style={{ flex: 1 }}>Produkt</span><span style={{ width: 70, textAlign: 'right' }}>Sålt</span><span style={{ width: 90, textAlign: 'right' }}>Kvar i bilen</span>{days === 1 && mine && <span style={{ width: 120, textAlign: 'right' }}>Påfyllning</span>}
           </div>
         )}
         {soldRows.map(r => {
@@ -194,6 +210,16 @@ export default function CarStockPage() {
               </div>
               <span style={{ width: 70, textAlign: 'right', fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>{r.qty} st</span>
               <span style={{ width: 90, textAlign: 'right', fontSize: 15, fontWeight: 700, color: r.product_id && left === 0 ? '#E0A85A' : 'var(--text)' }}>{r.product_id ? `${left} st` : '—'}</span>
+              {days === 1 && mine && (
+                <span style={{ width: 120, display: 'flex', justifyContent: 'flex-end' }}>
+                  {!r.product_id ? null : refilled[r.product_id] ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 700, color: 'var(--green)' }}><Check size={15} /> Påfylld</span>
+                  ) : (
+                    <button disabled={busy === r.product_id} onClick={() => refill(r.product_id!, r.qty, p?.name ?? r.name)}
+                      style={{ padding: '8px 12px', borderRadius: 8, background: 'var(--gold)', border: 'none', color: '#111', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Fyll på {r.qty}</button>
+                  )}
+                </span>
+              )}
             </div>
           )
         })}

@@ -11,7 +11,7 @@ import { useBudgetHistory } from '@/hooks/useBudgetHistory'
 import BudgetHistoryChart from '@/components/BudgetHistoryChart'
 import ReminderModal, { type Reminder } from '@/components/crm/ReminderModal'
 import { LeadsPanel, QuotesPanel, DraftsPanel, FollowUpPanel, ToShipPanel } from '@/components/crm/LeadsAndQuotes'
-import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, Trophy, ArrowRight, Calendar, ChevronLeft, ChevronRight, Activity } from 'lucide-react'
+import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, ArrowRight, Calendar, ChevronLeft, ChevronRight, Activity } from 'lucide-react'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Varukorg', quote: 'Offert', pending: 'Väntande', confirmed: 'Bekräftad',
@@ -230,7 +230,6 @@ export default function AdminDashboard() {
   const activeCustomers = customers.filter(c => c.status === 'active').length
   const lowStock        = products.filter(p => p.stock_qty < 20).sort((a, b) => a.stock_qty - b.stock_qty)
   const pipelineValue   = deals.reduce((s, d) => s + (d.value || 0), 0)
-  const wonThisMonth    = wonDeals.reduce((s, d) => s + (d.value || 0), 0)
   const totalBudget     = Object.values(budgets).reduce((a, b) => a + b, 0)
   const workDays        = workingDaysInMonth(year, month)
 
@@ -250,13 +249,12 @@ export default function AdminDashboard() {
     boxShadow: '0 1px 0 rgba(255,255,255,.04) inset, 0 6px 28px rgba(0,0,0,.35)',
   }
 
-  const kpis = [
+  const kpis: { label: string; value: string; sub: string; icon: typeof Clock; href: string; gold?: boolean; alert?: boolean; blue?: boolean; green?: boolean }[] = [
     { label: 'Total omsättning',  value: `${fmt(revenue)} kr`,         sub: 'alla ordrar exkl. moms',     icon: TrendingUp, gold: true, href: '/admin/orders' },
     { label: 'Aktiva ordrar',     value: pendingCount.toString(),       sub: unassignedCount > 0 ? `${unassignedCount} saknar säljare` : 'väntande behandling',         icon: Clock,      alert: pendingCount > 0, href: unassignedCount > 0 ? '/admin/orders?status=unassigned' : '/admin/orders?status=pending' },
     { label: 'Ordrar idag',       value: todayOrders.toString(),        sub: 'nya ordrar',                  icon: ShoppingBag, href: '/admin/orders?status=today' },
     { label: 'Aktiva kunder',     value: activeCustomers.toString(),    sub: `av ${customers.length} totalt`, icon: Users, href: '/admin/customers' },
     { label: 'Pipeline-värde',    value: `${fmt(pipelineValue)} kr`,   sub: `${deals.length} aktiva deals`, icon: GitBranch, blue: true, href: '/admin/crm/pipeline' },
-    { label: 'Stängt denna månad', value: `${fmt(wonThisMonth)} kr`,   sub: monthNames[month],             icon: Trophy,     green: wonThisMonth > 0, href: '/admin/crm/pipeline' },
   ]
 
   return (
@@ -281,7 +279,7 @@ export default function AdminDashboard() {
         </Link>
       </div>
 
-      {/* KPI grid — 6 cards */}
+      {/* KPI grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px,1fr))', gap: 12, marginBottom: 24 }}>
         {kpis.map((k, i) => {
           const Icon = k.icon

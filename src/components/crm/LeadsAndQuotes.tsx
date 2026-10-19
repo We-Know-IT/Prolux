@@ -13,29 +13,36 @@ import { AWAITING_SHIPMENT, SHIP_LINES_SELECT, qtyToShip } from '@/lib/shipping'
 // Shared by the CRM and admin overviews.
 
 const panel: React.CSSProperties = {
-  background: 'rgba(13,16,23,.72)', border: '1px solid rgba(255,255,255,.06)', borderRadius: 12,
+  background: 'var(--bg3)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12,
   boxShadow: '0 1px 0 rgba(255,255,255,.04) inset, 0 4px 24px rgba(0,0,0,.3)', overflow: 'hidden',
+}
+// Each kind of list has its own colour, so they are easy to tell apart.
+export const ACCENT = { leads: '#6AAFF0', quotes: '#B593F0', carts: '#E8B84B', ship: '#4FC1D9', follow: '#E0A85A' } as const
+const accentPanel = (c: string): React.CSSProperties => ({ ...panel, border: `1px solid ${c}40`, borderTop: `3px solid ${c}` })
+
+// Section heading: coloured icon chip, title, optional count and link.
+function Head({ icon: Icon, color, title, count, href, link }: { icon: typeof Truck; color: string; title: string; count?: number; href?: string; link?: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 10 }}>
+      <span style={{ width: 28, height: 28, borderRadius: 8, background: `${color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon size={15} color={color} /></span>
+      <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{title}</span>
+      {count !== undefined && <span style={{ fontSize: 12, fontWeight: 700, padding: '1px 9px', borderRadius: 10, background: `${color}26`, color }}>{count}</span>}
+      {href && <Link href={href} style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 600, color: 'var(--text2)', textDecoration: 'none' }}>{link} →</Link>}
+    </div>
+  )
 }
 // In the admin, "Alla ordrar" means the admin order list; in the CRM the CRM one.
 function useInAdmin() {
   const path = usePathname() || ''
   return path.startsWith('/admin') && !path.startsWith('/admin/crm')
 }
-// "Alla ordrar": admins always go to Admin → Ordrar, sellers to the CRM list.
-function useOrdersHref() {
-  const me = useMe()
-  return useInAdmin() || me.role === 'admin' ? '/admin/orders' : '/crm/orders?view=history'
-}
-// One order/quote: the admin order panel in the admin, the order form in the CRM.
+// One quote or saved cart: opens it in the order form (the admin's copy of the
+// CRM form when in the admin), ready to mail or turn into an order.
 function useOrderHref() {
   const admin = useInAdmin()
-  return (id: string) => admin ? `/admin/orders?order=${id}` : `/crm/orders?edit=${id}`
+  return (id: string) => admin ? `/admin/crm/orders?edit=${id}` : `/crm/orders?edit=${id}`
 }
 
-const heading: React.CSSProperties = {
-  fontSize: 11, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.09em',
-  marginBottom: 10, display: 'flex', alignItems: 'center', gap: 7,
-}
 
 // Open leads (deals not yet won or lost) with notes that can be edited in place.
 export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number }) {
@@ -75,24 +82,21 @@ export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number 
 
   return (
     <div>
-      <div style={heading}>
-        <Sparkles size={12} /> Leads
-        <Link href={`${base}/pipeline`} style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text2)', textDecoration: 'none', textTransform: 'none', letterSpacing: 0 }}>Pipeline →</Link>
-      </div>
-      <div style={panel}>
+      <Head icon={Sparkles} color={ACCENT.leads} title="Leads" count={leads?.length} href={`${base}/pipeline`} link="Pipeline" />
+      <div style={accentPanel(ACCENT.leads)}>
         {leads && leads.length === 0 && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Inga öppna leads. Förfrågningar från webben och offerter (Spara som lead) hamnar här.</div>}
         {leads === null && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Laddar…</div>}
         {(leads ?? []).map((l, i, arr) => (
           <div key={l.id} style={{ padding: '12px 16px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <Link href={quoteByDeal[l.id] ? orderHref(quoteByDeal[l.id].id) : l.customers?.id ? `/crm/customers/${l.customers.id}` : `${base}/pipeline`} style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', textDecoration: 'none' }}>
+              <Link href={`${base}/pipeline?deal=${l.id}`} title="Öppna leaden" style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', textDecoration: 'underline', textUnderlineOffset: 3, textDecorationColor: 'rgba(255,255,255,.25)' }}>
                 {l.customers?.company || l.title}
               </Link>
               <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(74,143,212,.14)', color: '#8DBDF0' }}>{l.stage}</span>
               {l.source === 'web' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(76,175,125,.14)', color: '#6FCB9C' }}>Från webben</span>}
               <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--gold)' }}>{l.value ? `${fmt(l.value)} kr` : ''}</span>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text2)', margin: '3px 0 6px' }}>{l.title}{l.assigned_to ? ` · ${l.assigned_to}` : ''} · {formatDate(l.updated_at || l.created_at)}</div>
+            <div style={{ fontSize: 12, color: 'var(--text2)', margin: '3px 0 6px' }}>{l.title}{l.assigned_to ? ` · ${l.assigned_to}` : ''} · {formatDate(l.updated_at || l.created_at)}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               {quoteByDeal[l.id] && (
                 <Link href={orderHref(quoteByDeal[l.id].id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 7, background: 'var(--gold)', color: '#111', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
@@ -132,7 +136,7 @@ export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number 
 // Open quotes; each opens in the order form (mail it or turn it into an order).
 export function QuotesPanel({ limit = 6 }: { limit?: number }) {
   const orderHref = useOrderHref()
-  const ordersHref = useOrdersHref()
+  const quotesHref = useInAdmin() ? '/admin/crm/orders?view=history&filter=quotes' : '/crm/orders?view=history&filter=quotes'
   const [quotes, setQuotes] = useState<any[] | null>(null)
   function load() {
     createClient().from('orders').select('id,order_nr,subtotal,created_at,notes,customers(company)')
@@ -144,11 +148,8 @@ export function QuotesPanel({ limit = 6 }: { limit?: number }) {
 
   return (
     <div>
-      <div style={heading}>
-        <FileText size={12} /> Offerter
-        <Link href={ordersHref} style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text2)', textDecoration: 'none', textTransform: 'none', letterSpacing: 0 }}>Alla ordrar →</Link>
-      </div>
-      <div style={panel}>
+      <Head icon={FileText} color={ACCENT.quotes} title="Offerter" count={quotes?.length} href={quotesHref} link="Alla offerter" />
+      <div style={accentPanel(ACCENT.quotes)}>
         {quotes && quotes.length === 0 && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Inga öppna offerter just nu.</div>}
         {quotes === null && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Laddar…</div>}
         {(quotes ?? []).map((q, i, arr) => (
@@ -157,10 +158,10 @@ export function QuotesPanel({ limit = 6 }: { limit?: number }) {
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.03)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{q.customers?.company || 'Kund saknas'}</span>
-              <span style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>#{q.order_nr}</span>
+              <span style={{ fontSize: 12, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>#{q.order_nr}</span>
               <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--gold)' }}>{fmt(q.subtotal)} kr</span>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 3 }}>{formatDate(q.created_at)}{q.notes ? ` · ${String(q.notes).split('\n')[0].slice(0, 80)}` : ''}</div>
+            <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 3 }}>{formatDate(q.created_at)}{q.notes ? ` · ${String(q.notes).split('\n')[0].slice(0, 80)}` : ''}</div>
           </Link>
         ))}
       </div>
@@ -188,11 +189,8 @@ export function DraftsPanel({ limit = 10 }: { limit?: number }) {
 
   return (
     <div>
-      <div style={heading}>
-        <ShoppingCart size={12} /> Sparade varukorgar
-        <Link href={cartsHref} style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text2)', textDecoration: 'none', textTransform: 'none', letterSpacing: 0 }}>Alla varukorgar →</Link>
-      </div>
-      <div style={panel}>
+      <Head icon={ShoppingCart} color={ACCENT.carts} title="Sparade varukorgar" count={drafts?.length} href={cartsHref} link="Alla" />
+      <div style={accentPanel(ACCENT.carts)}>
         {drafts && drafts.length === 0 && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Inga sparade varukorgar. En varukorg i Ny order sparas här automatiskt.</div>}
         {drafts === null && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Laddar…</div>}
         {(drafts ?? []).map((d, i, arr) => {
@@ -204,10 +202,10 @@ export function DraftsPanel({ limit = 10 }: { limit?: number }) {
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.03)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: d.customers?.company ? 'var(--text)' : 'var(--text2)' }}>{d.customers?.company || 'Utan kund'}</span>
-                <span style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>#{d.order_nr}</span>
+                <span style={{ fontSize: 12, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>#{d.order_nr}</span>
                 <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--gold)' }}>{fmt(d.subtotal)} kr</span>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 3 }}>{units} st · {formatDate(d.created_at)}{d.created_by ? ` · ${d.created_by}` : ''}</div>
+              <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 3 }}>{units} st · {formatDate(d.created_at)}{d.created_by ? ` · ${d.created_by}` : ''}</div>
             </Link>
             <button onClick={() => remove(d)} aria-label={`Ta bort varukorg #${d.order_nr}`} title="Ta bort varukorgen"
               style={{ margin: '0 12px 0 4px', width: 32, height: 32, flexShrink: 0, borderRadius: 8, background: 'transparent', border: '1px solid rgba(224,82,82,.3)', color: 'var(--red)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -260,12 +258,9 @@ export function FollowUpPanel({ days = 3, bare = false, onCount }: { days?: numb
     </div>
   )
   return (
-    <div style={{ ...panel, border: '1px solid rgba(232,184,75,.3)', padding: '14px 16px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <BellRing size={15} color="var(--gold)" />
-        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Att göra – följ upp</span>
-        <span style={{ fontSize: 12, color: 'var(--text2)' }}>Offerter och varukorgar som legat orörda i {days} dagar eller mer</span>
-      </div>
+    <div style={{ ...accentPanel(ACCENT.follow), padding: '14px 16px' }}>
+      <Head icon={BellRing} color={ACCENT.follow} title="Följ upp" count={rows.length} />
+      <div style={{ fontSize: 13, color: 'var(--text2)', margin: '-4px 0 10px' }}>Offerter och varukorgar som legat orörda i {days} dagar eller mer</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {rows.map(o => (
           <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '8px 10px', background: 'rgba(255,255,255,.03)', borderRadius: 8 }}>
@@ -298,16 +293,13 @@ export function ToShipPanel({ limit = 8 }: { limit?: number }) {
   useEffect(load, []) // eslint-disable-line react-hooks/exhaustive-deps
   useLiveRefresh(['orders'], load)
   if (rows.length === 0) return null
-  const href = (id: string) => admin ? `/admin/orders?order=${id}` : `/crm/orders?view=history&filter=ship&open=${id}`
+  const shipHref = admin ? '/admin/crm/shipping' : '/crm/shipping'
+  const href = (id: string) => `${shipHref}?order=${id}`
 
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={heading}>
-        <Truck size={12} /> Att skicka
-        <span style={{ fontSize: 11, fontWeight: 700, padding: '1px 8px', borderRadius: 10, background: 'rgba(74,143,212,.15)', color: 'var(--blue)', letterSpacing: 0 }}>{rows.length}</span>
-        <Link href={admin ? '/admin/orders?status=ship' : '/crm/orders?view=history&filter=ship'} style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text2)', textDecoration: 'none', textTransform: 'none', letterSpacing: 0 }}>Alla →</Link>
-      </div>
-      <div style={panel}>
+      <Head icon={Truck} color={ACCENT.ship} title="Att skicka" count={rows.length} href={shipHref} link="Öppna leveranser" />
+      <div style={accentPanel(ACCENT.ship)}>
         {rows.slice(0, limit).map((o, i, arr) => {
           const lines = (o.ship_lines ?? []).filter((l: any) => (l.delivery ?? 'ship') === 'ship')
           return (
@@ -315,13 +307,13 @@ export function ToShipPanel({ limit = 8 }: { limit?: number }) {
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.03)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{o.customers?.company || o.delivery_name || 'Utan kund'}</span>
-                <span style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>#{o.order_nr}</span>
+                <span style={{ fontSize: 12, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>#{o.order_nr}</span>
                 <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: 'var(--blue)', whiteSpace: 'nowrap' }}>{qtyToShip(o)} st</span>
               </div>
               <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 3 }}>
                 {lines.map((l: any) => `${l.qty} × ${l.product_name}`).join(', ')}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>{formatDate(o.created_at)}{o.assigned_to ? ` · ${o.assigned_to}` : ''}</div>
+              <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{formatDate(o.created_at)}{o.assigned_to ? ` · ${o.assigned_to}` : ''}</div>
             </Link>
           )
         })}

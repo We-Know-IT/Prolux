@@ -1,5 +1,6 @@
 'use client'
-import { qtyToShip, awaitingShipment, SHIP_LINES_SELECT } from '@/lib/shipping'
+import { qtyToShip, SHIP_LINES_SELECT } from '@/lib/shipping'
+import DeliveryTag from '@/components/orders/DeliveryTag'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
@@ -174,7 +175,7 @@ export default function AdminOrders() {
           <button onClick={exportCSV} style={{ padding: '9px 18px', fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text2)' }}>
             ↓ Exportera CSV
           </button>
-          <Link href="/admin/crm/orders" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px', background: 'var(--gold)', borderRadius: 8, color: '#111', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
+          <Link href="/admin/crm/orders" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px', background: 'var(--gold)', borderRadius: 8, color: '#111', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
             + Ny order
           </Link>
         </div>
@@ -186,12 +187,12 @@ export default function AdminOrders() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Sök order, kund…"
-          style={{ flex: 1, maxWidth: 320, padding: '9px 14px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontFamily: 'var(--font-sans)', fontSize: '13px', outline: 'none' }}
+          style={{ flex: 1, maxWidth: 320, padding: '9px 14px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontFamily: 'var(--font-sans)', fontSize: '14px', outline: 'none' }}
         />
         <select
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value)}
-          style={{ padding: '8px 14px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontFamily: 'var(--font-sans)', fontSize: '13px', outline: 'none' }}
+          style={{ padding: '8px 14px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontFamily: 'var(--font-sans)', fontSize: '14px', outline: 'none' }}
         >
           <option value="">Alla statusar</option>
           {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -208,7 +209,7 @@ export default function AdminOrders() {
           <thead>
             <tr>
               {['#', 'Datum', 'Kund', 'Säljare', 'Prislista', 'Belopp', 'Status', 'Ändra status'].map(h => (
-                <th key={h} style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', padding: '14px 0', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>{h}</th>
+                <th key={h} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', padding: '14px 0', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -217,19 +218,19 @@ export default function AdminOrders() {
               const sc = STATUS_CSS[o.status] || STATUS_CSS.draft
               return (
                 <tr key={o.id} onClick={() => openOrder(o)} style={{ cursor: 'pointer' }}>
-                  <td style={{ padding: '16px 0', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--gold)', fontWeight: 500, borderBottom: '1px solid rgba(255,255,255,.04)' }}>#{o.order_nr}</td>
-                  <td style={{ padding: '16px 0', fontSize: '13px', color: 'var(--text)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>{formatDateTime(o.created_at)}</td>
-                  <td style={{ padding: '16px 0', fontSize: '13px', color: 'var(--text)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>{o.customers?.company || o.delivery_name || '—'}</td>
-                  <td style={{ padding: '16px 0', fontSize: '13px', color: o.assigned_to ? 'var(--text2)' : 'var(--red)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
+                  <td style={{ padding: '16px 0', fontFamily: 'var(--font-mono)', fontSize: '14px', color: 'var(--gold)', fontWeight: 500, borderBottom: '1px solid rgba(255,255,255,.04)' }}>#{o.order_nr}</td>
+                  <td style={{ padding: '16px 0', fontSize: '14px', color: 'var(--text)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>{formatDateTime(o.created_at)}</td>
+                  <td style={{ padding: '16px 0', fontSize: '14px', color: 'var(--text)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>{o.customers?.company || o.delivery_name || '—'}</td>
+                  <td style={{ padding: '16px 0', fontSize: '14px', color: o.assigned_to ? 'var(--text2)' : 'var(--red)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
                     {o.assigned_to || 'Saknas'}
                     {o.created_by && o.created_by !== o.assigned_to && <div style={{ fontSize: 11, color: 'var(--text2)' }}>såld av {o.created_by}</div>}
                   </td>
                   <td style={{ padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: 4, background: 'rgba(232,184,75,.15)', color: 'var(--gold)' }}>{o.price_list_id || 'Standard'}</span>
+                    <span style={{ fontSize: '12px', fontWeight: 600, padding: '3px 10px', borderRadius: 4, background: 'rgba(232,184,75,.15)', color: 'var(--gold)' }}>{o.price_list_id || 'Standard'}</span>
                   </td>
-                  <td style={{ padding: '16px 0', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--gold)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>{fmt(o.subtotal)} kr <span style={{ fontSize: 11, color: 'var(--text2)' }}>exkl.</span><IncVat net={o.subtotal} total={o.total} /></td>
+                  <td style={{ padding: '16px 0', fontFamily: 'var(--font-mono)', fontSize: '14px', color: 'var(--gold)', borderBottom: '1px solid rgba(255,255,255,.04)' }}>{fmt(o.subtotal)} kr <span style={{ fontSize: 11, color: 'var(--text2)' }}>exkl.</span><IncVat net={o.subtotal} total={o.total} /></td>
                   <td style={{ padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: 4, background: sc.bg, color: sc.color }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '12px', fontWeight: 600, padding: '3px 10px', borderRadius: 4, background: sc.bg, color: sc.color }}>
                       {STATUS_LABELS[o.status] || o.status}
                     </span>
                     {qtyToShip(o) > 0 && <div style={{ marginTop: 4, fontSize: 11, fontWeight: 700, color: 'var(--blue)', whiteSpace: 'nowrap' }}>{qtyToShip(o)} st att skicka</div>}
@@ -239,7 +240,7 @@ export default function AdminOrders() {
                       value={o.status}
                       onClick={e => e.stopPropagation()}
                       onChange={e => { e.stopPropagation(); updateStatus(o.id, e.target.value) }}
-                      style={{ fontSize: '11px', padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', background: 'var(--bg2)', color: 'var(--text)', fontFamily: 'var(--font-sans)' }}
+                      style={{ fontSize: '12px', padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', background: 'var(--bg2)', color: 'var(--text)', fontFamily: 'var(--font-sans)' }}
                     >
                       {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                     </select>
@@ -265,31 +266,33 @@ export default function AdminOrders() {
             <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
               {(selectedOrder.status === 'draft' || selectedOrder.status === 'quote') && (
                 <div style={{ marginBottom: 24, padding: 16, borderRadius: 10, background: 'rgba(232,184,75,.07)', border: '1px solid rgba(232,184,75,.25)' }}>
-                  <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text)' }}>
+                  <p style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--text)' }}>
                     {selectedOrder.status === 'quote' ? 'Offert' : 'Varukorg'} — öppna den i ordern för att ändra, mejla offerten eller lägga ordern.
                   </p>
                   <Link href={`/admin/crm/orders?edit=${selectedOrder.id}`}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 8, background: 'var(--gold)', color: '#111', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 8, background: 'var(--gold)', color: '#111', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
                     Öppna i ordern
                   </Link>
                 </div>
               )}
               {selectedOrder.status !== 'draft' && selectedOrder.status !== 'quote' && (
                 <Link href={`/admin/crm/orders?reorder=${selectedOrder.id}`}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 20, padding: '9px 14px', borderRadius: 8, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 20, padding: '9px 14px', borderRadius: 8, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>
                   <RefreshCw size={14} /> Lägg ordern igen
                 </Link>
               )}
               {/* Order info */}
               <div style={{ marginBottom: 24 }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,.04)', display: 'block' }}>Orderinfo</span>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,.04)', display: 'block' }}>Orderinfo</span>
                 {[
                   ['Status', (
-                    <span key="s" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: 4, background: (STATUS_CSS[selectedOrder.status] || STATUS_CSS.draft).bg, color: (STATUS_CSS[selectedOrder.status] || STATUS_CSS.draft).color }}>
+                    <span key="s" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '12px', fontWeight: 600, padding: '3px 10px', borderRadius: 4, background: (STATUS_CSS[selectedOrder.status] || STATUS_CSS.draft).bg, color: (STATUS_CSS[selectedOrder.status] || STATUS_CSS.draft).color }}>
                       {STATUS_LABELS[selectedOrder.status] || selectedOrder.status}
                     </span>
                   )],
                   ['Datum',     formatDateTime(selectedOrder.created_at)],
+                  ...(selectedOrder.packed_at ? [['Packad', `${formatDateTime(selectedOrder.packed_at)}${selectedOrder.packed_by ? ` · ${selectedOrder.packed_by}` : ''}`]] : []),
+                  ...(selectedOrder.shipped_at ? [['Hämtad av transportör', `${formatDateTime(selectedOrder.shipped_at)}${selectedOrder.carrier ? ` · ${selectedOrder.carrier}` : ''}`]] : []),
                   ['Prislista', selectedOrder.price_list_id || 'Standard'],
                   ['Kund',      selectedOrder.customer_id ? (selectedOrder.customers?.company || selectedOrder.delivery_name || '—') : (
                     <select key="k" value="" onChange={e => linkCustomer(selectedOrder.id, e.target.value)} aria-label="Koppla kund"
@@ -308,7 +311,7 @@ export default function AdminOrders() {
                     </select>
                   )],
                 ].map(([k, v]) => (
-                  <div key={String(k)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.04)', fontSize: 13, gap: 12 }}>
+                  <div key={String(k)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.04)', fontSize: 14, gap: 12 }}>
                     <span style={{ color: 'var(--text2)', flexShrink: 0 }}>{k}</span>
                     <strong style={{ color: 'var(--text)', fontWeight: 500, textAlign: 'right' }}>{v as any}</strong>
                   </div>
@@ -317,13 +320,13 @@ export default function AdminOrders() {
 
               {/* Delivery */}
               <div style={{ marginBottom: 24 }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,.04)', display: 'block' }}>Leverans</span>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,.04)', display: 'block' }}>Leverans</span>
                 {[
                   ['Namn',   selectedOrder.delivery_name || '—'],
                   ['Adress', selectedOrder.delivery_address || '—'],
                   ['Stad',   `${selectedOrder.delivery_city || '—'} ${selectedOrder.delivery_zip || ''}`],
                 ].map(([k, v]) => (
-                  <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.04)', fontSize: 13, gap: 12 }}>
+                  <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.04)', fontSize: 14, gap: 12 }}>
                     <span style={{ color: 'var(--text2)', flexShrink: 0 }}>{k}</span>
                     <strong style={{ color: 'var(--text)', fontWeight: 500, textAlign: 'right' }}>{v}</strong>
                   </div>
@@ -332,20 +335,16 @@ export default function AdminOrders() {
 
               {/* Products */}
               <div style={{ marginBottom: 24 }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,.04)', display: 'block' }}>Produkter</span>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,.04)', display: 'block' }}>Produkter</span>
                 {orderItems.length === 0 && <p style={{ fontSize: 12, color: 'var(--text3)' }}>Inga rader</p>}
                 {orderItems.map(item => (
                   <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,.04)', fontSize: 13 }}>
                     <div>
                       <div style={{ color: 'var(--text)', fontWeight: 500, marginBottom: 2 }}>
                         {item.product_name}
-                        {item.delivery === 'car' ? (
-                          <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(76,175,125,.14)', color: 'var(--green)' }}>LEVERERAD FRÅN BILEN</span>
-                        ) : awaitingShipment(selectedOrder.status) && (
-                          <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(74,143,212,.14)', color: 'var(--blue)' }}>ATT SKICKA</span>
-                        )}
                       </div>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text3)' }}>× {item.qty} · {item.product_sku}</div>
+                      <DeliveryTag line={item} order={selectedOrder} />
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text3)' }}>× {item.qty} · {item.product_sku}</div>
                     </div>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gold)', fontWeight: 500, whiteSpace: 'nowrap', marginLeft: 12, textAlign: 'right' }}>{fmt(item.total_price)} kr<IncVat net={item.total_price} /></div>
                   </div>
@@ -365,7 +364,7 @@ export default function AdminOrders() {
               {/* Visma */}
               {!['draft', 'quote', 'cancelled'].includes(selectedOrder.status) && (
                 <div style={{ marginBottom: 24 }}>
-                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10, display: 'block' }}>Visma</span>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10, display: 'block' }}>Visma</span>
                   {selectedOrder.visma_status && VISMA_STATUS[selectedOrder.visma_status] && (
                     <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 4, marginBottom: 8, background: VISMA_STATUS[selectedOrder.visma_status].bg, color: VISMA_STATUS[selectedOrder.visma_status].color }}>
                       {VISMA_STATUS[selectedOrder.visma_status].label}{selectedOrder.visma_invoice_number ? ` · nr ${selectedOrder.visma_invoice_number}` : ''}
@@ -374,7 +373,7 @@ export default function AdminOrders() {
                   {selectedOrder.visma_status === 'error' && <p style={{ fontSize: 12, color: 'var(--red)', margin: '0 0 8px' }}>{selectedOrder.visma_error}</p>}
                   {(!selectedOrder.visma_status || selectedOrder.visma_status === 'error') && (
                     <button onClick={() => sendToVisma(selectedOrder.id)} disabled={vismaBusy}
-                      style={{ display: 'block', padding: '9px 14px', borderRadius: 8, background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: vismaBusy ? 'wait' : 'pointer' }}>
+                      style={{ display: 'block', padding: '9px 14px', borderRadius: 8, background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: vismaBusy ? 'wait' : 'pointer' }}>
                       {vismaBusy ? 'Skickar till Visma…' : selectedOrder.visma_status === 'error' ? 'Försök igen' : 'Skapa faktura i Visma'}
                     </button>
                   )}
@@ -383,7 +382,7 @@ export default function AdminOrders() {
 
               {/* Status update */}
               <div style={{ marginBottom: 16 }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10, display: 'block' }}>Uppdatera status</span>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10, display: 'block' }}>Uppdatera status</span>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                   {Object.entries(STATUS_LABELS).map(([v, l]) => {
                     const sc = STATUS_CSS[v] || STATUS_CSS.draft
@@ -400,7 +399,7 @@ export default function AdminOrders() {
 
               {/* Shipping */}
               <div>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8, display: 'block' }}>Frakt & spårning</span>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8, display: 'block' }}>Frakt & spårning</span>
                 <ShipOrderForm key={selectedOrder.id} order={selectedOrder} onShipped={patch => {
                   setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, ...patch } : o))
                   setSelectedOrder((prev: any) => ({ ...prev, ...patch }))
@@ -414,7 +413,7 @@ export default function AdminOrders() {
 
       {/* Toast */}
       {toast && (
-        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', padding: '12px 20px', fontSize: 13, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap' }}>
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', padding: '12px 20px', fontSize: 14, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap' }}>
           <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--gold)', flexShrink: 0 }} />
           {toast}
         </div>

@@ -5,12 +5,12 @@ import { createClient } from '@/lib/supabase/client'
 import OrgNrLookup from '@/components/crm/OrgNrLookup'
 import type { Customer, PriceList } from '@/types'
 
-// Price lists with their discount, shown wherever a list is picked.
+// Price lists, shown by letter only; the discount itself is shown in the checkout.
 export const PRICE_LIST_OPTIONS: { id: PriceList; label: string }[] = [
-  { id: 'A', label: 'A · 40 %' },
-  { id: 'B', label: 'B · 30 %' },
-  { id: 'C', label: 'C · 20 %' },
-  { id: 'Standard', label: 'Standard · 0 %' },
+  { id: 'A', label: 'A' },
+  { id: 'B', label: 'B' },
+  { id: 'C', label: 'C' },
+  { id: 'Standard', label: 'Standard' },
 ]
 
 const EMPTY = { company: '', contact_name: '', email: '', phone: '', org_nr: '', address: '', postal_code: '', city: '', price_list_id: 'Standard' as PriceList, customer_type: 'business' as 'business' | 'private' }
@@ -112,7 +112,7 @@ export default function NewCustomerModal({ accountManager, initialCompany = '', 
   )
 }
 
-// A / B / C / Standard with the discount written out, folded away behind a
+// A / B / C / Standard, folded away behind a
 // small button so a customer filling in the form never sees the other lists.
 export function PriceListPicker({ value, onChange }: { value: string; onChange: (v: PriceList) => void }) {
   const [open, setOpen] = useState(false)
@@ -129,8 +129,7 @@ export function PriceListPicker({ value, onChange }: { value: string; onChange: 
         return (
           <button key={id} type="button" onClick={() => { onChange(id); setOpen(false) }} aria-pressed={on}
             style={{ padding: '9px 4px', background: on ? 'rgba(232,184,75,.1)' : 'var(--bg3)', border: `1px solid ${on ? 'var(--gold)' : 'var(--border)'}`, borderRadius: 8, color: on ? 'var(--gold)' : 'var(--text2)', fontSize: 13, fontWeight: 700, cursor: 'pointer', lineHeight: 1.3 }}>
-            {label.split(' · ')[0]}
-            <span style={{ display: 'block', fontSize: 11, fontWeight: 600, color: on ? 'var(--gold)' : 'var(--text2)' }}>{label.split(' · ')[1]} rabatt</span>
+            {label}
           </button>
         )
       })}

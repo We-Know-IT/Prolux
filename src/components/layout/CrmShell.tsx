@@ -12,7 +12,7 @@ import GuideTour, { GuideButton } from '@/components/onboarding/GuideTour'
 import { CRM_GUIDE } from '@/components/onboarding/guides'
 import { createClient } from '@/lib/supabase/client'
 import { currentStaff } from '@/lib/team'
-import { LayoutDashboard, GitBranch, Users, ShoppingCart, LogOut, Menu, X, CalendarDays, StickyNote, ClipboardList, Truck, FileCheck } from 'lucide-react'
+import { LayoutDashboard, GitBranch, Users, ShoppingCart, LogOut, Menu, X, CalendarDays, StickyNote, ClipboardList, Truck, FileCheck, PackageCheck } from 'lucide-react'
 
 export const CRM_SECTIONS = [
   { href: '/crm/dashboard', label: 'Översikt',      icon: LayoutDashboard },
@@ -21,6 +21,7 @@ export const CRM_SECTIONS = [
   { href: '/crm/customers', label: 'Kunder',         icon: Users },
   { href: '/crm/orders',    label: 'Ny order',       icon: ShoppingCart },
   { href: '/crm/orders?view=history', label: 'Ordrar', icon: ClipboardList },
+  { href: '/crm/shipping',  label: 'Leveranser',     icon: PackageCheck },
   { href: '/crm/car',       label: 'Bilen',          icon: Truck },
   { href: '/crm/calendar',  label: 'Kalender',       icon: CalendarDays },
   { href: '/crm/notes',     label: 'Anteckningar',   icon: StickyNote },
@@ -100,13 +101,13 @@ export default function CrmShell({ children }: { children: ReactNode }) {
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '6px 13px', borderRadius: 7,
                 background: active ? 'rgba(232,184,75,.09)' : 'transparent',
-                color: active ? 'var(--gold)' : 'var(--text3)',
-                fontSize: 13, fontWeight: active ? 600 : 400,
+                color: active ? 'var(--gold)' : 'var(--text)',
+                fontSize: 13, fontWeight: active ? 700 : 500,
                 textDecoration: 'none',
                 border: `1px solid ${active ? 'var(--line-gold)' : 'transparent'}`,
                 transition: 'all .15s',
               }}>
-                <Icon size={14} style={{ opacity: active ? 1 : 0.6 }} />
+                <Icon size={14} style={{ opacity: active ? 1 : 0.75 }} />
                 {label}
               </Link>
             )
