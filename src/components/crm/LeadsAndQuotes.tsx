@@ -303,7 +303,7 @@ export function ToShipPanel({ limit = 8 }: { limit?: number }) {
   const admin = useInAdmin() || me.role === 'admin'
   const [rows, setRows] = useState<any[]>([])
   function load() {
-    createClient().from('orders').select(`id,order_nr,status,created_at,assigned_to,created_by,customers(company),delivery_name,${SHIP_LINES_SELECT}`)
+    createClient().from('orders').select(`id,order_nr,status,created_at,assigned_to,created_by,packed_at,customers(company),delivery_name,${SHIP_LINES_SELECT}`)
       .in('status', [...AWAITING_SHIPMENT]).order('created_at', { ascending: true }).limit(200)
       .then(({ data }) => setRows((data ?? []).filter((o: any) => qtyToShip(o) > 0)))
   }
@@ -321,18 +321,23 @@ export function ToShipPanel({ limit = 8 }: { limit?: number }) {
         {rows.slice(0, limit).map((o, i, arr) => {
           const lines = (o.ship_lines ?? []).filter((l: any) => (l.delivery ?? 'ship') === 'ship')
           return (
-            <Link key={o.id} href={href(o.id)} style={{ display: 'block', padding: '12px 16px', textDecoration: 'none', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none' }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.03)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{o.customers?.company || o.delivery_name || 'Utan kund'}</span>
-                <span style={{ fontSize: 12, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>#{o.order_nr}</span>
-                <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: 'var(--blue)', whiteSpace: 'nowrap' }}>{qtyToShip(o)} st</span>
+            <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.06)' : 'none' }}>
+              <Link href={href(o.id)} title="Öppna ordern" style={{ flex: 1, minWidth: 0, textDecoration: 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', textDecoration: 'underline', textUnderlineOffset: 3, textDecorationColor: 'rgba(255,255,255,.25)' }}>{o.customers?.company || o.delivery_name || 'Utan kund'}</span>
+                  <span style={{ fontSize: 13, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>#{o.order_nr}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue)', whiteSpace: 'nowrap' }}>· {qtyToShip(o)} st</span>
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text)', marginTop: 3 }}>
+                  {lines.map((l: any) => `${l.qty} × ${l.product_name}`).join(', ')}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{formatDate(o.created_at)}{o.assigned_to ? ` · ${o.assigned_to}` : ''}{o.packed_at ? ' · packad' : ''}</div>
+              </Link>
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <Link href={href(o.id)} style={{ padding: '8px 12px', borderRadius: 8, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>Öppna ordern</Link>
+                <Link href={`${shipHref}?order=${o.id}`} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(79,193,217,.14)', border: '1px solid rgba(79,193,217,.45)', color: 'var(--text)', fontSize: 13, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>Packa / skicka</Link>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 3 }}>
-                {lines.map((l: any) => `${l.qty} × ${l.product_name}`).join(', ')}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{formatDate(o.created_at)}{o.assigned_to ? ` · ${o.assigned_to}` : ''}</div>
-            </Link>
+            </div>
           )
         })}
       </div>
