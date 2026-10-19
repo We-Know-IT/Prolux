@@ -12,11 +12,12 @@ import GuideTour, { GuideButton } from '@/components/onboarding/GuideTour'
 import { ADMIN_GUIDE } from '@/components/onboarding/guides'
 import { createClient } from '@/lib/supabase/client'
 import { CRM_SECTIONS } from '@/components/layout/CrmShell'
-import { LayoutDashboard, ShoppingBag, Users, Tag, Megaphone, Zap, LogOut, UserCog, Menu, X, GitBranch, StickyNote, Bell, FileText, Plug, FileCheck, Sparkles } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, Users, Tag, Megaphone, Zap, LogOut, UserCog, Menu, X, GitBranch, Bell, FileText, Plug, FileCheck, Sparkles, PackageCheck } from 'lucide-react'
 
 const ADMIN_NAV = [
   { href: '/admin/dashboard',  label: 'Översikt',  icon: LayoutDashboard },
   { href: '/admin/orders',     label: 'Ordrar',    icon: ShoppingBag },
+  { href: '/admin/crm/shipping', label: 'Leveranser', icon: PackageCheck },
   { href: '/admin/crm/quotes', label: 'Offerter', icon: FileCheck },
   { href: '/admin/crm/leads',  label: 'Leads',    icon: Sparkles },
   { href: '/admin/customers',  label: 'Kunder',    icon: Users },
@@ -32,12 +33,8 @@ const ADMIN_NAV_ALL = [
   { href: '/admin/automations', label: 'Automationer', icon: Zap },
 ]
 
-const CRM_NAV = [
-  { href: '/admin/crm/pipeline',  label: 'Pipeline',     icon: GitBranch },
-  { href: '/admin/crm/customers', label: 'CRM Kunder',   icon: Users },
-  { href: '/admin/crm/orders',    label: 'Ny order',     icon: ShoppingBag },
-  { href: '/admin/crm/notes',     label: 'Anteckningar', icon: StickyNote },
-]
+// Mobile menu: the same CRM sections as the bar under the top menu.
+const CRM_NAV = CRM_SECTIONS
 
 export function AdminShell({ children, email }: { children: ReactNode; email: string }) {
   const pathname = usePathname()

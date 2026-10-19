@@ -1,12 +1,13 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Truck, PackageCheck, Package, Check } from 'lucide-react'
+import { Truck, PackageCheck, Package, Check, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatDateTime } from '@/lib/utils'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { useMe } from '@/hooks/useMe'
-import { SHIP_LINES_SELECT, type ShipLine } from '@/lib/shipping'
+import { type ShipLine } from '@/lib/shipping'
+import { usePathname } from 'next/navigation'
 import ShipOrderForm from '@/components/orders/ShipOrderForm'
 import PackingForm from '@/components/orders/PackingForm'
 
@@ -26,6 +27,13 @@ interface ShipOrder {
 // who packed and when; "hämtad" records when the carrier picked it up.
 export default function ShippingPage() {
   const me = useMe()
+  const inAdmin = (usePathname() || '').startsWith('/admin')
+  // The order itself: the admin order panel, or the order in the CRM list.
+  const orderHref = (id: string) => inAdmin || me.role === 'admin' ? `/admin/orders?order=${id}` : `/crm/orders?view=history&open=${id}`
+  const [pics, setPics] = useState<Record<string, string | null>>({})
+  useEffect(() => {
+    supabase.from('products').select('id,image_url').then(({ data }) => setPics(Object.fromEntries((data ?? []).map((p: any) => [p.id, p.image_url]))))
+  }, [])
   const [orders, setOrders] = useState<ShipOrder[] | null>(null)
   const [tab, setTab] = useState<Tab>('pack')
   const [focus, setFocus] = useState<string | null>(null)
@@ -34,7 +42,7 @@ export default function ShippingPage() {
   function load() {
     const since = new Date(Date.now() - 30 * 86_400_000).toISOString()
     supabase.from('orders')
-      .select(`id,order_nr,status,created_at,assigned_to,created_by,delivery_name,delivery_city,packed_by,packed_at,pickup_at,shipped_at,carrier,transport_order_id,notes,customers(id,company),${SHIP_LINES_SELECT}`)
+      .select(`id,order_nr,status,created_at,assigned_to,created_by,delivery_name,delivery_city,packed_by,packed_at,pickup_at,shipped_at,carrier,transport_order_id,notes,customers(id,company),ship_lines:order_items(qty,delivery,product_name,product_id)`)
       .or(`status.in.(pending,confirmed,packed),and(status.in.(shipped,delivered),shipped_at.gte."${since}")`)
       .order('created_at', { ascending: true }).limit(300)
       .then(({ data, error }) => {
@@ -102,16 +110,28 @@ export default function ShippingPage() {
                 <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
                   {o.customers ? <Link href={`/crm/customers/${o.customers.id}`} style={{ color: 'var(--text)' }}>{o.customers.company}</Link> : o.delivery_name || 'Utan kund'}
                 </span>
-                <span style={{ fontSize: 13, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>#{o.order_nr}</span>
+                <Link href={orderHref(o.id)} style={{ fontSize: 14, color: 'var(--text)', fontFamily: 'var(--font-mono)', textDecoration: 'underline', textUnderlineOffset: 3 }}>#{o.order_nr}</Link>
                 {o.status === 'pending' && <span style={{ fontSize: 12, fontWeight: 700, padding: '2px 8px', borderRadius: 5, background: 'rgba(232,184,75,.14)', color: 'var(--gold)' }}>Ej bekräftad</span>}
                 <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--text2)' }}>Order lagd {formatDateTime(o.created_at)}{o.assigned_to ? ` · ${o.assigned_to}` : ''}</span>
               </div>
 
-              <ul style={{ margin: '10px 0 0', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {lines.map((l, i) => (
-                  <li key={i} style={{ fontSize: 15, color: 'var(--text)' }}><strong>{l.qty} st</strong> {l.product_name}</li>
-                ))}
-              </ul>
+              <Link href={orderHref(o.id)} title="Öppna ordern" style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, padding: '10px 12px', borderRadius: 10, background: 'var(--bg2)', border: '1px solid var(--border)', textDecoration: 'none' }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(79,193,217,.6)')} onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
+                <ul style={{ flex: 1, margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {lines.map((l, i) => {
+                    const src = (l as any).product_id ? pics[(l as any).product_id] : null
+                    return (
+                      <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, color: 'var(--text)' }}>
+                        <span style={{ width: 52, height: 52, borderRadius: 8, background: '#fff', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 3, boxSizing: 'border-box' }}>
+                          {src ? <img src={src} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <Package size={20} color="#999" />}
+                        </span>
+                        <span><strong>{l.qty} st</strong> {l.product_name}</span>
+                      </li>
+                    )
+                  })}
+                </ul>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 600, color: 'var(--text2)', whiteSpace: 'nowrap' }}>Öppna ordern <ChevronRight size={16} /></span>
+              </Link>
               {carLines.length > 0 && (
                 <div style={{ marginTop: 6, fontSize: 13, color: 'var(--green)' }}>Redan lämnat från bilen: {carLines.map(l => `${l.qty} × ${l.product_name}`).join(', ')}</div>
               )}

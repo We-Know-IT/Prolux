@@ -8,6 +8,8 @@ import { createClient } from '@/lib/supabase/client'
 import { fmt, formatDate } from '@/lib/utils'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { useMe } from '@/hooks/useMe'
+import Portal from '@/components/ui/Portal'
+import CreateLeadModal from '@/components/crm/CreateLeadModal'
 import { AWAITING_SHIPMENT, SHIP_LINES_SELECT, qtyToShip } from '@/lib/shipping'
 
 // Shared by the CRM and admin overviews.
@@ -53,6 +55,7 @@ export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number 
   const [editId, setEditId] = useState<string | null>(null)
   const [text, setText] = useState('')
   const [quoteByDeal, setQuoteByDeal] = useState<Record<string, { id: string; order_nr: number; status: string }>>({})
+  const [openLead, setOpenLead] = useState<any | null>(null)
 
   const me = useMe()
   // Salespeople see their own leads; admins see everyone's.
@@ -66,7 +69,7 @@ export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number 
       return q.order('updated_at', { ascending: false }).limit(limit)
     }
     const base = 'id,title,value,stage,notes,assigned_to,source,created_at,updated_at,customers(id,company)'
-    let { data, error } = await query(`${base},products(name)`)
+    let { data, error } = await query(`${base},product_id,products(name)`)
     if (error) ({ data } = await query(base))   // before migration 0024
     setLeads((data ?? []) as any[])
     const ids = ((data ?? []) as any[]).map(d => d.id)
@@ -97,15 +100,16 @@ export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number 
         {(leads ?? []).map((l, i, arr) => (
           <div key={l.id} style={{ padding: '12px 16px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <Link href={`${base}/pipeline?deal=${l.id}`} title="Öppna leaden" style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', textDecoration: 'underline', textUnderlineOffset: 3, textDecorationColor: 'rgba(255,255,255,.25)' }}>
+              <button type="button" onClick={() => setOpenLead(l)} title="Öppna och redigera leaden" style={{ padding: 0, background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, fontWeight: 600, color: 'var(--text)', textDecoration: 'underline', textUnderlineOffset: 3, textDecorationColor: 'rgba(255,255,255,.25)' }}>
                 {l.customers?.company || l.title}
-              </Link>
+              </button>
               <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(74,143,212,.14)', color: '#8DBDF0' }}>{l.stage}</span>
               {l.source === 'web' && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(76,175,125,.14)', color: '#6FCB9C' }}>Från webben</span>}
               {l.source === 'visit' && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(94,196,154,.14)', color: '#6FCB9C' }}>Från besök</span>}
               <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--gold)' }}>{l.value ? `${fmt(l.value)} kr` : ''}</span>
             </div>
-            <div style={{ fontSize: 13, color: 'var(--text2)', margin: '3px 0 6px' }}>{l.title}{l.products?.name ? ` · ${l.products.name}` : ''}{l.assigned_to ? ` · ${l.assigned_to}` : ''} · {formatDate(l.updated_at || l.created_at)}</div>
+            <div style={{ fontSize: 14, color: 'var(--text)', margin: '4px 0 2px' }}>{l.title}{l.products?.name ? <span style={{ color: 'var(--text2)' }}> · {l.products.name}</span> : ''}</div>
+            <div style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 6px' }}>{l.assigned_to || 'Ingen säljare'} · {formatDate(l.updated_at || l.created_at)}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               {quoteByDeal[l.id] && (
                 <Link href={orderHref(quoteByDeal[l.id].id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 7, background: 'var(--gold)', color: '#111', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
@@ -138,6 +142,10 @@ export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number 
           </div>
         ))}
       </div>
+      {openLead && (<Portal>
+        <CreateLeadModal lead={openLead} customer={openLead.customers ?? { id: '', company: openLead.title }} me={me.name}
+          onCreated={load} onClose={() => setOpenLead(null)} />
+      </Portal>)}
     </div>
   )
 }

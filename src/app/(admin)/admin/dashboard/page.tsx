@@ -10,8 +10,9 @@ import { useTeam } from '@/hooks/useTeam'
 import { useBudgetHistory } from '@/hooks/useBudgetHistory'
 import BudgetHistoryChart from '@/components/BudgetHistoryChart'
 import ReminderModal, { type Reminder } from '@/components/crm/ReminderModal'
+import VisitList from '@/components/crm/VisitList'
 import { LeadsPanel, QuotesPanel, DraftsPanel, FollowUpPanel, ToShipPanel } from '@/components/crm/LeadsAndQuotes'
-import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, ArrowRight, Calendar, ChevronLeft, ChevronRight, Activity } from 'lucide-react'
+import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, ArrowRight, Bell, Activity } from 'lucide-react'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Varukorg', quote: 'Offert', pending: 'Väntande', confirmed: 'Bekräftad',
@@ -51,13 +52,10 @@ export default function AdminDashboard() {
   const [budgets, setBudgets]       = useState<Record<string, number>>({})
   const [reminders, setReminders]   = useState<any[]>([])
   const [activities, setActivities] = useState<any[]>([])
-  const [calMonth, setCalMonth]     = useState(new Date().getMonth())
-  const [calYear, setCalYear]       = useState(new Date().getFullYear())
   const [chartPeriod, setChartPeriod] = useState<'week' | 'month'>('week')
   const [editBudget, setEditBudget]     = useState(false)
   const [budgetInput, setBudgetInput]   = useState<Record<string, string>>({})
   const [savingBudget, setSavingBudget] = useState(false)
-  const [selectedDay, setSelectedDay]   = useState<string | null>(null)
   const [remModal, setRemModal]         = useState<{ reminder: Reminder | null } | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -77,7 +75,7 @@ export default function AdminDashboard() {
       sb.from('deals').select('id,title,value,stage,assigned_to,updated_at').neq('stage', 'Vunnen').neq('stage', 'Förlorad'),
       sb.from('deals').select('id,assigned_to,value,updated_at').eq('stage', 'Vunnen').gte('updated_at', monthStart).lte('updated_at', monthEnd + 'T23:59:59'),
       sb.from('sales_budgets').select('salesperson,budget').eq('year', year).eq('month', month),
-      sb.from('reminders').select('id,customer_id,title,due_date,priority,status,customers(company)').eq('status', 'upcoming').order('due_date').limit(20),
+      sb.from('reminders').select('id,customer_id,title,due_date,priority,status,customers(company)').eq('status', 'upcoming').order('due_date').limit(50),
       // Notes, calls, e-mails and meetings logged on customer cards (plus new web accounts and B2B enquiries).
       sb.from('activities').select('id,type,title,body,created_by,created_at,customers(id,company)').order('created_at', { ascending: false }).limit(12),
     ]).then(([{ data: o }, { data: p }, { data: c }, { data: d }, { data: w }, { data: b }, { data: r }, { data: a }]) => {
@@ -129,11 +127,6 @@ export default function AdminDashboard() {
     setEditBudget(false)
   }
 
-  async function deleteReminder(id: string) {
-    const sb = createClient()
-    await sb.from('reminders').delete().eq('id', id)
-    setReminders(rs => rs.filter(r => r.id !== id))
-  }
 
   async function markReminderDone(id: string) {
     const sb = createClient()
@@ -206,18 +199,7 @@ export default function AdminDashboard() {
     })
   }
 
-  // Calendar
-  const daysInCal   = new Date(calYear, calMonth + 1, 0).getDate()
-  const firstDow    = new Date(calYear, calMonth, 1).getDay()
-  const firstMon    = firstDow === 0 ? 6 : firstDow - 1
-  const calCells: (number | null)[] = [...Array(firstMon).fill(null), ...Array.from({ length: daysInCal }, (_, i) => i + 1)]
-  while (calCells.length % 7 !== 0) calCells.push(null)
   const todayStr = now.toISOString().slice(0, 10)
-  const remindersByDate: Record<string, any[]> = {}
-  for (const r of reminders) {
-    const d = r.due_date?.slice(0, 10)
-    if (d) { if (!remindersByDate[d]) remindersByDate[d] = []; remindersByDate[d].push(r) }
-  }
   const PRIORITY_DOT: Record<string, string> = { high: 'var(--red)', normal: 'var(--blue)', low: 'var(--text3)' }
 
   // Activity feed
@@ -289,7 +271,7 @@ export default function AdminDashboard() {
           return (
             <Link key={i} href={k.href} className="kpi-link" style={{ ...card, display: 'block', textDecoration: 'none', padding: '20px 22px', borderColor, boxShadow: k.gold ? `${card.boxShadow}, var(--gold-glow)` : card.boxShadow as string }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-                <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.09em' }}>{k.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{k.label}</span>
                 <div style={{ width: 28, height: 28, borderRadius: 7, background: iconBg, border: `1px solid ${borderColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Icon size={13} color={iconColor} />
                 </div>
@@ -306,6 +288,32 @@ export default function AdminDashboard() {
           )
         })}
       </div>
+
+      {/* To do */}
+      <div style={{ ...card, padding: '20px 24px', marginBottom: 16, border: `1px solid ${reminders.length ? 'rgba(232,184,75,.45)' : 'var(--line)'}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 14 }}>
+          <span style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(232,184,75,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Bell size={15} color="var(--gold)" /></span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', flex: 1 }}>To do {reminders.length > 0 && <span style={{ fontSize: 12, fontWeight: 800, padding: '1px 9px', borderRadius: 10, background: 'var(--gold)', color: '#111', marginLeft: 6 }}>{reminders.length}</span>}</span>
+          <button onClick={() => setRemModal({ reminder: null })} style={{ fontSize: 13, padding: '6px 12px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>+ Ny to do</button>
+        </div>
+        {reminders.length === 0 && <div style={{ fontSize: 14, color: 'var(--green)', fontWeight: 600 }}>✓ Inget som väntar just nu</div>}
+        {[...reminders].sort((x, y) => (x.due_date || '').localeCompare(y.due_date || '')).map((r, i) => {
+          const d = (r.due_date || '').slice(0, 10)
+          const late = d < todayStr
+          return (
+            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderTop: i ? '1px solid var(--line2)' : 'none' }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: PRIORITY_DOT[r.priority] || 'var(--blue)', flexShrink: 0 }} />
+              <button type="button" onClick={() => setRemModal({ reminder: r })} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{r.title}</div>
+                <div style={{ fontSize: 13, color: late ? '#E0A85A' : 'var(--text2)' }}>{r.customers?.company ? `${r.customers.company} · ` : ''}{late ? `försenad sedan ${d}` : d === todayStr ? 'idag' : d}</div>
+              </button>
+              <button onClick={() => markReminderDone(r.id)} style={{ padding: '6px 12px', background: 'rgba(76,175,125,.12)', border: '1px solid rgba(76,175,125,.35)', borderRadius: 7, color: 'var(--green)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Klar</button>
+            </div>
+          )
+        })}
+      </div>
+
+      <VisitList />
 
       {/* Att göra: quotes and carts to follow up (shown only when there are any) */}
       <div style={{ marginBottom: 16 }}><FollowUpPanel /></div>
@@ -324,7 +332,7 @@ export default function AdminDashboard() {
         {/* Revenue chart */}
         <div style={{ ...card, padding: '22px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.09em' }}>Omsättning</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Omsättning</span>
             <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--line)' }}>
               {(['week', 'month'] as const).map(p => (
                 <button key={p} onClick={() => setChartPeriod(p)} style={{
@@ -347,7 +355,7 @@ export default function AdminDashboard() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
               <Target size={14} color="var(--gold)" />
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.09em' }}>Budget — {monthNames[month]}</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Budget — {monthNames[month]}</span>
             </div>
             <button onClick={() => editBudget ? setEditBudget(false) : openBudgetEditor()}
               style={{ fontSize: 11, padding: '4px 10px', background: 'rgba(232,184,75,.1)', border: '1px solid rgba(232,184,75,.2)', borderRadius: 6, color: 'var(--gold)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 600 }}>
@@ -430,14 +438,14 @@ export default function AdminDashboard() {
         {/* Recent orders */}
         <div style={{ ...card, padding: '22px 24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.09em' }}>Senaste ordrar</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Senaste ordrar</span>
             <Link href="/admin/orders" style={{ fontSize: 11, color: 'var(--gold)', textDecoration: 'none', fontWeight: 600 }}>Visa alla →</Link>
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 {['#', 'Kund', 'Belopp', 'Status'].map(h => (
-                  <th key={h} style={{ fontSize: 10, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em', padding: '0 0 10px', textAlign: 'left', borderBottom: '1px solid var(--line2)' }}>{h}</th>
+                  <th key={h} style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.06em', padding: '0 0 10px', textAlign: 'left', borderBottom: '1px solid var(--line2)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -461,97 +469,11 @@ export default function AdminDashboard() {
           </table>
         </div>
 
-        {/* Calendar */}
-        <div style={{ ...card, padding: '22px 24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 16 }}>
-            <Calendar size={13} color="var(--gold)" />
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.09em', flex: 1 }}>Kalender & påminnelser</span>
-          </div>
-          <div style={{ border: '1px solid rgba(255,255,255,.05)', borderRadius: 10, overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,.04)', background: 'rgba(255,255,255,.02)' }}>
-              <button onClick={() => { const d = new Date(calYear, calMonth - 1); setCalMonth(d.getMonth()); setCalYear(d.getFullYear()) }}
-                style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 4, display: 'flex' }}><ChevronLeft size={14} /></button>
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{monthNames[calMonth]} {calYear}</span>
-              <button onClick={() => { const d = new Date(calYear, calMonth + 1); setCalMonth(d.getMonth()); setCalYear(d.getFullYear()) }}
-                style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 4, display: 'flex' }}><ChevronRight size={14} /></button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', padding: '6px 8px 0' }}>
-              {['M','T','O','T','F','L','S'].map((d, i) => (
-                <div key={i} style={{ textAlign: 'center', fontSize: 10, fontWeight: 600, color: 'var(--text3)', padding: '2px 0' }}>{d}</div>
-              ))}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', padding: '2px 8px 8px', gap: 2 }}>
-              {calCells.map((day, idx) => {
-                if (!day) return <div key={idx} />
-                const ds = `${calYear}-${String(calMonth + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
-                const dayRems = remindersByDate[ds] || []
-                const isToday = ds === todayStr
-                const isPast  = ds < todayStr
-                const isSelected = ds === selectedDay
-                return (
-                  <button key={idx} onClick={() => setSelectedDay(isSelected ? null : ds)} title={dayRems.map(r => r.title).join(', ')}
-                    style={{ borderRadius: 5, padding: '3px 2px', textAlign: 'center', cursor: 'pointer', background: isSelected ? 'rgba(232,184,75,.2)' : isToday ? 'rgba(232,184,75,.12)' : 'transparent', border: isSelected ? '1px solid rgba(232,184,75,.5)' : isToday ? '1px solid rgba(232,184,75,.25)' : '1px solid transparent', fontFamily: 'inherit' }}>
-                    <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--gold)' : isPast ? 'var(--text3)' : 'var(--text)' }}>{day}</div>
-                    {dayRems.length > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: 2, marginTop: 1 }}>
-                        {dayRems.slice(0, 2).map((r, i) => <div key={i} style={{ width: 4, height: 4, borderRadius: '50%', background: PRIORITY_DOT[r.priority] || 'var(--blue)' }} />)}
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Selected day detail */}
-            {selectedDay && (
-              <div style={{ borderTop: '1px solid rgba(255,255,255,.05)', padding: '12px 12px 14px' }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 8 }}>
-                  {new Date(selectedDay + 'T12:00:00').toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
-                </div>
-                {(remindersByDate[selectedDay] || []).length === 0 ? (
-                  <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 8 }}>Inga påminnelser denna dag</div>
-                ) : (remindersByDate[selectedDay] || []).map(r => (
-                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0' }}>
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: PRIORITY_DOT[r.priority], flexShrink: 0 }} />
-                    <button type="button" onClick={() => setRemModal({ reminder: r })} title="Redigera"
-                      style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
-                      <div style={{ fontSize: 12, color: 'var(--text)', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.2)', textUnderlineOffset: 3 }}>{r.title}</div>
-                      {r.customers?.company && <div style={{ fontSize: 10, color: 'var(--text2)' }}>{r.customers.company}</div>}
-                    </button>
-                    <button onClick={() => markReminderDone(r.id)} style={{ fontSize: 10, padding: '3px 8px', background: 'rgba(76,175,125,.1)', border: '1px solid rgba(76,175,125,.2)', borderRadius: 5, color: 'var(--green)', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>Klar</button>
-                    <button onClick={() => deleteReminder(r.id)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 2, flexShrink: 0 }}>×</button>
-                  </div>
-                ))}
-                <button onClick={() => setRemModal({ reminder: null })}
-                  style={{ marginTop: 8, fontSize: 11, padding: '5px 12px', background: 'rgba(232,184,75,.1)', border: '1px solid rgba(232,184,75,.2)', borderRadius: 6, color: 'var(--gold)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                  + Lägg till aktivitet
-                </button>
-              </div>
-            )}
-          </div>
-          {/* Upcoming reminders list */}
-          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {reminders.filter(r => r.due_date >= todayStr).slice(0, 5).map(r => (
-              <div key={r.id} role="button" tabIndex={0} onClick={() => setRemModal({ reminder: r })} onKeyDown={e => { if (e.key === 'Enter') setRemModal({ reminder: r }) }}
-                style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '7px 0', borderBottom: '1px solid rgba(255,255,255,.04)', cursor: 'pointer' }}>
-                <div style={{ width: 7, height: 7, borderRadius: '50%', background: PRIORITY_DOT[r.priority], flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text3)' }}>{r.customers?.company} · {r.due_date?.slice(0, 10)}</div>
-                </div>
-              </div>
-            ))}
-            {reminders.filter(r => r.due_date >= todayStr).length === 0 && (
-              <div style={{ padding: '14px 0', fontSize: 12, color: 'var(--text3)', textAlign: 'center' }}>Inga kommande påminnelser</div>
-            )}
-          </div>
-        </div>
-
         {/* Activity feed */}
         <div style={{ ...card, padding: '22px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 18 }}>
             <Activity size={13} color="var(--gold)" />
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.09em' }}>Senaste aktivitet</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Senaste aktivitet</span>
           </div>
           {activities.length === 0 ? (
             <div style={{ fontSize: 13, color: 'var(--text2)' }}>Inga anteckningar eller samtal loggade ännu.</div>
@@ -583,7 +505,7 @@ export default function AdminDashboard() {
         {/* Low stock */}
         <div style={{ ...card, padding: '22px 24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.09em' }}>Lagerstatus</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Lagerstatus</span>
             {lowStock.length > 0 && (
               <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#D48A3A', fontWeight: 600 }}>
                 <AlertTriangle size={12} /> {lowStock.length} varnar
@@ -597,7 +519,7 @@ export default function AdminDashboard() {
               <thead>
                 <tr>
                   {['Produkt', 'SKU', 'Lager'].map(h => (
-                    <th key={h} style={{ fontSize: 10, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em', padding: '0 0 10px', textAlign: 'left', borderBottom: '1px solid var(--line2)' }}>{h}</th>
+                    <th key={h} style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.06em', padding: '0 0 10px', textAlign: 'left', borderBottom: '1px solid var(--line2)' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -639,7 +561,7 @@ export default function AdminDashboard() {
 
       {/* Create / edit calendar activity */}
       {remModal && (
-        <ReminderModal reminder={remModal.reminder} defaultDate={selectedDay || todayStr}
+        <ReminderModal reminder={remModal.reminder} defaultDate={todayStr}
           customers={customers} createdBy="Admin"
           onSaved={saved => setReminders(rs => [...rs.filter(r => r.id !== saved.id), saved].sort((a, b) => a.due_date.localeCompare(b.due_date)))}
           onRemoved={id => setReminders(rs => rs.filter(r => r.id !== id))}

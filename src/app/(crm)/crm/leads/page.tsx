@@ -1,13 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
 import { Sparkles, Search } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt, formatDate } from '@/lib/utils'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { useMe } from '@/hooks/useMe'
 import { useTeam, teamOptions } from '@/hooks/useTeam'
+import Portal from '@/components/ui/Portal'
+import CreateLeadModal from '@/components/crm/CreateLeadModal'
 
 const OPEN = ['Prospekt', 'Kontaktad', 'Offert', 'Förhandling']
 const SOURCE: Record<string, string> = { web: 'Webben', visit: 'Besök', crm: 'Offert' }
@@ -17,19 +18,18 @@ const SOURCE: Record<string, string> = { web: 'Webben', visit: 'Besök', crm: 'O
 export default function LeadsPage() {
   const me = useMe()
   const team = useTeam()
-  const path = usePathname() || ''
-  const base = path.startsWith('/admin') ? '/admin/crm' : '/crm'
   const [leads, setLeads] = useState<any[] | null>(null)
   const [seller, setSeller] = useState<string | null>(null)
   const [stage, setStage] = useState('open')
   const [q, setQ] = useState('')
+  const [openLead, setOpenLead] = useState<any | null>(null)
 
   useEffect(() => { if (me.loaded && seller === null) setSeller(me.role === 'admin' ? '' : me.name) }, [me.loaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function load() {
     const sb = createClient()
     const base = 'id,title,value,stage,notes,assigned_to,source,created_at,updated_at,customers(id,company,city)'
-    const withProduct = await sb.from('deals').select(`${base},products(name)`).order('updated_at', { ascending: false }).limit(1000)
+    const withProduct = await sb.from('deals').select(`${base},product_id,products(name)`).order('updated_at', { ascending: false }).limit(1000)
     // Before migration 0024 there is no product on a lead.
     const res = withProduct.error ? await sb.from('deals').select(base).order('updated_at', { ascending: false }).limit(1000) : withProduct
     setLeads((res.data ?? []) as any[])
@@ -56,7 +56,7 @@ export default function LeadsPage() {
         <span style={{ fontSize: 14, color: 'var(--text2)' }}>{shown.length} st</span>
       </div>
       <p style={{ margin: '0 0 18px', fontSize: 14, color: 'var(--text2)' }}>
-        Leads från kundbesök, webben och offerter. Skapa en ny från kundkortet med <strong style={{ color: 'var(--text)' }}>Skapa lead</strong>. Klicka på en lead för att öppna den.
+        Leads från kundbesök, webben och offerter. Skapa en ny från kundkortet med <strong style={{ color: 'var(--text)' }}>Skapa lead</strong>. Klicka på en lead för att se och redigera den.
       </p>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
@@ -99,7 +99,7 @@ export default function LeadsPage() {
                   {l.customers?.city && <div style={{ fontSize: 12, color: 'var(--text2)' }}>{l.customers.city}</div>}
                 </td>
                 <td style={td}>
-                  <Link href={`${base}/pipeline?deal=${l.id}`} style={{ color: 'var(--text)', fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 3, textDecorationColor: 'rgba(255,255,255,.3)' }}>{l.title}</Link>
+                  <button type="button" onClick={() => setOpenLead(l)} title="Öppna och redigera" style={{ padding: 0, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--text)', fontWeight: 600, textAlign: 'left', textDecoration: 'underline', textUnderlineOffset: 3, textDecorationColor: 'rgba(255,255,255,.3)' }}>{l.title}</button>
                   {l.source && <div style={{ fontSize: 12, color: 'var(--text2)' }}>Från {(SOURCE[l.source] || l.source).toLowerCase()}</div>}
                 </td>
                 <td style={td}>{l.products?.name || '—'}</td>
@@ -113,6 +113,10 @@ export default function LeadsPage() {
           </tbody>
         </table>
       </div>
+      {openLead && (<Portal>
+        <CreateLeadModal lead={openLead} customer={openLead.customers ?? { id: '', company: openLead.title }} me={me.name}
+          onCreated={load} onClose={() => setOpenLead(null)} />
+      </Portal>)}
     </div>
   )
 }
