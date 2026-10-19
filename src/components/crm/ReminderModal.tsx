@@ -78,7 +78,7 @@ export default function ReminderModal({ reminder, defaultDate, customers, create
       <div role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}
         style={{ background: 'var(--bg2)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, width: '100%', maxWidth: 420, padding: '22px 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{reminder ? 'Redigera aktivitet' : 'Ny aktivitet'}</h3>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{reminder ? 'Redigera to do' : 'Ny to do'}</h3>
           <button onClick={onClose} aria-label="Stäng" style={{ background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer', padding: 4, display: 'flex' }}><X size={18} /></button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

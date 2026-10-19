@@ -54,14 +54,22 @@ export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number 
   const [text, setText] = useState('')
   const [quoteByDeal, setQuoteByDeal] = useState<Record<string, { id: string; order_nr: number; status: string }>>({})
 
+  const me = useMe()
+  // Salespeople see their own leads; admins see everyone's.
+  const onlyMine = me.loaded && me.role !== 'admin'
   async function load() {
+    if (!me.loaded) return
     const sb = createClient()
-    const { data } = await sb.from('deals')
-      .select('id,title,value,stage,notes,assigned_to,source,created_at,updated_at,customers(id,company)')
-      .in('stage', ['Prospekt', 'Kontaktad', 'Offert', 'Förhandling'])
-      .order('updated_at', { ascending: false }).limit(limit)
-    setLeads(data ?? [])
-    const ids = (data ?? []).map(d => d.id)
+    const query = (cols: string) => {
+      let q = sb.from('deals').select(cols).in('stage', ['Prospekt', 'Kontaktad', 'Offert', 'Förhandling'])
+      if (onlyMine) q = q.eq('assigned_to', me.name)
+      return q.order('updated_at', { ascending: false }).limit(limit)
+    }
+    const base = 'id,title,value,stage,notes,assigned_to,source,created_at,updated_at,customers(id,company)'
+    let { data, error } = await query(`${base},products(name)`)
+    if (error) ({ data } = await query(base))   // before migration 0024
+    setLeads((data ?? []) as any[])
+    const ids = ((data ?? []) as any[]).map(d => d.id)
     if (!ids.length) return
     // The quote behind each lead, so one click opens it (needs orders.deal_id, migration 0006).
     const { data: qs } = await sb.from('orders').select('id,order_nr,status,deal_id').in('deal_id', ids).in('status', ['quote', 'draft']).order('created_at', { ascending: false })
@@ -69,7 +77,7 @@ export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number 
     for (const o of (qs ?? []) as any[]) if (!map[o.deal_id]) map[o.deal_id] = o
     setQuoteByDeal(map)
   }
-  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load() }, [me.loaded, me.name]) // eslint-disable-line react-hooks/exhaustive-deps
   useLiveRefresh(['deals', 'orders'], load)
 
   async function save(id: string) {
@@ -82,7 +90,7 @@ export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number 
 
   return (
     <div>
-      <Head icon={Sparkles} color={ACCENT.leads} title="Leads" count={leads?.length} href={`${base}/pipeline`} link="Pipeline" />
+      <Head icon={Sparkles} color={ACCENT.leads} title={onlyMine ? 'Mina leads' : 'Leads'} count={leads?.length} href={`${base}/leads`} link="Alla leads" />
       <div style={accentPanel(ACCENT.leads)}>
         {leads && leads.length === 0 && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Inga öppna leads. Förfrågningar från webben och offerter (Spara som lead) hamnar här.</div>}
         {leads === null && <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text2)' }}>Laddar…</div>}
@@ -93,10 +101,11 @@ export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number 
                 {l.customers?.company || l.title}
               </Link>
               <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(74,143,212,.14)', color: '#8DBDF0' }}>{l.stage}</span>
-              {l.source === 'web' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(76,175,125,.14)', color: '#6FCB9C' }}>Från webben</span>}
+              {l.source === 'web' && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(76,175,125,.14)', color: '#6FCB9C' }}>Från webben</span>}
+              {l.source === 'visit' && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(94,196,154,.14)', color: '#6FCB9C' }}>Från besök</span>}
               <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--gold)' }}>{l.value ? `${fmt(l.value)} kr` : ''}</span>
             </div>
-            <div style={{ fontSize: 12, color: 'var(--text2)', margin: '3px 0 6px' }}>{l.title}{l.assigned_to ? ` · ${l.assigned_to}` : ''} · {formatDate(l.updated_at || l.created_at)}</div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', margin: '3px 0 6px' }}>{l.title}{l.products?.name ? ` · ${l.products.name}` : ''}{l.assigned_to ? ` · ${l.assigned_to}` : ''} · {formatDate(l.updated_at || l.created_at)}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               {quoteByDeal[l.id] && (
                 <Link href={orderHref(quoteByDeal[l.id].id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 7, background: 'var(--gold)', color: '#111', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
@@ -294,7 +303,8 @@ export function ToShipPanel({ limit = 8 }: { limit?: number }) {
   useLiveRefresh(['orders'], load)
   if (rows.length === 0) return null
   const shipHref = admin ? '/admin/crm/shipping' : '/crm/shipping'
-  const href = (id: string) => `${shipHref}?order=${id}`
+  // One order: opens the order itself, where packing is filled in.
+  const href = (id: string) => admin ? `/admin/orders?order=${id}` : `/crm/orders?view=history&open=${id}`
 
   return (
     <div style={{ marginBottom: 16 }}>

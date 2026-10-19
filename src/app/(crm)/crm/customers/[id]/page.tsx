@@ -7,7 +7,7 @@ import { fmt, formatDate, custPrice } from '@/lib/utils'
 import {
   Plus, Mail, FileText, Bell, Calendar,
   TrendingUp, ShoppingBag, Package, Star,
-  BarChart2, X, Trash2, ChevronLeft, ChevronRight, RefreshCw, Pencil, ShoppingCart, Info, MapPin
+  BarChart2, X, Trash2, ChevronLeft, ChevronRight, RefreshCw, Pencil, ShoppingCart, Info, MapPin, Sparkles
 } from 'lucide-react'
 import { PriceListPicker } from '@/components/crm/NewCustomerModal'
 import IncVat from '@/components/orders/IncVat'
@@ -20,6 +20,7 @@ import { useTeam, teamOptions } from '@/hooks/useTeam'
 import { nextBirthday, formatBirthday } from '@/lib/birthdays'
 import { useMe } from '@/hooks/useMe'
 import { isoDay } from '@/lib/visits'
+import CreateLeadModal from '@/components/crm/CreateLeadModal'
 
 const supabase = createClient()
 
@@ -78,6 +79,7 @@ export default function CustomerDetailPage() {
   const [nameById, setNameById]           = useState<Record<string, string>>({})
   const [recommendations, setRecommendations] = useState<string[]>([])
   const [viewOrder, setViewOrder]         = useState<any | null>(null)
+  const [leadOpen, setLeadOpen]           = useState(false)
   const [editingActId, setEditingActId]   = useState<string | null>(null)
   const [editingActText, setEditingActText] = useState('')
   const [infoEdit, setInfoEdit]           = useState<string | null>(null)   // fast info being edited
@@ -371,6 +373,9 @@ export default function CustomerDetailPage() {
             <a href={`mailto:${customer.email}`} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 7, color: 'var(--text)', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
               <Mail size={13} /> Mail
             </a>
+            <button onClick={() => setLeadOpen(true)} title="Något att följa upp – t.ex. intresse för en produkt" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'rgba(106,175,240,.12)', border: '1px solid rgba(106,175,240,.45)', borderRadius: 7, color: 'var(--text)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+              <Sparkles size={13} color="#6AAFF0" /> Skapa lead
+            </button>
             <button onClick={planVisit} title="Lägg kunden i dagens besökslista" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--bg4)', border: '1px solid rgba(94,196,154,.4)', borderRadius: 7, color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
               <MapPin size={13} color="#5EC49A" /> Besök idag
             </button>
@@ -805,6 +810,9 @@ export default function CustomerDetailPage() {
       </Portal>)}
 
 
+      {leadOpen && customer && (<Portal>
+        <CreateLeadModal customer={customer} me={me.name} onClose={() => setLeadOpen(false)} onCreated={() => showToast('Lead skapad – den syns i översikten och pipelinen')} />
+      </Portal>)}
       {viewOrder && (<Portal>
         <div onClick={() => setViewOrder(null)} style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div role="dialog" aria-modal="true" aria-label={`Order #${viewOrder.order_nr}`} onClick={e => e.stopPropagation()}

@@ -12,12 +12,13 @@ import GuideTour, { GuideButton } from '@/components/onboarding/GuideTour'
 import { ADMIN_GUIDE } from '@/components/onboarding/guides'
 import { createClient } from '@/lib/supabase/client'
 import { CRM_SECTIONS } from '@/components/layout/CrmShell'
-import { LayoutDashboard, ShoppingBag, Users, Tag, Megaphone, Zap, LogOut, UserCog, Menu, X, GitBranch, CalendarDays, StickyNote, Bell, FileText, Plug, FileCheck } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, Users, Tag, Megaphone, Zap, LogOut, UserCog, Menu, X, GitBranch, StickyNote, Bell, FileText, Plug, FileCheck, Sparkles } from 'lucide-react'
 
 const ADMIN_NAV = [
   { href: '/admin/dashboard',  label: 'Översikt',  icon: LayoutDashboard },
   { href: '/admin/orders',     label: 'Ordrar',    icon: ShoppingBag },
   { href: '/admin/crm/quotes', label: 'Offerter', icon: FileCheck },
+  { href: '/admin/crm/leads',  label: 'Leads',    icon: Sparkles },
   { href: '/admin/customers',  label: 'Kunder',    icon: Users },
   { href: '/admin/products',   label: 'Produkter', icon: Tag },
   { href: '/admin/content',    label: 'Innehåll',  icon: FileText },
@@ -35,7 +36,6 @@ const CRM_NAV = [
   { href: '/admin/crm/pipeline',  label: 'Pipeline',     icon: GitBranch },
   { href: '/admin/crm/customers', label: 'CRM Kunder',   icon: Users },
   { href: '/admin/crm/orders',    label: 'Ny order',     icon: ShoppingBag },
-  { href: '/admin/crm/calendar',  label: 'Kalender',     icon: CalendarDays },
   { href: '/admin/crm/notes',     label: 'Anteckningar', icon: StickyNote },
 ]
 
@@ -304,7 +304,7 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
         </nav>
       )}
 
-      <main style={{ flex: 1, zoom: 'var(--ui-zoom, 1.1)', ['--vz' as string]: 'var(--ui-zoom, 1.1)' }}>
+      <main style={{ flex: 1, zoom: 'var(--ui-zoom, 1.15)', ['--vz' as string]: 'var(--ui-zoom, 1.15)' }}>
         {children}
       </main>
 

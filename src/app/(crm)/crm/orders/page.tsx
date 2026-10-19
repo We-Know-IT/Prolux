@@ -20,6 +20,7 @@ import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { currentStaff, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
 import { useTeam, teamOptions } from '@/hooks/useTeam'
 import ShipOrderForm from '@/components/orders/ShipOrderForm'
+import PackingForm from '@/components/orders/PackingForm'
 import { qtyToShip, SHIP_LINES_SELECT } from '@/lib/shipping'
 import { Thumb, ProductCard, CustomerPicker, ProductSheet } from '@/components/crm/order/parts'
 import QuoteShareModal from '@/components/crm/order/QuoteShareModal'
@@ -88,6 +89,12 @@ export default function CrmOrdersPage() {
   const [isAdmin, setIsAdmin]             = useState(false)
   const [confirmingId, setConfirmingId]   = useState<string | null>(null)
   const [onlyMine, setOnlyMine]           = useState(false)
+  // Filters in the order list.
+  const [fSeller, setFSeller]             = useState('')
+  const [fStatus, setFStatus]             = useState('')
+  const [fCustomer, setFCustomer]         = useState('')
+  const [fFrom, setFFrom]                 = useState('')
+  const [fTo, setFTo]                     = useState('')
   const [placing, setPlacing]             = useState(false)
   const [sendConfirmation, setSendConfirmation] = useState(false)
   // The cart is saved as a draft automatically; these keep saves in order.
@@ -124,7 +131,7 @@ export default function CrmOrdersPage() {
   }, [])
 
   function loadOrders() {
-    supabase.from('orders').select(`*,customers(id,company),${SHIP_LINES_SELECT}`).order('created_at', { ascending: false }).limit(50)
+    supabase.from('orders').select(`*,customers(id,company),${SHIP_LINES_SELECT}`).order('created_at', { ascending: false }).limit(500)
       .then(({ data }) => { if (data) setOrders(data as any) })
   }
 
@@ -132,7 +139,7 @@ export default function CrmOrdersPage() {
 
   useEffect(() => {
     Promise.all([
-      supabase.from('orders').select(`*,customers(id,company),${SHIP_LINES_SELECT}`).order('created_at', { ascending: false }).limit(50),
+      supabase.from('orders').select(`*,customers(id,company),${SHIP_LINES_SELECT}`).order('created_at', { ascending: false }).limit(500),
       supabase.from('customers').select('id,company,contact_name,price_list_id,address,postal_code,city,org_nr,phone,email,account_manager,customer_type').neq('status', 'inactive').order('company'),
       supabase.from('products').select('id,sku,name,brand,unit,list_price,stock_qty,active,image_url,category_id,description').eq('active', true).order('sort_order'),
       supabase.from('categories').select('id,name,sort_order').order('sort_order'),
@@ -169,19 +176,21 @@ export default function CrmOrdersPage() {
 
   // ?edit=<order id> (e.g. from the admin order list) opens a draft or quote in the form.
   // ?reorder=<order id> starts a new order with the same products.
-  const editOpenedRef = useRef(false)
+  // Remembers which link was opened, so a new ?edit= on the same page opens too.
+  const editOpenedRef = useRef('')
+  const editKey = searchParams.get('edit') || searchParams.get('reorder') || ''
   useEffect(() => {
     const reorderId = searchParams.get('reorder')
     const editId = searchParams.get('edit') || reorderId
-    if (loading || !editId || editOpenedRef.current || customers.length === 0) return
-    editOpenedRef.current = true
+    if (loading || !editId || editOpenedRef.current === editKey || customers.length === 0) return
+    editOpenedRef.current = editKey
     supabase.from('orders').select(`*,customers(id,company),${SHIP_LINES_SELECT}`).eq('id', editId).single().then(({ data }) => {
       if (!data) { showToast('Ordern hittades inte'); return }
       if (reorderId) { openForEdit(data, true); return }
       if (data.status !== 'draft' && data.status !== 'quote') { setView('history'); showToast(`#${data.order_nr} är redan en order`); return }
       openForEdit(data)
     })
-  }, [loading, customers]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loading, customers, editKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // The cart is remembered in this browser: coming back to Ny order picks up the
   // saved draft again, and the cart icon in the top bar shows it.
@@ -242,6 +251,11 @@ export default function CrmOrdersPage() {
   async function toggleOrderExpand(orderId: string) {
     if (expandedOrderId === orderId) { setExpandedOrderId(null); return }
     setExpandedOrderId(orderId)
+    // Not among the latest orders in the list (e.g. opened from a link): fetch it.
+    if (!orders.some(o => o.id === orderId)) {
+      const { data: one } = await supabase.from('orders').select(`*,customers(id,company),${SHIP_LINES_SELECT}`).eq('id', orderId).maybeSingle()
+      if (one) setOrders(os => os.some(o => o.id === orderId) ? os : [...os, one as any])
+    }
     if (orderItemsById[orderId]) return
     const { data } = await supabase.from('order_items').select('*').eq('order_id', orderId)
     if (data) setOrderItemsById(items => ({ ...items, [orderId]: data as OrderItem[] }))
@@ -768,8 +782,9 @@ export default function CrmOrdersPage() {
   const shareModal = share && <QuoteShareModal share={share} onClose={() => setShare(null)} />
 
   // ── HISTORY VIEW ───────────────────────────────────────────
+  const filterField: React.CSSProperties = { padding: '9px 12px', background: 'var(--bg3)', border: '1px solid var(--line)', borderRadius: 9, color: 'var(--text)', fontSize: 14, outline: 'none', boxSizing: 'border-box', colorScheme: 'dark' }
   if (view === 'history') return (
-    <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ padding: 24, maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: 0 }}>{onlyMine ? 'Mina ordrar' : 'Alla ordrar'}</h1>
         <button onClick={() => setOnlyMine(m => !m)} style={{ marginLeft: 'auto', marginRight: 10, padding: '8px 14px', background: onlyMine ? 'rgba(232,184,75,.12)' : 'transparent', border: `1px solid ${onlyMine ? 'rgba(232,184,75,.35)' : 'var(--line)'}`, borderRadius: 8, color: onlyMine ? 'var(--gold)' : 'var(--text2)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
@@ -790,6 +805,30 @@ export default function CrmOrdersPage() {
           </button>
         ))}
       </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ position: 'relative', flex: '1 1 200px' }}>
+          <Search size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text2)' }} />
+          <input value={fCustomer} onChange={e => setFCustomer(e.target.value)} placeholder="Sök kund eller ordernummer" aria-label="Sök kund eller ordernummer"
+            style={{ ...filterField, width: '100%', paddingLeft: 32 }} />
+        </div>
+        <select value={fSeller} onChange={e => setFSeller(e.target.value)} aria-label="Säljare" style={filterField}>
+          <option value="">Alla säljare</option>
+          {teamOptions(SALESPEOPLE, fSeller).map(sp => <option key={sp} value={sp}>{sp}</option>)}
+        </select>
+        <select value={fStatus} onChange={e => setFStatus(e.target.value)} aria-label="Status" style={filterField}>
+          <option value="">Alla statusar</option>
+          {(Object.keys(ORDER_STATUS_LABEL) as OrderStatus[]).map(st => <option key={st} value={st}>{ORDER_STATUS_LABEL[st]}</option>)}
+        </select>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text2)' }}>Från
+          <input type="date" value={fFrom} onChange={e => setFFrom(e.target.value)} style={filterField} />
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text2)' }}>Till
+          <input type="date" value={fTo} onChange={e => setFTo(e.target.value)} style={filterField} />
+        </label>
+        {(fSeller || fStatus || fCustomer || fFrom || fTo) && (
+          <button onClick={() => { setFSeller(''); setFStatus(''); setFCustomer(''); setFFrom(''); setFTo('') }} style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}>Rensa</button>
+        )}
+      </div>
       <div style={{ background: 'var(--bg3)', border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden', overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 480 }}>
           <thead>
@@ -804,6 +843,10 @@ export default function CrmOrdersPage() {
               <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'var(--text3)' }}>Laddar...</td></tr>
             ) : orders
               .filter(o => !onlyMine || o.assigned_to === myName || o.created_by === myName)
+              .filter(o => !fSeller || o.assigned_to === fSeller || o.created_by === fSeller)
+              .filter(o => !fStatus || o.status === fStatus)
+              .filter(o => !fCustomer || [(o as any).customers?.company, o.delivery_name, String(o.order_nr)].some(v => (v || '').toLowerCase().includes(fCustomer.trim().toLowerCase())))
+              .filter(o => (!fFrom || o.created_at.slice(0, 10) >= fFrom) && (!fTo || o.created_at.slice(0, 10) <= fTo))
               .filter(o => historyFilter === 'all'
                 || (historyFilter === 'carts' && o.status === 'draft')
                 || (historyFilter === 'quotes' && o.status === 'quote')
@@ -812,12 +855,12 @@ export default function CrmOrdersPage() {
               .map(o => {
               const isOpen = o.status === 'draft' || o.status === 'quote'
               const expanded = expandedOrderId === o.id
-              const items = orderItemsById[o.id]
               return (
                 <Fragment key={o.id}>
-                  <tr onClick={() => toggleOrderExpand(o.id)} style={{ borderBottom: expanded ? 'none' : '1px solid var(--border2)', cursor: 'pointer', background: expanded ? 'rgba(232,184,75,.04)' : 'transparent' }}>
+                  <tr onClick={() => toggleOrderExpand(o.id)} title="Öppna ordern" style={{ borderBottom: '1px solid var(--border2)', cursor: 'pointer', background: expanded ? 'rgba(232,184,75,.06)' : 'transparent' }}
+                    onMouseEnter={e => { if (!expanded) e.currentTarget.style.background = 'rgba(255,255,255,.03)' }} onMouseLeave={e => { if (!expanded) e.currentTarget.style.background = 'transparent' }}>
                     <td style={{ padding: '12px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text3)', whiteSpace: 'nowrap' }}>
-                      <ChevronDown size={14} aria-hidden style={{ verticalAlign: -2, marginRight: 4, transition: 'transform .15s', transform: expanded ? 'rotate(180deg)' : 'none' }} />#{o.order_nr}
+                      #{o.order_nr}
                     </td>
                     <td style={{ padding: '12px 16px', color: 'var(--text2)' }}>{formatDateTime(o.created_at)}</td>
                     <td style={{ padding: '12px 16px', color: 'var(--text)', fontWeight: 500 }}>{(o as any).customers?.company || 'Utan kund'}</td>
@@ -852,43 +895,6 @@ export default function CrmOrdersPage() {
                       )}
                     </td>
                   </tr>
-                  {expanded && (
-                    <tr style={{ borderBottom: '1px solid var(--border2)' }}>
-                      <td colSpan={6} style={{ padding: '4px 16px 16px', background: 'rgba(232,184,75,.02)' }}>
-                        <OrderDetails o={o} items={items} products={products} />
-                        {isOpen && (
-                          <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-                            {o.status === 'quote' && (
-                              <button onClick={() => downloadQuote(o)} style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Ladda ner PDF</button>
-                            )}
-                            {o.status === 'quote' && (
-                              <button onClick={() => mailQuote(o)} style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Mejla offerten</button>
-                            )}
-                            <button onClick={() => openForEdit(o)} style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                              {o.status === 'quote' ? 'Gör om till order' : 'Fortsätt med varukorgen'}
-                            </button>
-                            <button onClick={() => deleteOpenOrder(o)} style={{ padding: '7px 12px', borderRadius: 7, background: 'transparent', border: '1px solid rgba(224,82,82,.35)', color: 'var(--red)', fontSize: 12, cursor: 'pointer' }}>Radera</button>
-                          </div>
-                        )}
-                        {!isOpen && (
-                          <button onClick={() => openForEdit(o, true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 12, padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                            <RefreshCw size={12} /> Lägg ordern igen
-                          </button>
-                        )}
-                        {!isOpen && o.status !== 'pending' && (canConfirmOrder(o, myName, isAdmin) || o.transport_order_id) && (
-                          <div style={{ marginTop: 14 }}>
-                            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Frakt & spårning</div>
-                            {canConfirmOrder(o, myName, isAdmin)
-                              ? <ShipOrderForm order={o} onShipped={patch => {
-                                  setOrders(os => os.map(x => x.id === o.id ? { ...x, ...patch } : x))
-                                  showToast(`Order #${o.order_nr} markerad som skickad`)
-                                }} />
-                              : <ShipOrderForm order={o} readOnly onShipped={() => {}} />}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  )}
                 </Fragment>
               )
             })}
@@ -900,7 +906,65 @@ export default function CrmOrdersPage() {
       </div>
       {shareModal}
       {customerNeeded}
-      
+      {/* The opened order: everything about it, plus what can be done with it */}
+      {(() => {
+        const o = orders.find(x => x.id === expandedOrderId) as any
+        if (!o) return null
+        const isOpen = o.status === 'draft' || o.status === 'quote'
+        const items = orderItemsById[o.id]
+        return (<Portal>
+          <div onClick={() => setExpandedOrderId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 900 }}>
+            <aside role="dialog" aria-modal="true" aria-label={`Order #${o.order_nr}`} onClick={e => e.stopPropagation()}
+              style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(720px, 100vw)', background: 'var(--bg2)', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', boxShadow: '-12px 0 40px rgba(0,0,0,.4)' }}>
+              <div style={{ padding: '16px 22px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{o.status === 'quote' ? 'Offert' : o.status === 'draft' ? 'Varukorg' : 'Order'} #{o.order_nr}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 10px', borderRadius: 6, background: 'var(--bg4)', color: 'var(--text)' }}>{ORDER_STATUS_LABEL[o.status as OrderStatus] || o.status}</span>
+                <span style={{ fontSize: 13, color: 'var(--text2)' }}>{formatDateTime(o.created_at)}</span>
+                <button onClick={() => setExpandedOrderId(null)} aria-label="Stäng" style={{ marginLeft: 'auto', width: 36, height: 36, borderRadius: 9, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={18} /></button>
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '6px 22px 28px' }}>
+<OrderDetails o={o} items={items} products={products} />
+            {isOpen && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                {o.status === 'quote' && (
+                  <button onClick={() => downloadQuote(o)} style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Ladda ner PDF</button>
+                )}
+                {o.status === 'quote' && (
+                  <button onClick={() => mailQuote(o)} style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Mejla offerten</button>
+                )}
+                <button onClick={() => openForEdit(o)} style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                  {o.status === 'quote' ? 'Gör om till order' : 'Fortsätt med varukorgen'}
+                </button>
+                <button onClick={() => deleteOpenOrder(o)} style={{ padding: '7px 12px', borderRadius: 7, background: 'transparent', border: '1px solid rgba(224,82,82,.35)', color: 'var(--red)', fontSize: 12, cursor: 'pointer' }}>Radera</button>
+              </div>
+            )}
+            {!isOpen && (
+              <button onClick={() => openForEdit(o, true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 12, padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                <RefreshCw size={12} /> Lägg ordern igen
+              </button>
+            )}
+                {!isOpen && o.status !== 'cancelled' && (qtyToShip(o) > 0 || o.packed_at || o.pickup_at) && (
+                  <div style={{ marginTop: 18, padding: '14px 16px', borderRadius: 10, background: 'var(--bg3)', border: '1px solid rgba(79,193,217,.35)' }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Packning på lagret</div>
+                    <PackingForm order={o} onSaved={patch => setOrders(os => os.map(x => x.id === o.id ? { ...x, ...patch } as any : x))} />
+                  </div>
+                )}
+            {!isOpen && o.status !== 'pending' && (canConfirmOrder(o, myName, isAdmin) || o.transport_order_id) && (
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Frakt & spårning</div>
+                {canConfirmOrder(o, myName, isAdmin)
+                  ? <ShipOrderForm order={o} onShipped={patch => {
+                      setOrders(os => os.map(x => x.id === o.id ? { ...x, ...patch } : x))
+                      showToast(`Order #${o.order_nr} markerad som skickad`)
+                    }} />
+                  : <ShipOrderForm order={o} readOnly onShipped={() => {}} />}
+              </div>
+            )}
+              </div>
+            </aside>
+          </div>
+        </Portal>)
+      })()}
       {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#fff', padding: '12px 24px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 999 }}>{toast}</div>}
     </div>
   )
@@ -932,6 +996,17 @@ export default function CrmOrdersPage() {
           <ArrowLeft size={15} /> Lägg till fler produkter
         </button>
       </div>
+      {editingOrder?.status === 'quote' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '12px 16px', marginBottom: 16, borderRadius: 10, background: 'rgba(181,147,240,.1)', border: '1px solid rgba(181,147,240,.4)' }}>
+          <span style={{ flex: '1 1 260px', fontSize: 14, color: 'var(--text)' }}>
+            Du redigerar offerten. Ändra antal och priser här, eller tryck <strong>Lägg till fler produkter</strong>. Spara sedan offerten.
+          </span>
+          <button onClick={() => saveOrder('quote')} disabled={placing || cart.length === 0}
+            style={{ padding: '10px 16px', borderRadius: 9, background: '#B593F0', border: 'none', color: '#0F1115', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: placing ? .6 : 1 }}>
+            {placing ? 'Sparar…' : 'Spara offerten'}
+          </button>
+        </div>
+      )}
 
       {/* Kassan: lines, discounts and totals first */}
       <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
@@ -1255,6 +1330,10 @@ export default function CrmOrdersPage() {
           </h1>
           {saveError ? (
             <span role="alert" style={{ fontSize: 12, color: 'var(--red)' }}>{saveError}</span>
+          ) : editingOrder?.status === 'quote' ? (
+            <button onClick={() => setView('confirm')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 9, background: 'rgba(181,147,240,.14)', border: '1px solid rgba(181,147,240,.45)', color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              <ArrowLeft size={14} /> Tillbaka till offert #{editingOrder.order_nr}
+            </button>
           ) : editingOrder?.status === 'draft' && autoSavedAt && (
             <span style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 5 }}>
               <Check size={13} color="var(--green)" /> Varukorg #{editingOrder.order_nr} sparad {autoSavedAt}

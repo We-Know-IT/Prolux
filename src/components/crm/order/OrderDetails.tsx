@@ -26,6 +26,9 @@ export default function OrderDetails({ o, items, products }: { o: any; items?: O
         {o.packed_at && (
           <div><div style={label}>Packad</div><div style={value}>{formatDateTime(o.packed_at)}{o.packed_by ? ` · ${o.packed_by}` : ''}</div></div>
         )}
+        {o.pickup_at && !o.shipped_at && (
+          <div><div style={label}>Hämtas</div><div style={value}>{formatDateTime(o.pickup_at)}</div></div>
+        )}
         {(o.shipped_at || o.carrier || o.transport_order_id) && (
           <div><div style={label}>Hämtad av transportör</div><div style={value}>{[o.shipped_at && formatDateTime(o.shipped_at), o.carrier, o.transport_order_id].filter(Boolean).join(' · ')}</div></div>
         )}

@@ -8,6 +8,7 @@ import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { useMe } from '@/hooks/useMe'
 import { SHIP_LINES_SELECT, type ShipLine } from '@/lib/shipping'
 import ShipOrderForm from '@/components/orders/ShipOrderForm'
+import PackingForm from '@/components/orders/PackingForm'
 
 const supabase = createClient()
 type Tab = 'pack' | 'pickup' | 'sent'
@@ -15,7 +16,7 @@ type Tab = 'pack' | 'pickup' | 'sent'
 interface ShipOrder {
   id: string; order_nr: number; status: string; created_at: string
   assigned_to: string | null; created_by: string | null; delivery_name: string | null; delivery_city: string | null
-  packed_by: string | null; packed_at: string | null; shipped_at: string | null
+  packed_by: string | null; packed_at: string | null; pickup_at: string | null; shipped_at: string | null
   carrier: string | null; transport_order_id: string | null; notes: string | null
   customers: { id: string; company: string } | null
   ship_lines: ShipLine[]
@@ -28,17 +29,16 @@ export default function ShippingPage() {
   const [orders, setOrders] = useState<ShipOrder[] | null>(null)
   const [tab, setTab] = useState<Tab>('pack')
   const [focus, setFocus] = useState<string | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState('')
 
   function load() {
     const since = new Date(Date.now() - 30 * 86_400_000).toISOString()
     supabase.from('orders')
-      .select(`id,order_nr,status,created_at,assigned_to,created_by,delivery_name,delivery_city,packed_by,packed_at,shipped_at,carrier,transport_order_id,notes,customers(id,company),${SHIP_LINES_SELECT}`)
+      .select(`id,order_nr,status,created_at,assigned_to,created_by,delivery_name,delivery_city,packed_by,packed_at,pickup_at,shipped_at,carrier,transport_order_id,notes,customers(id,company),${SHIP_LINES_SELECT}`)
       .or(`status.in.(pending,confirmed,packed),and(status.in.(shipped,delivered),shipped_at.gte."${since}")`)
       .order('created_at', { ascending: true }).limit(300)
       .then(({ data, error }) => {
-        if (error) { setMsg(error.message.includes('packed') ? 'Kör migration 0023 i Supabase för packning.' : error.message); setOrders([]); return }
+        if (error) { setMsg(/packed|pickup/.test(error.message) ? 'Kör migration 0023 och 0024 i Supabase för packning.' : error.message); setOrders([]); return }
         setOrders(((data ?? []) as any[]).filter(o => shipQty(o) > 0))
       })
   }
@@ -55,16 +55,7 @@ export default function ShippingPage() {
     setTimeout(() => document.getElementById(`ship-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150)
   }, [orders])
 
-  async function pack(o: ShipOrder, undo = false) {
-    setBusy(o.id); setMsg('')
-    const patch = undo
-      ? { status: 'confirmed', packed_by: null, packed_at: null }
-      : { status: 'packed', packed_by: me.name || null, packed_at: new Date().toISOString() }
-    const { error } = await supabase.from('orders').update(patch).eq('id', o.id)
-    setBusy(null)
-    if (error) { setMsg(error.message.includes('packed') ? 'Kör migration 0023 i Supabase för packning.' : `Kunde inte spara: ${error.message}`); return }
-    setOrders(os => (os ?? []).map(x => x.id === o.id ? { ...x, ...patch } as ShipOrder : x))
-  }
+
 
   const list = orders ?? []
   const byTab = (t: Tab) => list.filter(o => tabOf(o) === t)
@@ -127,17 +118,12 @@ export default function ShippingPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginTop: 12, padding: '10px 12px', background: 'var(--bg2)', borderRadius: 9, fontSize: 13 }}>
                 <Step done={!!o.packed_at} title="Packad" text={o.packed_at ? `${formatDateTime(o.packed_at)}${o.packed_by ? ` av ${o.packed_by}` : ''}` : 'Inte packad ännu'} />
-                <Step done={!!o.shipped_at} title="Hämtad av transportör" text={o.shipped_at ? `${formatDateTime(o.shipped_at)}${o.carrier ? ` · ${o.carrier}` : ''}${o.transport_order_id ? ` · ${o.transport_order_id}` : ''}` : 'Inte hämtad ännu'} />
+                <Step done={!!o.shipped_at} title="Hämtad av transportör" text={o.shipped_at ? `${formatDateTime(o.shipped_at)}${o.carrier ? ` · ${o.carrier}` : ''}${o.transport_order_id ? ` · ${o.transport_order_id}` : ''}` : o.pickup_at ? `Ska hämtas ${formatDateTime(o.pickup_at)}` : 'Inte hämtad ännu'} />
               </div>
 
-              {tab === 'pack' && (
+              {tab !== 'sent' && (
                 <div style={{ marginTop: 12 }}>
-                  {o.status === 'pending'
-                    ? <span style={{ fontSize: 13, color: 'var(--text2)' }}>Ordern behöver bekräftas av säljaren innan den packas.</span>
-                    : <button onClick={() => pack(o)} disabled={busy === o.id}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 18px', borderRadius: 9, background: '#4FC1D9', border: 'none', color: '#0F1115', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: busy === o.id ? .6 : 1 }}>
-                        <PackageCheck size={16} /> {busy === o.id ? 'Sparar…' : 'Markera som packad'}
-                      </button>}
+                  <PackingForm order={o} onSaved={patch => setOrders(os => (os ?? []).map(x => x.id === o.id ? { ...x, ...patch } as ShipOrder : x))} />
                 </div>
               )}
               {tab === 'pickup' && (
@@ -146,7 +132,6 @@ export default function ShippingPage() {
                   {canShip(o)
                     ? <ShipOrderForm order={o} onShipped={() => load()} />
                     : <span style={{ fontSize: 13, color: 'var(--text2)' }}>{o.assigned_to || 'Säljaren'} eller admin markerar den som skickad.</span>}
-                  <button onClick={() => pack(o, true)} disabled={busy === o.id} style={{ marginTop: 8, background: 'none', border: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>Ångra packad</button>
                 </div>
               )}
             </article>

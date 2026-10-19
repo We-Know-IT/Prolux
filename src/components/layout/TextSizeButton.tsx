@@ -6,10 +6,10 @@ import { useEffect, useState } from 'react'
 const KEY = 'prolux-text-size'
 export const TEXT_SIZES = [
   { value: 1, label: 'Normal' },
-  { value: 1.1, label: 'Större' },
-  { value: 1.2, label: 'Störst' },
+  { value: 1.15, label: 'Större' },
+  { value: 1.3, label: 'Störst' },
 ]
-export const DEFAULT_TEXT_SIZE = 1.1
+export const DEFAULT_TEXT_SIZE = 1.15
 
 function read(): number {
   try {
@@ -50,7 +50,7 @@ export default function TextSizeButton({ variant = 'bar' }: { variant?: 'bar' | 
       display: 'flex', alignItems: 'center', justifyContent: 'center', height: 34, minWidth: 38, padding: '0 9px', boxSizing: 'border-box',
       background: 'transparent', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text2)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
     }}>
-      A<span style={{ fontSize: size > 1.15 ? 17 : size > 1 ? 15 : 12 }}>a</span>
+      A<span style={{ fontSize: size > 1.2 ? 17 : size > 1 ? 15 : 12 }}>a</span>
     </button>
   )
 }

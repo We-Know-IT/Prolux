@@ -1,6 +1,7 @@
 'use client'
 import { qtyToShip, SHIP_LINES_SELECT } from '@/lib/shipping'
 import DeliveryTag from '@/components/orders/DeliveryTag'
+import PackingForm from '@/components/orders/PackingForm'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
@@ -36,6 +37,9 @@ export default function AdminOrders() {
   const [filtered, setFiltered]       = useState<any[]>([])
   const [search, setSearch]           = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [sellerFilter, setSellerFilter] = useState('')
+  const [fromDate, setFromDate]       = useState('')
+  const [toDate, setToDate]           = useState('')
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
   const [orderItems, setOrderItems]   = useState<any[]>([])
   const [toast, setToast]             = useState('')
@@ -81,8 +85,11 @@ export default function AdminOrders() {
     else if (statusFilter === 'ship') list = list.filter(o => qtyToShip(o) > 0)
     else if (statusFilter === 'today') list = list.filter(o => new Date(o.created_at).toDateString() === new Date().toDateString())
     else if (statusFilter) list = list.filter(o => o.status === statusFilter)
+    if (sellerFilter) list = list.filter(o => o.assigned_to === sellerFilter || o.created_by === sellerFilter)
+    if (fromDate) list = list.filter(o => o.created_at.slice(0, 10) >= fromDate)
+    if (toDate) list = list.filter(o => o.created_at.slice(0, 10) <= toDate)
     setFiltered(list)
-  }, [search, statusFilter, orders])
+  }, [search, statusFilter, sellerFilter, fromDate, toDate, orders])
 
   async function openOrder(order: any) {
     setSelectedOrder(order)
@@ -182,7 +189,7 @@ export default function AdminOrders() {
       </div>
 
       {/* Filters */}
-      <div style={{ padding: '20px 40px', display: 'flex', gap: 10, alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
+      <div style={{ padding: '20px 40px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -200,6 +207,17 @@ export default function AdminOrders() {
           <option value="ship">Att skicka</option>
           <option value="today">Lagda idag</option>
         </select>
+        <select value={sellerFilter} onChange={e => setSellerFilter(e.target.value)} aria-label="Säljare"
+          style={{ padding: '8px 14px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontFamily: 'var(--font-sans)', fontSize: '14px', outline: 'none' }}>
+          <option value="">Alla säljare</option>
+          {teamOptions(SALESPEOPLE, sellerFilter).map(sp => <option key={sp} value={sp}>{sp}</option>)}
+        </select>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text2)' }}>Från
+          <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} style={{ padding: '7px 10px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 14, colorScheme: 'dark' }} />
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text2)' }}>Till
+          <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} style={{ padding: '7px 10px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 14, colorScheme: 'dark' }} />
+        </label>
         <span style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--text3)' }}>{filtered.length} ordrar</span>
       </div>
 
@@ -292,6 +310,7 @@ export default function AdminOrders() {
                   )],
                   ['Datum',     formatDateTime(selectedOrder.created_at)],
                   ...(selectedOrder.packed_at ? [['Packad', `${formatDateTime(selectedOrder.packed_at)}${selectedOrder.packed_by ? ` · ${selectedOrder.packed_by}` : ''}`]] : []),
+                  ...(selectedOrder.pickup_at && !selectedOrder.shipped_at ? [['Hämtas', formatDateTime(selectedOrder.pickup_at)]] : []),
                   ...(selectedOrder.shipped_at ? [['Hämtad av transportör', `${formatDateTime(selectedOrder.shipped_at)}${selectedOrder.carrier ? ` · ${selectedOrder.carrier}` : ''}`]] : []),
                   ['Prislista', selectedOrder.price_list_id || 'Standard'],
                   ['Kund',      selectedOrder.customer_id ? (selectedOrder.customers?.company || selectedOrder.delivery_name || '—') : (
@@ -396,6 +415,17 @@ export default function AdminOrders() {
                   })}
                 </div>
               </div>
+
+              {/* Packing in the warehouse */}
+              {!['draft', 'quote', 'cancelled'].includes(selectedOrder.status) && (qtyToShip(selectedOrder) > 0 || selectedOrder.packed_at || selectedOrder.pickup_at) && (
+                <div style={{ marginBottom: 24 }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8, display: 'block' }}>Packning</span>
+                  <PackingForm order={selectedOrder} onSaved={patch => {
+                    setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, ...patch } : o))
+                    setSelectedOrder((prev: any) => ({ ...prev, ...patch }))
+                  }} />
+                </div>
+              )}
 
               {/* Shipping */}
               <div>

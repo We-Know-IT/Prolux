@@ -12,18 +12,18 @@ import GuideTour, { GuideButton } from '@/components/onboarding/GuideTour'
 import { CRM_GUIDE } from '@/components/onboarding/guides'
 import { createClient } from '@/lib/supabase/client'
 import { currentStaff } from '@/lib/team'
-import { LayoutDashboard, GitBranch, Users, ShoppingCart, LogOut, Menu, X, CalendarDays, StickyNote, ClipboardList, Truck, FileCheck, PackageCheck } from 'lucide-react'
+import { LayoutDashboard, GitBranch, Users, ShoppingCart, LogOut, Menu, X, StickyNote, ClipboardList, Truck, FileCheck, PackageCheck, Sparkles } from 'lucide-react'
 
 export const CRM_SECTIONS = [
   { href: '/crm/dashboard', label: 'Översikt',      icon: LayoutDashboard },
-  { href: '/crm/quotes',    label: 'Offerter & leads', icon: FileCheck },
+  { href: '/crm/quotes',    label: 'Offerter',       icon: FileCheck },
+  { href: '/crm/leads',     label: 'Leads',          icon: Sparkles },
   { href: '/crm/pipeline',  label: 'Pipeline',       icon: GitBranch },
   { href: '/crm/customers', label: 'Kunder',         icon: Users },
   { href: '/crm/orders',    label: 'Ny order',       icon: ShoppingCart },
   { href: '/crm/orders?view=history', label: 'Ordrar', icon: ClipboardList },
   { href: '/crm/shipping',  label: 'Leveranser',     icon: PackageCheck },
   { href: '/crm/car',       label: 'Bilen',          icon: Truck },
-  { href: '/crm/calendar',  label: 'Kalender',       icon: CalendarDays },
   { href: '/crm/notes',     label: 'Anteckningar',   icon: StickyNote },
 ]
 
@@ -201,7 +201,7 @@ export default function CrmShell({ children }: { children: ReactNode }) {
           <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{orderToast.name} · tryck för att hantera</div>
         </Link>
       )}
-      <main style={{ flex: 1, zoom: 'var(--ui-zoom, 1.1)', ['--vz' as string]: 'var(--ui-zoom, 1.1)' }}>
+      <main style={{ flex: 1, zoom: 'var(--ui-zoom, 1.15)', ['--vz' as string]: 'var(--ui-zoom, 1.15)' }}>
         {children}
       </main>
 

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt, formatDate, formatDateTime } from '@/lib/utils'
-import { Plus, Users, ShoppingBag, Package, ChevronRight, FileText, GitBranch, Target, Calendar, ChevronLeft, Cake, Bell } from 'lucide-react'
+import { Plus, Users, ShoppingBag, Package, ChevronRight, GitBranch, Target, Cake, Bell } from 'lucide-react'
 import Link from 'next/link'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { currentStaff, monthRange, budgetAchieved, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
@@ -58,8 +58,6 @@ export default function CrmDashboardPage() {
   const [firstName, setFirstName]         = useState('')
   const [deals, setDeals]                 = useState<any[]>([])
   const [recentCustomers, setRecentCustomers] = useState<any[]>([])
-  const [calMonth, setCalMonth]           = useState(month)
-  const [calYear, setCalYear]             = useState(year)
   const [reminders, setReminders]         = useState<any[]>([])
   const [budgets, setBudgets]             = useState<Record<string, number>>({})
   const [achieved, setAchieved]           = useState<Record<string, number>>({})
@@ -70,7 +68,6 @@ export default function CrmDashboardPage() {
   const [savingBudget, setSavingBudget]   = useState(false)
   const [isAdmin, setIsAdmin]             = useState(false)
   const [activeCustomers, setActiveCustomers] = useState<{ id: string; company: string }[]>([])
-  const [selectedDay, setSelectedDay]     = useState<string | null>(null)
   const [remModal, setRemModal]           = useState<{ reminder: Reminder | null } | null>(null)
   const [meLoaded, setMeLoaded]           = useState(false)
   const [pendingOrders, setPendingOrders] = useState<any[]>([])
@@ -167,28 +164,11 @@ export default function CrmDashboardPage() {
     setReminders(rs => rs.filter(r => r.id !== id))
   }
 
-  async function deleteReminder(id: string) {
-    await supabase.from('reminders').delete().eq('id', id)
-    setReminders(rs => rs.filter(r => r.id !== id))
-  }
 
   const totalBudget = Object.values(budgets).reduce((a, b) => a + b, 0)
   const workDays    = workingDaysInMonth(year, month)
   const daysPassed  = workingDaysPassed(year, month)
   const dailyTarget = workDays > 0 ? Math.round(totalBudget / workDays) : 0
-
-  // Calendar
-  const daysInCalMonth = new Date(calYear, calMonth + 1, 0).getDate()
-  const firstDayOfWeek = new Date(calYear, calMonth, 1).getDay()
-  const firstMon = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1
-  const calCells: (number | null)[] = [...Array(firstMon).fill(null), ...Array.from({ length: daysInCalMonth }, (_, i) => i + 1)]
-  while (calCells.length % 7 !== 0) calCells.push(null)
-
-  const remindersByDate: Record<string, any[]> = {}
-  for (const r of reminders) {
-    const d = r.due_date?.slice(0, 10)
-    if (d) { if (!remindersByDate[d]) remindersByDate[d] = []; remindersByDate[d].push(r) }
-  }
 
   const todayStr = now.toISOString().slice(0, 10)
   const PRIORITY_DOT: Record<string, string> = { high: 'var(--red)', normal: 'var(--blue)', low: 'var(--text3)' }
@@ -246,18 +226,19 @@ export default function CrmDashboardPage() {
       {/* Att göra: orders to confirm, reminders due and quotes/carts to follow up */}
       {(() => {
         const mine = meLoaded ? pendingOrders.filter(o => canConfirmOrder(o, firstName, isAdmin)) : []
-        const due = reminders.filter(r => (r.due_date || '').slice(0, 10) <= todayStr)
+        // Every open to do, oldest date first (a new one shows here at once).
+        const due = [...reminders].sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''))
         const count = mine.length + due.length + followCount
         const sub: React.CSSProperties = { fontSize: 12, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '12px 0 4px' }
         return (
           <section style={{ marginBottom: 20, background: 'var(--bg3)', border: `1px solid ${count ? 'rgba(232,184,75,.45)' : 'rgba(255,255,255,.08)'}`, borderRadius: 14, padding: '16px 20px', boxShadow: count ? '0 0 0 1px rgba(232,184,75,.08), 0 6px 28px rgba(0,0,0,.3)' : 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(232,184,75,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Bell size={17} color="var(--gold)" /></span>
-              <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Att göra</span>
+              <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>To do</span>
               {count > 0
                 ? <span style={{ fontSize: 13, fontWeight: 800, padding: '2px 10px', borderRadius: 12, background: 'var(--gold)', color: '#111' }}>{count}</span>
                 : <span style={{ fontSize: 14, color: 'var(--green)', fontWeight: 600 }}>✓ Inget som väntar just nu</span>}
-              <button onClick={() => setRemModal({ reminder: null })} style={{ marginLeft: 'auto', fontSize: 13, padding: '7px 12px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>+ Påminnelse</button>
+              <button onClick={() => setRemModal({ reminder: null })} style={{ marginLeft: 'auto', fontSize: 13, padding: '7px 12px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>+ Ny to do</button>
             </div>
             {mine.length > 0 && <div style={sub}>Ordrar att bekräfta</div>}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -280,7 +261,7 @@ export default function CrmDashboardPage() {
                 </div>
               ))}
             </div>
-            {due.length > 0 && <div style={sub}>Påminnelser idag och försenade</div>}
+            {due.length > 0 && (mine.length > 0) && <div style={sub}>Att göra</div>}
             {due.map((r, i) => {
               const late = (r.due_date || '').slice(0, 10) < todayStr
               return (
@@ -288,7 +269,7 @@ export default function CrmDashboardPage() {
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: PRIORITY_DOT[r.priority] || 'var(--blue)', flexShrink: 0 }} />
                   <button type="button" onClick={() => setRemModal({ reminder: r })} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{r.title}</div>
-                    <div style={{ fontSize: 12, color: late ? '#E0A85A' : 'var(--text2)' }}>{r.customers?.company ? `${r.customers.company} · ` : ''}{late ? `försenad sedan ${formatDate(r.due_date)}` : 'idag'}</div>
+                    <div style={{ fontSize: 13, color: late ? '#E0A85A' : 'var(--text2)' }}>{r.customers?.company ? `${r.customers.company} · ` : ''}{late ? `försenad sedan ${formatDate(r.due_date)}` : (r.due_date || '').slice(0, 10) === todayStr ? 'idag' : formatDate(r.due_date)}</div>
                   </button>
                   <button onClick={() => markReminderDone(r.id)} style={{ padding: '6px 12px', background: 'rgba(76,175,125,.12)', border: '1px solid rgba(76,175,125,.35)', borderRadius: 7, color: 'var(--green)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Klar</button>
                 </div>
@@ -335,92 +316,8 @@ export default function CrmDashboardPage() {
         </div>
       )}
 
-      {/* Calendar + recent customers */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 24, alignItems: 'start' }}>
-
-        {/* Calendar */}
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 7 }}>
-            <Calendar size={15} color="#E07BA8" /> Kalender & påminnelser
-          </div>
-          <div style={{ ...glass, overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
-              <button onClick={() => { const d = new Date(calYear, calMonth - 1); setCalMonth(d.getMonth()); setCalYear(d.getFullYear()) }}
-                style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 4 }}><ChevronLeft size={14} /></button>
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{monthNames[calMonth]} {calYear}</span>
-              <button onClick={() => { const d = new Date(calYear, calMonth + 1); setCalMonth(d.getMonth()); setCalYear(d.getFullYear()) }}
-                style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 4 }}><ChevronRight size={14} /></button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', padding: '6px 8px 0' }}>
-              {['M','T','O','T','F','L','S'].map((d, i) => (
-                <div key={i} style={{ textAlign: 'center', fontSize: 10, fontWeight: 600, color: 'var(--text3)', padding: '2px 0' }}>{d}</div>
-              ))}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', padding: '2px 8px 10px', gap: 2 }}>
-              {calCells.map((day, idx) => {
-                if (!day) return <div key={idx} />
-                const dateStr = `${calYear}-${String(calMonth + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
-                const dayRems = remindersByDate[dateStr] || []
-                const isToday = dateStr === todayStr
-                const isPast  = dateStr < todayStr
-                const isSelected = dateStr === selectedDay
-                return (
-                  <button key={idx} onClick={() => setSelectedDay(isSelected ? null : dateStr)} title={dayRems.map(r => r.title).join(', ')}
-                    style={{ borderRadius: 5, padding: '3px 2px', textAlign: 'center', cursor: 'pointer', background: isSelected ? 'rgba(232,184,75,.2)' : isToday ? 'rgba(232,184,75,.12)' : 'transparent', border: isSelected ? '1px solid rgba(232,184,75,.5)' : isToday ? '1px solid rgba(232,184,75,.25)' : '1px solid transparent', fontFamily: 'inherit' }}>
-                    <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--gold)' : isPast ? 'var(--text3)' : 'var(--text)' }}>{day}</div>
-                    {dayRems.length > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: 2, marginTop: 1 }}>
-                        {dayRems.slice(0, 2).map((r, i) => (
-                          <div key={i} style={{ width: 4, height: 4, borderRadius: '50%', background: PRIORITY_DOT[r.priority] || 'var(--blue)' }} />
-                        ))}
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Selected day detail */}
-            {selectedDay && (
-              <div style={{ borderTop: '1px solid rgba(255,255,255,.05)', padding: '10px 14px 12px' }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 8 }}>
-                  {new Date(selectedDay + 'T12:00:00').toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
-                </div>
-                {(remindersByDate[selectedDay] || []).length === 0 ? (
-                  <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 8 }}>Inga påminnelser denna dag</div>
-                ) : (remindersByDate[selectedDay] || []).map((r: any) => (
-                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0' }}>
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: PRIORITY_DOT[r.priority], flexShrink: 0 }} />
-                    <button type="button" onClick={() => setRemModal({ reminder: r })} title="Redigera"
-                      style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
-                      <div style={{ fontSize: 12, color: 'var(--text)', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.2)', textUnderlineOffset: 3 }}>{r.title}</div>
-                      {r.customers?.company && <div style={{ fontSize: 10, color: 'var(--text2)' }}>{r.customers.company}</div>}
-                    </button>
-                    <button onClick={() => markReminderDone(r.id)} style={{ fontSize: 10, padding: '3px 8px', background: 'rgba(76,175,125,.1)', border: '1px solid rgba(76,175,125,.2)', borderRadius: 5, color: 'var(--green)', cursor: 'pointer', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>Klar</button>
-                    <button onClick={() => deleteReminder(r.id)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 2, flexShrink: 0 }}>×</button>
-                  </div>
-                ))}
-                <button onClick={() => setRemModal({ reminder: null })}
-                  style={{ marginTop: 8, fontSize: 11, padding: '5px 12px', background: 'rgba(232,184,75,.1)', border: '1px solid rgba(232,184,75,.2)', borderRadius: 6, color: 'var(--gold)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                  + Lägg till aktivitet
-                </button>
-              </div>
-            )}
-            {reminders.filter(r => r.due_date >= todayStr).slice(0, 4).map((r) => (
-              <div key={r.id} role="button" tabIndex={0} onClick={() => setRemModal({ reminder: r })} onKeyDown={e => { if (e.key === 'Enter') setRemModal({ reminder: r }) }}
-                style={{ padding: '8px 14px', borderTop: '1px solid rgba(255,255,255,.04)', display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: PRIORITY_DOT[r.priority], flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text3)' }}>{r.customers?.company} · {formatDate(r.due_date)}</div>
-                </div>
-              </div>
-            ))}
-            {reminders.filter(r => r.due_date >= todayStr).length === 0 && (
-              <div style={{ padding: '10px 14px', borderTop: '1px solid rgba(255,255,255,.04)', fontSize: 12, color: 'var(--text3)', textAlign: 'center' }}>Inga kommande påminnelser</div>
-            )}
-          </div>
-        </div>
+      {/* Recent customers */}
+      <div style={{ marginBottom: 24 }}>
 
         {/* Senaste kunder */}
         <div>
@@ -572,7 +469,7 @@ export default function CrmDashboardPage() {
 
       {/* Create / edit calendar activity */}
       {remModal && (
-        <ReminderModal reminder={remModal.reminder} defaultDate={selectedDay || todayStr}
+        <ReminderModal reminder={remModal.reminder} defaultDate={todayStr}
           customers={activeCustomers} createdBy={firstName || undefined}
           onSaved={saved => setReminders(rs => [...rs.filter(r => r.id !== saved.id), saved].sort((a, b) => a.due_date.localeCompare(b.due_date)))}
           onRemoved={id => setReminders(rs => rs.filter(r => r.id !== id))}
