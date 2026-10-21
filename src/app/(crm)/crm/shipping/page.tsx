@@ -28,8 +28,8 @@ interface ShipOrder {
 export default function ShippingPage() {
   const me = useMe()
   const inAdmin = (usePathname() || '').startsWith('/admin')
-  // The order itself: the admin order panel, or the order in the CRM list.
-  const orderHref = (id: string) => inAdmin || me.role === 'admin' ? `/admin/orders?order=${id}` : `/crm/orders?view=history&open=${id}`
+  // The order itself, opened in the order list's panel (lines, delivery, packing).
+  const orderHref = (id: string) => `${inAdmin ? '/admin/crm' : '/crm'}/orders?view=history&open=${id}`
   const [pics, setPics] = useState<Record<string, string | null>>({})
   useEffect(() => {
     supabase.from('products').select('id,image_url').then(({ data }) => setPics(Object.fromEntries((data ?? []).map((p: any) => [p.id, p.image_url]))))

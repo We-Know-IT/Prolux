@@ -312,7 +312,7 @@ export function ToShipPanel({ limit = 8 }: { limit?: number }) {
   if (rows.length === 0) return null
   const shipHref = admin ? '/admin/crm/shipping' : '/crm/shipping'
   // One order: opens the order itself, where packing is filled in.
-  const href = (id: string) => admin ? `/admin/orders?order=${id}` : `/crm/orders?view=history&open=${id}`
+  const href = (id: string) => `${admin ? '/admin/crm' : '/crm'}/orders?view=history&open=${id}`
 
   return (
     <div style={{ marginBottom: 16 }}>
