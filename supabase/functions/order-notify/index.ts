@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import nodemailer from 'npm:nodemailer@6.9.16'
 
 // E-mail to the salesperson and the admins when a customer places an order in the webshop.
 // Called by the database (migration 0020, trigger notify_new_order) with
@@ -28,6 +29,17 @@ async function sendEmail(to: string[], subject: string, html: string, config: an
       body: JSON.stringify({ message: { subject, body: { contentType: 'HTML', content: html }, toRecipients: to.map(address => ({ emailAddress: { address } })) } }),
     })
     return res.ok
+  }
+  if (config.provider === 'smtp') {
+    // An ordinary mailbox, e.g. one.com (send.one.com, port 465). Port 587 is
+    // blocked from Edge Functions, so 465 (SSL) is used.
+    const port = Number(config.smtp_port) || 465
+    const transport = nodemailer.createTransport({
+      host: config.smtp_host || 'send.one.com', port, secure: port === 465,
+      auth: { user: config.smtp_user || config.from_email, pass: config.smtp_password },
+    })
+    await transport.sendMail({ from: { name: config.from_name || 'ProLuxShine', address: config.from_email }, to: to, subject, html: html })
+    return true
   }
   if (config.provider === 'sendgrid') {
     const res = await fetch('https://api.sendgrid.com/v3/mail/send', {

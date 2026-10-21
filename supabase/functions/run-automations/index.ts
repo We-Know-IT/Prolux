@@ -1,5 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import nodemailer from 'npm:nodemailer@6.9.16';
 
 // Daily e-mail automations, configured in admin (Automationer).
 // Deploy: Supabase → Edge Functions → run-automations → paste this file.
@@ -56,6 +57,22 @@ async function sendEmail(to: string, subject: string, body: string, config: any)
       return res.ok;
     } catch (e) {
       console.error('Outlook error:', e);
+      return false;
+    }
+  }
+
+  // SMTP — an ordinary mailbox, e.g. one.com (send.one.com, port 465)
+  if (config.provider === 'smtp') {
+    try {
+      const port = Number(config.smtp_port) || 465;
+      const transport = nodemailer.createTransport({
+        host: config.smtp_host || 'send.one.com', port, secure: port === 465,
+        auth: { user: config.smtp_user || config.from_email, pass: config.smtp_password },
+      });
+      await transport.sendMail({ from: { name: config.from_name || 'ProLuxShine', address: config.from_email }, to, subject, html: body });
+      return true;
+    } catch (e) {
+      console.error('SMTP error:', e);
       return false;
     }
   }

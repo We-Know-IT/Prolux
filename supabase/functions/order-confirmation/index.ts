@@ -1,11 +1,12 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import nodemailer from 'npm:nodemailer@6.9.16'
 
 // Order confirmation to the customer, sent when the seller ticks "Skicka
 // orderbekräftelse" in the CRM checkout. Called with { order_id } and the
 // logged-in seller's token.
 // Deploy: Supabase → Edge Functions → new function "order-confirmation",
 // paste this file. "Verify JWT" may stay on.
-// Sends with the e-mail settings in Admin → Automationer (email_config).
+// Sends with the e-mail settings in email_config (SMTP e.g. one.com, SendGrid or Microsoft 365).
 
 const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 const APP_URL = Deno.env.get('APP_URL') || 'https://crm.proluxshine.com'
@@ -33,6 +34,17 @@ async function sendEmail(to: string[], subject: string, html: string, config: an
       body: JSON.stringify({ message: { subject, body: { contentType: 'HTML', content: html }, toRecipients: to.map(address => ({ emailAddress: { address } })) } }),
     })
     return res.ok
+  }
+  if (config.provider === 'smtp') {
+    // An ordinary mailbox, e.g. one.com (send.one.com, port 465). Port 587 is
+    // blocked from Edge Functions, so 465 (SSL) is used.
+    const port = Number(config.smtp_port) || 465
+    const transport = nodemailer.createTransport({
+      host: config.smtp_host || 'send.one.com', port, secure: port === 465,
+      auth: { user: config.smtp_user || config.from_email, pass: config.smtp_password },
+    })
+    await transport.sendMail({ from: { name: config.from_name || 'ProLuxShine', address: config.from_email }, to: to, subject, html: html })
+    return true
   }
   if (config.provider === 'sendgrid') {
     const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
