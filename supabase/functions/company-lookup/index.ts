@@ -34,13 +34,19 @@ const json = (body: unknown, status = 200) =>
 let cached: { token: string; until: number } | null = null
 async function accessToken(): Promise<string> {
   if (cached && cached.until > Date.now()) return cached.token
-  const res = await fetch(TOKEN_URL, {
+  const request = (withScope: boolean) => fetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: env('BOLAGSVERKET_CLIENT_ID')!, client_secret: env('BOLAGSVERKET_CLIENT_SECRET')!, scope: SCOPE }),
+    body: new URLSearchParams({
+      grant_type: 'client_credentials', client_id: env('BOLAGSVERKET_CLIENT_ID')!, client_secret: env('BOLAGSVERKET_CLIENT_SECRET')!,
+      ...(withScope ? { scope: SCOPE } : {}),
+    }),
   })
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok || !data.access_token) throw new Error(`Bolagsverket godkände inte nyckeln (${res.status})`)
+  let res = await request(true)
+  let data = await res.json().catch(() => ({}))
+  // A scope the application does not have: ask for the application's default instead.
+  if (!res.ok && !env('BOLAGSVERKET_SCOPE')) { res = await request(false); data = await res.json().catch(() => ({})) }
+  if (!res.ok || !data.access_token) throw new Error(`Bolagsverket godkände inte nycklarna (${res.status}${data.error ? `: ${data.error}` : ''})`)
   cached = { token: data.access_token, until: Date.now() + Math.max(60, (data.expires_in ?? 3600) - 60) * 1000 }
   return cached.token
 }
@@ -72,7 +78,11 @@ Deno.serve(async req => {
     })
     const data = await res.json().catch(() => null)
     if (res.status === 404) return json({ error: 'Hittade inget företag med det organisationsnumret.' }, 404)
-    if (!res.ok) return json({ error: `Bolagsverket svarade med fel (${res.status}).` }, 502)
+    if (!res.ok) {
+      const detail = data ? JSON.stringify(data).slice(0, 200) : ''
+      console.error('Bolagsverket', res.status, detail)
+      return json({ error: `Bolagsverket svarade med fel (${res.status})${detail ? `: ${detail}` : ''}` }, 502)
+    }
     const info = parseOrganisation(data, orgNr)
     if (!info) return json({ error: 'Hittade inget företag med det organisationsnumret.' }, 404)
     return json(info)
