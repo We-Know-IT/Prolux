@@ -10,7 +10,6 @@ import {
   BarChart2, X, Trash2, ChevronLeft, ChevronRight, RefreshCw, Pencil, ShoppingCart, Info, MapPin, Sparkles
 } from 'lucide-react'
 import { PriceListPicker } from '@/components/crm/NewCustomerModal'
-import IncVat from '@/components/orders/IncVat'
 import Portal from '@/components/ui/Portal'
 import { recommendFor } from '@/lib/recommend'
 import { deleteOpenOrder } from '@/lib/crm-cart'
@@ -21,6 +20,7 @@ import { nextBirthday, formatBirthday } from '@/lib/birthdays'
 import { useMe } from '@/hooks/useMe'
 import { isoDay } from '@/lib/visits'
 import CreateLeadModal from '@/components/crm/CreateLeadModal'
+import OrderDrawer from '@/components/orders/OrderDrawer'
 
 const supabase = createClient()
 
@@ -35,7 +35,7 @@ function ProductPic({ src, size }: { src?: string | null; size: number }) {
 }
 
 
-type Tab = 'overview' | 'orders' | 'stats' | 'notes'
+type Tab = 'overview' | 'orders' | 'quotes' | 'leads' | 'stats' | 'notes'
 type ReminderPriority = 'low' | 'normal' | 'high'
 
 interface Reminder {
@@ -78,20 +78,28 @@ export default function CustomerDetailPage() {
   const [imageByName, setImageByName]     = useState<Record<string, string | null>>({})
   const [nameById, setNameById]           = useState<Record<string, string>>({})
   const [recommendations, setRecommendations] = useState<string[]>([])
-  const [viewOrder, setViewOrder]         = useState<any | null>(null)
   const [leadOpen, setLeadOpen]           = useState(false)
+  const [leads, setLeads]                 = useState<any[]>([])
+  const [drawerId, setDrawerId]           = useState<string | null>(null)
   const [editingActId, setEditingActId]   = useState<string | null>(null)
   const [editingActText, setEditingActText] = useState('')
   const [infoEdit, setInfoEdit]           = useState<string | null>(null)   // fast info being edited
 
   useEffect(() => { loadData() }, [id])
-  useLiveRefresh(['customers', 'orders', 'order_items', 'activities', 'reminders'], loadData)
+  useLiveRefresh(['customers', 'orders', 'order_items', 'activities', 'reminders', 'deals'], loadData)
 
   function loadData() {
     if (!id) return
+    // This customer's leads (deals), with the product when migration 0024 is run.
+    supabase.from('deals').select('id,title,stage,value,notes,assigned_to,source,created_at,updated_at,product_id,products(name)').eq('customer_id', id).order('updated_at', { ascending: false })
+      .then(async ({ data, error }) => {
+        if (!error) { setLeads(data ?? []); return }
+        const { data: d2 } = await supabase.from('deals').select('id,title,stage,value,notes,assigned_to,source,created_at,updated_at').eq('customer_id', id).order('updated_at', { ascending: false })
+        setLeads(d2 ?? [])
+      })
     Promise.all([
       supabase.from('customers').select('*').eq('id', id).single(),
-      supabase.from('orders').select('id,order_nr,status,total,subtotal,vat_amount,created_at,delivery_city,notes,order_items(id,product_id,product_name,product_sku,qty,unit_price,list_price,total_price)').eq('customer_id', id).order('created_at', { ascending: false }),
+      supabase.from('orders').select('*,order_items(id,product_id,product_name,product_sku,qty,unit_price,list_price,total_price)').eq('customer_id', id).order('created_at', { ascending: false }),
       supabase.from('activities').select('id,type,title,body,created_by,created_at').eq('customer_id', id).order('created_at', { ascending: false }),
       supabase.from('reminders').select('*').eq('customer_id', id).order('due_date'),
       supabase.from('products').select('id,name,brand,list_price,unit,image_url').eq('active', true).order('sort_order'),
@@ -218,6 +226,10 @@ export default function CustomerDetailPage() {
   // Derived stats
   const sold           = orders.filter(o => !NOT_SOLD.includes(o.status))
   const openCarts      = orders.filter(o => o.status === 'draft' || o.status === 'quote')
+  // Orders (placed or cancelled) and quotes, shown apart. A quote that became
+  // an order is listed under both (migration 0026 remembers it was a quote).
+  const placed         = orders.filter(o => o.status !== 'draft' && o.status !== 'quote')
+  const quotes         = orders.filter(o => o.status === 'quote' || (o as any).quoted_at)
   const totalSpend     = sold.reduce((s, o) => s + (o.total || 0), 0)
   const ordersThisYear = sold.filter(o => new Date(o.created_at).getFullYear() === new Date().getFullYear()).length
   const avgOrderValue  = sold.length ? Math.round(totalSpend / sold.length) : 0
@@ -292,7 +304,7 @@ export default function CustomerDetailPage() {
   const orderRow = (o: Order, big = false) => {
     const items = ((o as any).order_items || []) as OrderItem[]
     return (
-      <button key={o.id} type="button" onClick={() => setViewOrder(o)}
+      <button key={o.id} type="button" onClick={() => setDrawerId(o.id)}
         style={{ ...card, width: '100%', textAlign: 'left', cursor: 'pointer', padding: big ? '14px 18px' : '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}
         onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(232,184,75,.35)')} onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--line)')}>
         <div style={{ display: 'flex', gap: 4 }}>
@@ -411,7 +423,9 @@ export default function CustomerDetailPage() {
         <div style={{ display: 'flex', gap: 0, marginTop: 16, borderBottom: '2px solid var(--line)' }}>
           {([
             { key: 'overview', label: 'Översikt' },
-            { key: 'orders',   label: `Ordrar (${orders.length})` },
+            { key: 'orders',   label: `Ordrar (${placed.length})` },
+            { key: 'quotes',   label: `Offerter (${quotes.length})` },
+            { key: 'leads',    label: `Leads (${leads.filter(l => !['Vunnen', 'Förlorad'].includes(l.stage)).length})` },
             { key: 'stats',    label: 'Statistik' },
             { key: 'notes',    label: `Anteckningar${reminders.filter(r=>r.status!=='done').length > 0 ? ` · ${reminders.filter(r=>r.status!=='done').length} påm.` : ''}` },
           ] as const).map(({ key, label }) => (
@@ -596,8 +610,39 @@ export default function CustomerDetailPage() {
       {/* ── TAB: Orders ──────────────────────────────────────── */}
       {tab === 'orders' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {orders.map(o => orderRow(o, true))}
-          {orders.length === 0 && <p style={{ color: 'var(--text3)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>Inga ordrar ännu</p>}
+          {placed.map(o => orderRow(o, true))}
+          {placed.length === 0 && <p style={{ color: 'var(--text2)', fontSize: 14, textAlign: 'center', padding: '40px 0' }}>Inga ordrar ännu</p>}
+        </div>
+      )}
+
+      {/* ── TAB: Quotes ──────────────────────────────────────── */}
+      {tab === 'quotes' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {quotes.map(o => orderRow(o, true))}
+          {quotes.length === 0 && <p style={{ color: 'var(--text2)', fontSize: 14, textAlign: 'center', padding: '40px 0' }}>Inga offerter ännu</p>}
+        </div>
+      )}
+
+      {/* ── TAB: Leads ───────────────────────────────────────── */}
+      {tab === 'leads' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <button onClick={() => setLeadOpen(true)} style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', background: 'rgba(106,175,240,.12)', border: '1px solid rgba(106,175,240,.45)', borderRadius: 8, color: 'var(--text)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+            <Sparkles size={14} color="#6AAFF0" /> Skapa lead
+          </button>
+          {leads.map(l => (
+            <Link key={l.id} href={`/crm/pipeline?deal=${l.id}`} title="Öppna i pipelinen"
+              style={{ ...card, display: 'block', padding: '14px 18px', textDecoration: 'none', borderTop: '3px solid #6AAFF0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{l.title}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, padding: '2px 8px', borderRadius: 5, background: 'rgba(106,175,240,.14)', color: '#8DBDF0' }}>{l.stage}</span>
+                {l.products?.name && <span style={{ fontSize: 13, color: 'var(--text2)' }}>{l.products.name}</span>}
+                {l.value ? <span style={{ marginLeft: 'auto', color: 'var(--gold)', fontWeight: 700 }}>{fmt(l.value)} kr</span> : null}
+              </div>
+              {l.notes && <div style={{ fontSize: 14, color: 'var(--text)', marginTop: 6, whiteSpace: 'pre-line' }}>{l.notes}</div>}
+              <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 6 }}>{l.assigned_to || 'Ingen säljare'} · {formatDate(l.created_at)}</div>
+            </Link>
+          ))}
+          {leads.length === 0 && <p style={{ color: 'var(--text2)', fontSize: 14, textAlign: 'center', padding: '30px 0' }}>Inga leads för kunden ännu</p>}
         </div>
       )}
 
@@ -811,52 +856,9 @@ export default function CustomerDetailPage() {
 
 
       {leadOpen && customer && (<Portal>
-        <CreateLeadModal customer={customer} me={me.name} onClose={() => setLeadOpen(false)} onCreated={() => showToast('Lead skapad – den syns i översikten och pipelinen')} />
+        <CreateLeadModal customer={customer} me={me.name} onClose={() => setLeadOpen(false)} onCreated={() => { showToast('Lead skapad – den syns i översikten och pipelinen'); loadData() }} />
       </Portal>)}
-      {viewOrder && (<Portal>
-        <div onClick={() => setViewOrder(null)} style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div role="dialog" aria-modal="true" aria-label={`Order #${viewOrder.order_nr}`} onClick={e => e.stopPropagation()}
-            style={{ background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 16, width: '100%', maxWidth: 820, maxHeight: 'calc(92vh / var(--vz, 1))', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 19, fontWeight: 700, color: 'var(--text)' }}>{viewOrder.status === 'quote' ? 'Offert' : viewOrder.status === 'draft' ? 'Varukorg' : 'Order'} #{viewOrder.order_nr}</div>
-                <div style={{ fontSize: 12, color: 'var(--text2)' }}>{formatDate(viewOrder.created_at)} · {ORDER_STATUS_LABEL[viewOrder.status as OrderStatus] || viewOrder.status}</div>
-              </div>
-              <button onClick={() => setViewOrder(null)} aria-label="Stäng" style={{ marginLeft: 'auto', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', padding: 6, display: 'flex' }}><X size={16} /></button>
-            </div>
-            <div style={{ overflowY: 'auto', padding: '6px 22px' }}>
-              {(((viewOrder.order_items || []) as OrderItem[])).map(it => (
-                <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 0', borderBottom: '1px solid var(--line)' }}>
-                  <ProductPic src={productImages[it.product_id]} size={72} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{it.product_name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text2)' }}>{it.qty} × {fmt(it.unit_price)} kr{it.product_sku ? ` · ${it.product_sku}` : ''}</div>
-                  </div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', textAlign: 'right' }}>{fmt(it.total_price)} kr<IncVat net={it.total_price} /></div>
-                </div>
-              ))}
-              {viewOrder.notes && <p style={{ fontSize: 12, color: 'var(--text2)', margin: '12px 0 0', whiteSpace: 'pre-line' }}>{viewOrder.notes}</p>}
-            </div>
-            <div style={{ padding: '14px 22px', borderTop: '1px solid var(--line)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text)', marginBottom: 4 }}><span>Summa exkl. moms</span><span>{fmt(viewOrder.subtotal)} kr</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text2)', marginBottom: 6 }}><span>Moms</span><span>{fmt(viewOrder.vat_amount)} kr</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 17, fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}><span>Totalt inkl. moms</span><span style={{ color: 'var(--gold)' }}>{fmt(viewOrder.total)} kr</span></div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                {(viewOrder.status === 'draft' || viewOrder.status === 'quote') ? (
-                  <button onClick={() => router.push(`/crm/orders?edit=${viewOrder.id}`)} style={{ flex: 1, padding: '12px 0', background: 'var(--gold)', border: 'none', borderRadius: 9, color: '#111', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-                    {viewOrder.status === 'quote' ? 'Öppna offerten' : 'Fortsätt med varukorgen'}
-                  </button>
-                ) : (
-                  <button onClick={() => router.push(`/crm/orders?reorder=${viewOrder.id}`)} style={{ flex: 1, padding: '12px 0', background: 'var(--gold)', border: 'none', borderRadius: 9, color: '#111', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                    <RefreshCw size={15} /> Sälj igen
-                  </button>
-                )}
-                <button onClick={() => setViewOrder(null)} style={{ padding: '12px 20px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 9, color: 'var(--text)', fontSize: 14, cursor: 'pointer' }}>Stäng</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Portal>)}
+      {drawerId && <OrderDrawer orderId={drawerId} onClose={() => setDrawerId(null)} onChanged={() => loadData()} />}
 
       {toast && (
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--bg3)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', padding: '12px 20px', fontSize: 13, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 4px 20px rgba(0,0,0,.4)' }}>

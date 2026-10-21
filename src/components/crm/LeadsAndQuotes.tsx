@@ -8,8 +8,6 @@ import { createClient } from '@/lib/supabase/client'
 import { fmt, formatDate } from '@/lib/utils'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { useMe } from '@/hooks/useMe'
-import Portal from '@/components/ui/Portal'
-import CreateLeadModal from '@/components/crm/CreateLeadModal'
 import { AWAITING_SHIPMENT, SHIP_LINES_SELECT, qtyToShip } from '@/lib/shipping'
 
 // Shared by the CRM and admin overviews.
@@ -55,7 +53,6 @@ export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number 
   const [editId, setEditId] = useState<string | null>(null)
   const [text, setText] = useState('')
   const [quoteByDeal, setQuoteByDeal] = useState<Record<string, { id: string; order_nr: number; status: string }>>({})
-  const [openLead, setOpenLead] = useState<any | null>(null)
 
   const me = useMe()
   // Salespeople see their own leads; admins see everyone's.
@@ -100,15 +97,15 @@ export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number 
         {(leads ?? []).map((l, i, arr) => (
           <div key={l.id} style={{ padding: '12px 16px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <button type="button" onClick={() => setOpenLead(l)} title="Öppna och redigera leaden" style={{ padding: 0, background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, fontWeight: 600, color: 'var(--text)', textDecoration: 'underline', textUnderlineOffset: 3, textDecorationColor: 'rgba(255,255,255,.25)' }}>
+              <Link href={`${base}/pipeline?deal=${l.id}`} title="Öppna leaden i pipelinen" style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', textDecoration: 'underline', textUnderlineOffset: 3, textDecorationColor: 'rgba(255,255,255,.25)' }}>
                 {l.customers?.company || l.title}
-              </button>
+              </Link>
               <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(74,143,212,.14)', color: '#8DBDF0' }}>{l.stage}</span>
               {l.source === 'web' && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(76,175,125,.14)', color: '#6FCB9C' }}>Från webben</span>}
               {l.source === 'visit' && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(94,196,154,.14)', color: '#6FCB9C' }}>Från besök</span>}
               <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--gold)' }}>{l.value ? `${fmt(l.value)} kr` : ''}</span>
             </div>
-            <div style={{ fontSize: 14, color: 'var(--text)', margin: '4px 0 2px' }}>{l.title}{l.products?.name ? <span style={{ color: 'var(--text2)' }}> · {l.products.name}</span> : ''}</div>
+            <Link href={`${base}/pipeline?deal=${l.id}`} style={{ display: 'block', textDecoration: 'none', fontSize: 14, color: 'var(--text)', margin: '4px 0 2px' }}>{l.title}{l.products?.name ? <span style={{ color: 'var(--text2)' }}> · {l.products.name}</span> : ''}</Link>
             <div style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 6px' }}>{l.assigned_to || 'Ingen säljare'} · {formatDate(l.updated_at || l.created_at)}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               {quoteByDeal[l.id] && (
@@ -142,10 +139,6 @@ export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number 
           </div>
         ))}
       </div>
-      {openLead && (<Portal>
-        <CreateLeadModal lead={openLead} customer={openLead.customers ?? { id: '', company: openLead.title }} me={me.name}
-          onCreated={load} onClose={() => setOpenLead(null)} />
-      </Portal>)}
     </div>
   )
 }
@@ -153,7 +146,7 @@ export function LeadsPanel({ base, limit = 8 }: { base?: string; limit?: number 
 // Open quotes; each opens in the order form (mail it or turn it into an order).
 export function QuotesPanel({ limit = 6 }: { limit?: number }) {
   const orderHref = useOrderHref()
-  const quotesHref = useInAdmin() ? '/admin/crm/orders?view=history&filter=quotes' : '/crm/orders?view=history&filter=quotes'
+  const quotesHref = useInAdmin() ? '/admin/crm/quotes' : '/crm/quotes'
   const [quotes, setQuotes] = useState<any[] | null>(null)
   function load() {
     createClient().from('orders').select('id,order_nr,subtotal,created_at,notes,customers(company)')
@@ -240,13 +233,13 @@ export function DraftsPanel({ limit = 10 }: { limit?: number }) {
 // Shown only when there is something to follow up.
 // bare: just the rows, for use inside another box (the overview's "Att göra");
 // onCount tells that box how many there are.
-export function FollowUpPanel({ days = 3, bare = false, onCount }: { days?: number; bare?: boolean; onCount?: (n: number) => void }) {
+export function FollowUpPanel({ days = 3, bare = false, onCount, onlyQuotes = false }: { days?: number; bare?: boolean; onCount?: (n: number) => void; onlyQuotes?: boolean }) {
   const orderHref = useOrderHref()
   const [rows, setRows] = useState<any[]>([])
   function load() {
     const before = new Date(Date.now() - days * 86_400_000).toISOString()
     createClient().from('orders').select('id,order_nr,status,subtotal,created_at,customers(company,email)')
-      .in('status', ['quote', 'draft']).lt('created_at', before).order('created_at', { ascending: true }).limit(8)
+      .in('status', onlyQuotes ? ['quote'] : ['quote', 'draft']).lt('created_at', before).order('created_at', { ascending: true }).limit(8)
       .then(({ data }) => { setRows(data ?? []); onCount?.((data ?? []).length) })
   }
   useEffect(load, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -277,7 +270,7 @@ export function FollowUpPanel({ days = 3, bare = false, onCount }: { days?: numb
   return (
     <div style={{ ...accentPanel(ACCENT.follow), padding: '14px 16px' }}>
       <Head icon={BellRing} color={ACCENT.follow} title="Följ upp" count={rows.length} />
-      <div style={{ fontSize: 13, color: 'var(--text2)', margin: '-4px 0 10px' }}>Offerter och varukorgar som legat orörda i {days} dagar eller mer</div>
+      <div style={{ fontSize: 13, color: 'var(--text2)', margin: '-4px 0 10px' }}>{onlyQuotes ? 'Offerter' : 'Offerter och varukorgar'} som legat orörda i {days} dagar eller mer</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {rows.map(o => (
           <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '8px 10px', background: 'rgba(255,255,255,.03)', borderRadius: 8 }}>

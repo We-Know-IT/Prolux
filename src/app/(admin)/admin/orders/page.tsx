@@ -1,16 +1,13 @@
 'use client'
 import { qtyToShip, SHIP_LINES_SELECT } from '@/lib/shipping'
-import DeliveryTag from '@/components/orders/DeliveryTag'
-import PackingForm from '@/components/orders/PackingForm'
+import OrderDrawer from '@/components/orders/OrderDrawer'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import IncVat from '@/components/orders/IncVat'
-import { withVat, VAT_RATE } from '@/lib/pricing'
-import { callVisma, invoiceInVismaInBackground, VISMA_STATUS } from '@/lib/visma'
+import { withVat } from '@/lib/pricing'
+import { invoiceInVismaInBackground } from '@/lib/visma'
 import { fmt, formatDateTime } from '@/lib/utils'
-import { X, RefreshCw } from 'lucide-react'
-import ShipOrderForm from '@/components/orders/ShipOrderForm'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { useTeam, teamOptions } from '@/hooks/useTeam'
 
@@ -33,7 +30,6 @@ const STATUS_CSS: Record<string, { bg: string; color: string }> = {
 export default function AdminOrders() {
   const SALESPEOPLE = useTeam()
   const [orders, setOrders]           = useState<any[]>([])
-  const [vismaBusy, setVismaBusy]     = useState(false)
   const [filtered, setFiltered]       = useState<any[]>([])
   const [search, setSearch]           = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -41,7 +37,6 @@ export default function AdminOrders() {
   const [fromDate, setFromDate]       = useState('')
   const [toDate, setToDate]           = useState('')
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
-  const [orderItems, setOrderItems]   = useState<any[]>([])
   const [toast, setToast]             = useState('')
 
   function loadOrders() {
@@ -91,32 +86,11 @@ export default function AdminOrders() {
     setFiltered(list)
   }, [search, statusFilter, sellerFilter, fromDate, toDate, orders])
 
-  async function openOrder(order: any) {
-    setSelectedOrder(order)
-    const sb = createClient()
-    const { data } = await sb.from('order_items').select('*').eq('order_id', order.id)
-    setOrderItems(data || [])
-  }
+  function openOrder(order: any) { setSelectedOrder(order) }
 
-  async function updateAssignee(id: string, assignee: string) {
-    const sb = createClient()
-    const assigned_to = assignee || null
-    await sb.from('orders').update({ assigned_to }).eq('id', id)
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, assigned_to } : o))
-    setSelectedOrder((prev: any) => prev?.id === id ? { ...prev, assigned_to } : prev)
-    showToast(assigned_to ? `Säljare: ${assigned_to}` : 'Säljare borttagen')
-  }
 
-  async function sendToVisma(id: string) {
-    setVismaBusy(true)
-    try {
-      const r = await callVisma<{ draft_id?: string; invoice_number?: number; warning?: string; already?: boolean }>('sync-order', { order_id: id })
-      showToast(r.already ? 'Ordern finns redan i Visma' : r.invoice_number ? `Faktura ${r.invoice_number} skapad i Visma` : 'Fakturautkast skapat i Visma')
-    } catch (e) { showToast((e as Error).message) }
-    const { data } = await createClient().from('orders').select('*,customers(company,contact_name,email)').eq('id', id).single()
-    if (data) { setSelectedOrder((prev: any) => prev?.id === id ? { ...prev, ...data } : prev); setOrders(prev => prev.map(o => o.id === id ? { ...o, ...data } : o)) }
-    setVismaBusy(false)
-  }
+
+
 
   async function updateStatus(id: string, status: string) {
     // An order from the CRM needs a customer before it can be placed or delivered.
@@ -134,23 +108,7 @@ export default function AdminOrders() {
     showToast(`Status uppdaterad → ${STATUS_LABELS[status]}`)
   }
 
-  // Customers to pick from when an order has none ("Koppla kund").
-  const [customerList, setCustomerList] = useState<{ id: string; company: string; city: string | null; email: string | null; contact_name: string | null }[]>([])
-  useEffect(() => {
-    if (!selectedOrder || selectedOrder.customer_id || customerList.length) return
-    createClient().from('customers').select('id,company,city,email,contact_name').neq('status', 'inactive').order('company')
-      .then(({ data }) => setCustomerList(data ?? []))
-  }, [selectedOrder]) // eslint-disable-line react-hooks/exhaustive-deps
-  async function linkCustomer(id: string, customerId: string) {
-    const c = customerList.find(x => x.id === customerId)
-    if (!c) return
-    const { error } = await createClient().from('orders').update({ customer_id: c.id, delivery_name: c.company, delivery_city: c.city }).eq('id', id)
-    if (error) { showToast('Kunde inte koppla kunden: ' + error.message); return }
-    const patch = { customer_id: c.id, delivery_name: c.company, delivery_city: c.city, customers: { company: c.company, contact_name: c.contact_name, email: c.email } }
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, ...patch } : o))
-    setSelectedOrder((prev: any) => prev?.id === id ? { ...prev, ...patch } : prev)
-    showToast(`${c.company} kopplad till ordern`)
-  }
+
 
   function showToast(msg: string) {
     setToast(msg)
@@ -270,176 +228,11 @@ export default function AdminOrders() {
         </table>
       </div>
 
-      {/* Order Detail Panel */}
-      <div style={{ position: 'fixed', top: '58px', right: 0, bottom: 0, width: 480, background: 'var(--bg2)', borderLeft: '1px solid var(--border)', zIndex: 80, transform: selectedOrder ? 'translateX(0)' : 'translateX(100%)', transition: 'transform .28s cubic-bezier(.22,.68,0,1.1)', display: 'flex', flexDirection: 'column' }}>
-        {selectedOrder && (
-          <>
-            <div style={{ padding: '20px 28px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '16px', color: 'var(--gold)', fontWeight: 500 }}>Order #{selectedOrder.order_nr}</div>
-              <button onClick={() => setSelectedOrder(null)} style={{ width: 28, height: 28, border: '1px solid var(--border)', borderRadius: 6, background: 'transparent', color: 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                <X size={14} />
-              </button>
-            </div>
-
-            <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
-              {(selectedOrder.status === 'draft' || selectedOrder.status === 'quote') && (
-                <div style={{ marginBottom: 24, padding: 16, borderRadius: 10, background: 'rgba(232,184,75,.07)', border: '1px solid rgba(232,184,75,.25)' }}>
-                  <p style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--text)' }}>
-                    {selectedOrder.status === 'quote' ? 'Offert' : 'Varukorg'} — öppna den i ordern för att ändra, mejla offerten eller lägga ordern.
-                  </p>
-                  <Link href={`/admin/crm/orders?edit=${selectedOrder.id}`}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 8, background: 'var(--gold)', color: '#111', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
-                    Öppna i ordern
-                  </Link>
-                </div>
-              )}
-              {selectedOrder.status !== 'draft' && selectedOrder.status !== 'quote' && (
-                <Link href={`/admin/crm/orders?reorder=${selectedOrder.id}`}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 20, padding: '9px 14px', borderRadius: 8, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>
-                  <RefreshCw size={14} /> Lägg ordern igen
-                </Link>
-              )}
-              {/* Order info */}
-              <div style={{ marginBottom: 24 }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,.04)', display: 'block' }}>Orderinfo</span>
-                {[
-                  ['Status', (
-                    <span key="s" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '12px', fontWeight: 600, padding: '3px 10px', borderRadius: 4, background: (STATUS_CSS[selectedOrder.status] || STATUS_CSS.draft).bg, color: (STATUS_CSS[selectedOrder.status] || STATUS_CSS.draft).color }}>
-                      {STATUS_LABELS[selectedOrder.status] || selectedOrder.status}
-                    </span>
-                  )],
-                  ['Datum',     formatDateTime(selectedOrder.created_at)],
-                  ...(selectedOrder.packed_at ? [['Packad', `${formatDateTime(selectedOrder.packed_at)}${selectedOrder.packed_by ? ` · ${selectedOrder.packed_by}` : ''}`]] : []),
-                  ...(selectedOrder.pickup_at && !selectedOrder.shipped_at ? [['Hämtas', formatDateTime(selectedOrder.pickup_at)]] : []),
-                  ...(selectedOrder.shipped_at ? [['Hämtad av transportör', `${formatDateTime(selectedOrder.shipped_at)}${selectedOrder.carrier ? ` · ${selectedOrder.carrier}` : ''}`]] : []),
-                  ['Prislista', selectedOrder.price_list_id || 'Standard'],
-                  ['Kund',      selectedOrder.customer_id ? (selectedOrder.customers?.company || selectedOrder.delivery_name || '—') : (
-                    <select key="k" value="" onChange={e => linkCustomer(selectedOrder.id, e.target.value)} aria-label="Koppla kund"
-                      style={{ fontSize: 12, padding: '4px 8px', border: '1px solid var(--red)', borderRadius: 4, background: 'var(--bg3)', color: 'var(--text)', fontFamily: 'var(--font-sans)', maxWidth: 220 }}>
-                      <option value="">Koppla kund…</option>
-                      {customerList.map(c => <option key={c.id} value={c.id}>{c.company}{c.city ? ` · ${c.city}` : ''}</option>)}
-                    </select>
-                  )],
-                  ['E-post',    selectedOrder.customers?.email || '—'],
-                  ['Såld av',   selectedOrder.created_by || 'Webbshoppen'],
-                  ['Räknas på', (
-                    <select key="a" value={selectedOrder.assigned_to || ''} onChange={e => updateAssignee(selectedOrder.id, e.target.value)}
-                      style={{ fontSize: 12, padding: '4px 8px', border: `1px solid ${selectedOrder.assigned_to ? 'var(--border)' : 'var(--red)'}`, borderRadius: 4, background: 'var(--bg3)', color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>
-                      <option value="">— Ingen —</option>
-                      {teamOptions(SALESPEOPLE, selectedOrder.assigned_to).map(sp => <option key={sp} value={sp}>{sp}</option>)}
-                    </select>
-                  )],
-                ].map(([k, v]) => (
-                  <div key={String(k)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.04)', fontSize: 14, gap: 12 }}>
-                    <span style={{ color: 'var(--text2)', flexShrink: 0 }}>{k}</span>
-                    <strong style={{ color: 'var(--text)', fontWeight: 500, textAlign: 'right' }}>{v as any}</strong>
-                  </div>
-                ))}
-              </div>
-
-              {/* Delivery */}
-              <div style={{ marginBottom: 24 }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,.04)', display: 'block' }}>Leverans</span>
-                {[
-                  ['Namn',   selectedOrder.delivery_name || '—'],
-                  ['Adress', selectedOrder.delivery_address || '—'],
-                  ['Stad',   `${selectedOrder.delivery_city || '—'} ${selectedOrder.delivery_zip || ''}`],
-                ].map(([k, v]) => (
-                  <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.04)', fontSize: 14, gap: 12 }}>
-                    <span style={{ color: 'var(--text2)', flexShrink: 0 }}>{k}</span>
-                    <strong style={{ color: 'var(--text)', fontWeight: 500, textAlign: 'right' }}>{v}</strong>
-                  </div>
-                ))}
-              </div>
-
-              {/* Products */}
-              <div style={{ marginBottom: 24 }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,.04)', display: 'block' }}>Produkter</span>
-                {orderItems.length === 0 && <p style={{ fontSize: 12, color: 'var(--text3)' }}>Inga rader</p>}
-                {orderItems.map(item => (
-                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,.04)', fontSize: 13 }}>
-                    <div>
-                      <div style={{ color: 'var(--text)', fontWeight: 500, marginBottom: 2 }}>
-                        {item.product_name}
-                      </div>
-                      <DeliveryTag line={item} order={selectedOrder} />
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text3)' }}>× {item.qty} · {item.product_sku}</div>
-                    </div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--gold)', fontWeight: 500, whiteSpace: 'nowrap', marginLeft: 12, textAlign: 'right' }}>{fmt(item.total_price)} kr<IncVat net={item.total_price} /></div>
-                  </div>
-                ))}
-                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 14, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)' }}>
-                  <span>SUMMA EXKL. MOMS</span><span>{fmt(selectedOrder.subtotal)} kr</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 6, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text2)' }}>
-                  <span>MOMS 25 %</span><span>{fmt(selectedOrder.vat_amount ?? Math.round(selectedOrder.subtotal * VAT_RATE))} kr</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text2)' }}>
-                  <span>TOTALT INKL. MOMS</span>
-                  <strong style={{ color: 'var(--gold)', fontSize: 18, fontWeight: 400 }}>{fmt(selectedOrder.total ?? withVat(selectedOrder.subtotal))} kr</strong>
-                </div>
-              </div>
-
-              {/* Visma */}
-              {!['draft', 'quote', 'cancelled'].includes(selectedOrder.status) && (
-                <div style={{ marginBottom: 24 }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10, display: 'block' }}>Visma</span>
-                  {selectedOrder.visma_status && VISMA_STATUS[selectedOrder.visma_status] && (
-                    <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 4, marginBottom: 8, background: VISMA_STATUS[selectedOrder.visma_status].bg, color: VISMA_STATUS[selectedOrder.visma_status].color }}>
-                      {VISMA_STATUS[selectedOrder.visma_status].label}{selectedOrder.visma_invoice_number ? ` · nr ${selectedOrder.visma_invoice_number}` : ''}
-                    </span>
-                  )}
-                  {selectedOrder.visma_status === 'error' && <p style={{ fontSize: 12, color: 'var(--red)', margin: '0 0 8px' }}>{selectedOrder.visma_error}</p>}
-                  {(!selectedOrder.visma_status || selectedOrder.visma_status === 'error') && (
-                    <button onClick={() => sendToVisma(selectedOrder.id)} disabled={vismaBusy}
-                      style={{ display: 'block', padding: '9px 14px', borderRadius: 8, background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: vismaBusy ? 'wait' : 'pointer' }}>
-                      {vismaBusy ? 'Skickar till Visma…' : selectedOrder.visma_status === 'error' ? 'Försök igen' : 'Skapa faktura i Visma'}
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Status update */}
-              <div style={{ marginBottom: 16 }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10, display: 'block' }}>Uppdatera status</span>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                  {Object.entries(STATUS_LABELS).map(([v, l]) => {
-                    const sc = STATUS_CSS[v] || STATUS_CSS.draft
-                    const active = selectedOrder.status === v
-                    return (
-                      <button key={v} onClick={() => updateStatus(selectedOrder.id, v)}
-                        style={{ padding: '8px 10px', borderRadius: 6, border: `1px solid ${active ? sc.color : 'var(--border)'}`, background: active ? sc.bg : 'var(--bg3)', color: active ? sc.color : 'var(--text3)', fontSize: 12, fontWeight: active ? 700 : 400, cursor: 'pointer', transition: 'all .15s' }}>
-                        {l}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Packing in the warehouse */}
-              {!['draft', 'quote', 'cancelled'].includes(selectedOrder.status) && (qtyToShip(selectedOrder) > 0 || selectedOrder.packed_at || selectedOrder.pickup_at) && (
-                <div style={{ marginBottom: 24 }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8, display: 'block' }}>Packning</span>
-                  <PackingForm order={selectedOrder} onSaved={patch => {
-                    setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, ...patch } : o))
-                    setSelectedOrder((prev: any) => ({ ...prev, ...patch }))
-                  }} />
-                </div>
-              )}
-
-              {/* Shipping */}
-              <div>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8, display: 'block' }}>Frakt & spårning</span>
-                <ShipOrderForm key={selectedOrder.id} order={selectedOrder} onShipped={patch => {
-                  setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, ...patch } : o))
-                  setSelectedOrder((prev: any) => ({ ...prev, ...patch }))
-                  showToast(`Order #${selectedOrder.order_nr} markerad som skickad`)
-                }} />
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+      {/* One order: the same detailed view as everywhere else */}
+      {selectedOrder && (
+        <OrderDrawer orderId={selectedOrder.id} onClose={() => setSelectedOrder(null)}
+          onChanged={o => setOrders(prev => prev.map(x => x.id === o.id ? { ...x, ...o } : x))} />
+      )}
 
       {/* Toast */}
       {toast && (

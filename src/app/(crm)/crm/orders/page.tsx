@@ -8,7 +8,7 @@ import IncVat from '@/components/orders/IncVat'
 import { withVat } from '@/lib/pricing'
 import { invoiceInVismaInBackground } from '@/lib/visma'
 import { sendOrderConfirmation } from '@/lib/order-confirmation'
-import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star, X, RefreshCw, Trash2, UserPlus, Check, FileDown, Mail, Copy } from 'lucide-react'
+import { Plus, Minus, ShoppingCart, Search, Package, ArrowLeft, ChevronDown, Tag, Truck, Star, X, Trash2, UserPlus, Check, FileDown, Mail, Copy } from 'lucide-react'
 import NewCustomerModal from '@/components/crm/NewCustomerModal'
 import Portal from '@/components/ui/Portal'
 import { recommendFor } from '@/lib/recommend'
@@ -19,12 +19,10 @@ import { readCart, writeCart, OPEN_CART_EVENT, deleteOpenOrder as removeOpenOrde
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { currentStaff, canConfirmOrder, NOT_LIVE_FILTER } from '@/lib/team'
 import { useTeam, teamOptions } from '@/hooks/useTeam'
-import ShipOrderForm from '@/components/orders/ShipOrderForm'
-import PackingForm from '@/components/orders/PackingForm'
+import OrderDrawer from '@/components/orders/OrderDrawer'
 import { qtyToShip, SHIP_LINES_SELECT } from '@/lib/shipping'
 import { Thumb, ProductCard, CustomerPicker, ProductSheet } from '@/components/crm/order/parts'
 import QuoteShareModal from '@/components/crm/order/QuoteShareModal'
-import OrderDetails from '@/components/crm/order/OrderDetails'
 
 const supabase = createClient()
 type View = 'new' | 'confirm' | 'history'
@@ -548,11 +546,10 @@ export default function CrmOrdersPage() {
     const saved = { ...order, customers: selectedCustomer }
     setOrders(os => os.some(o => o.id === order.id) ? os.map(o => o.id === order.id ? saved : o) : [saved, ...os])
     if (status === 'quote') {
-      const e = { id: order.id, order_nr: order.order_nr, status: 'quote' }
-      editingRef.current = e; setEditingOrder(e)
-      if (order.deal_id) setDealId(order.deal_id)
-      setPlacing(false); setView('confirm')
-      showToast(`Offert #${order.order_nr} sparad${leadNote}`)
+      // The quote is saved (under Offerter); the cart is emptied for the next one.
+      resetOrderForm()
+      setPlacing(false); setShowCart(false); setView('new')
+      showToast(`Offert #${order.order_nr} sparad${leadNote} – varukorgen är tömd`)
       return saved
     }
     const confirmTo = status === 'pending' && sendConfirmation ? selectedCustomer?.email : null
@@ -782,6 +779,7 @@ export default function CrmOrdersPage() {
   const shareModal = share && <QuoteShareModal share={share} onClose={() => setShare(null)} />
 
   // ── HISTORY VIEW ───────────────────────────────────────────
+  const drawerAction: React.CSSProperties = { padding: '9px 14px', borderRadius: 8, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }
   const filterField: React.CSSProperties = { padding: '9px 12px', background: 'var(--bg3)', border: '1px solid var(--line)', borderRadius: 9, color: 'var(--text)', fontSize: 14, outline: 'none', boxSizing: 'border-box', colorScheme: 'dark' }
   if (view === 'history') return (
     <div style={{ padding: 24, maxWidth: 1100, margin: '0 auto' }}>
@@ -906,65 +904,21 @@ export default function CrmOrdersPage() {
       </div>
       {shareModal}
       {customerNeeded}
-      {/* The opened order: everything about it, plus what can be done with it */}
-      {(() => {
-        const o = orders.find(x => x.id === expandedOrderId) as any
-        if (!o) return null
-        const isOpen = o.status === 'draft' || o.status === 'quote'
-        const items = orderItemsById[o.id]
-        return (<Portal>
-          <div onClick={() => setExpandedOrderId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 900 }}>
-            <aside role="dialog" aria-modal="true" aria-label={`Order #${o.order_nr}`} onClick={e => e.stopPropagation()}
-              style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(720px, 100vw)', background: 'var(--bg2)', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', boxShadow: '-12px 0 40px rgba(0,0,0,.4)' }}>
-              <div style={{ padding: '16px 22px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{o.status === 'quote' ? 'Offert' : o.status === 'draft' ? 'Varukorg' : 'Order'} #{o.order_nr}</span>
-                <span style={{ fontSize: 13, fontWeight: 700, padding: '3px 10px', borderRadius: 6, background: 'var(--bg4)', color: 'var(--text)' }}>{ORDER_STATUS_LABEL[o.status as OrderStatus] || o.status}</span>
-                <span style={{ fontSize: 13, color: 'var(--text2)' }}>{formatDateTime(o.created_at)}</span>
-                <button onClick={() => setExpandedOrderId(null)} aria-label="Stäng" style={{ marginLeft: 'auto', width: 36, height: 36, borderRadius: 9, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={18} /></button>
-              </div>
-              <div style={{ flex: 1, overflowY: 'auto', padding: '6px 22px 28px' }}>
-<OrderDetails o={o} items={items} products={products} />
-            {isOpen && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-                {o.status === 'quote' && (
-                  <button onClick={() => downloadQuote(o)} style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Ladda ner PDF</button>
-                )}
-                {o.status === 'quote' && (
-                  <button onClick={() => mailQuote(o)} style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Mejla offerten</button>
-                )}
-                <button onClick={() => openForEdit(o)} style={{ padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                  {o.status === 'quote' ? 'Gör om till order' : 'Fortsätt med varukorgen'}
-                </button>
-                <button onClick={() => deleteOpenOrder(o)} style={{ padding: '7px 12px', borderRadius: 7, background: 'transparent', border: '1px solid rgba(224,82,82,.35)', color: 'var(--red)', fontSize: 12, cursor: 'pointer' }}>Radera</button>
-              </div>
-            )}
-            {!isOpen && (
-              <button onClick={() => openForEdit(o, true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 12, padding: '7px 12px', borderRadius: 7, background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                <RefreshCw size={12} /> Lägg ordern igen
+      {/* The opened order: the same detailed view as everywhere else */}
+      {expandedOrderId && (
+        <OrderDrawer orderId={expandedOrderId} onClose={() => setExpandedOrderId(null)}
+          onChanged={o => setOrders(os => os.map(x => x.id === o.id ? { ...x, ...o } : x))}
+          extra={o => (o.status === 'draft' || o.status === 'quote') ? (
+            <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+              {o.status === 'quote' && <button onClick={() => downloadQuote(o)} style={drawerAction}>Ladda ner PDF</button>}
+              {o.status === 'quote' && <button onClick={() => mailQuote(o)} style={drawerAction}>Mejla offerten</button>}
+              <button onClick={() => { setExpandedOrderId(null); openForEdit(o) }} style={{ ...drawerAction, background: 'var(--gold)', border: 'none', color: '#111', fontWeight: 700 }}>
+                {o.status === 'quote' ? 'Öppna och redigera offerten' : 'Fortsätt med varukorgen'}
               </button>
-            )}
-                {!isOpen && o.status !== 'cancelled' && (qtyToShip(o) > 0 || o.packed_at || o.pickup_at) && (
-                  <div style={{ marginTop: 18, padding: '14px 16px', borderRadius: 10, background: 'var(--bg3)', border: '1px solid rgba(79,193,217,.35)' }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Packning på lagret</div>
-                    <PackingForm order={o} onSaved={patch => setOrders(os => os.map(x => x.id === o.id ? { ...x, ...patch } as any : x))} />
-                  </div>
-                )}
-            {!isOpen && o.status !== 'pending' && (canConfirmOrder(o, myName, isAdmin) || o.transport_order_id) && (
-              <div style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Frakt & spårning</div>
-                {canConfirmOrder(o, myName, isAdmin)
-                  ? <ShipOrderForm order={o} onShipped={patch => {
-                      setOrders(os => os.map(x => x.id === o.id ? { ...x, ...patch } : x))
-                      showToast(`Order #${o.order_nr} markerad som skickad`)
-                    }} />
-                  : <ShipOrderForm order={o} readOnly onShipped={() => {}} />}
-              </div>
-            )}
-              </div>
-            </aside>
-          </div>
-        </Portal>)
-      })()}
+              <button onClick={() => { setExpandedOrderId(null); deleteOpenOrder(o) }} style={{ ...drawerAction, background: 'transparent', border: '1px solid rgba(224,82,82,.4)', color: 'var(--red)' }}>Radera</button>
+            </div>
+          ) : null} />
+      )}
       {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#fff', padding: '12px 24px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 999 }}>{toast}</div>}
     </div>
   )
@@ -1549,16 +1503,10 @@ export default function CrmOrdersPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 17, fontWeight: 700, color: 'var(--text)', marginBottom: 14, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
                     <span>Totalt inkl. moms</span><span style={{ color: 'var(--gold)' }}>{fmt(total)} kr</span>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    <button onClick={() => makeQuote('pdf')} disabled={placing}
-                      style={{ padding: '14px 0', background: 'var(--gold)', border: 'none', borderRadius: 10, color: '#111', fontSize: 15, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                      <FileDown size={16} /> Offert som PDF
-                    </button>
-                    <button onClick={() => { setShowCart(false); setView('confirm') }}
-                      style={{ padding: '14px 0', background: 'var(--bg3)', border: '1px solid rgba(232,184,75,.5)', borderRadius: 10, color: 'var(--text)', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
-                      Till kassan →
-                    </button>
-                  </div>
+                  <button onClick={() => { setShowCart(false); setView('confirm') }}
+                    style={{ width: '100%', padding: '16px 0', background: 'var(--gold)', border: 'none', borderRadius: 10, color: '#111', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}>
+                    Till order →
+                  </button>
                   {!selectedCustomer && <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--text2)', textAlign: 'center' }}>Ingen kund vald – du väljer eller skapar kunden i nästa steg.</p>}
                   <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginTop: 12 }}>
                     <button onClick={newCart} style={{ background: 'none', border: 'none', color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3 }}>Spara &amp; ny varukorg</button>

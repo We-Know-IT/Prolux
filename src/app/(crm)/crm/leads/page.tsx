@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Sparkles, Search } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt, formatDate } from '@/lib/utils'
@@ -17,6 +18,7 @@ const SOURCE: Record<string, string> = { web: 'Webben', visit: 'Besök', crm: 'O
 // own; admins see the whole team.
 export default function LeadsPage() {
   const me = useMe()
+  const base = (usePathname() || '').startsWith('/admin') ? '/admin/crm' : '/crm'
   const team = useTeam()
   const [leads, setLeads] = useState<any[] | null>(null)
   const [seller, setSeller] = useState<string | null>(null)
@@ -56,7 +58,7 @@ export default function LeadsPage() {
         <span style={{ fontSize: 14, color: 'var(--text2)' }}>{shown.length} st</span>
       </div>
       <p style={{ margin: '0 0 18px', fontSize: 14, color: 'var(--text2)' }}>
-        Leads från kundbesök, webben och offerter. Skapa en ny från kundkortet med <strong style={{ color: 'var(--text)' }}>Skapa lead</strong>. Klicka på en lead för att se och redigera den.
+        Leads från kundbesök, webben och offerter. Skapa en ny från kundkortet med <strong style={{ color: 'var(--text)' }}>Skapa lead</strong>. Klicka på en lead för att öppna den i pipelinen, där du ser allt och kan flytta den mellan stegen.
       </p>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
@@ -99,7 +101,7 @@ export default function LeadsPage() {
                   {l.customers?.city && <div style={{ fontSize: 12, color: 'var(--text2)' }}>{l.customers.city}</div>}
                 </td>
                 <td style={td}>
-                  <button type="button" onClick={() => setOpenLead(l)} title="Öppna och redigera" style={{ padding: 0, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--text)', fontWeight: 600, textAlign: 'left', textDecoration: 'underline', textUnderlineOffset: 3, textDecorationColor: 'rgba(255,255,255,.3)' }}>{l.title}</button>
+                  <Link href={`${base}/pipeline?deal=${l.id}`} title="Öppna i pipelinen" style={{ fontSize: 14, color: 'var(--text)', fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 3, textDecorationColor: 'rgba(255,255,255,.3)' }}>{l.title}</Link>
                   {l.source && <div style={{ fontSize: 12, color: 'var(--text2)' }}>Från {(SOURCE[l.source] || l.source).toLowerCase()}</div>}
                 </td>
                 <td style={td}>{l.products?.name || '—'}</td>

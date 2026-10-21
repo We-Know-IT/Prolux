@@ -11,8 +11,8 @@ import { useBudgetHistory } from '@/hooks/useBudgetHistory'
 import BudgetHistoryChart from '@/components/BudgetHistoryChart'
 import ReminderModal, { type Reminder } from '@/components/crm/ReminderModal'
 import VisitList from '@/components/crm/VisitList'
-import { LeadsPanel, QuotesPanel, DraftsPanel, FollowUpPanel, ToShipPanel } from '@/components/crm/LeadsAndQuotes'
-import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, ArrowRight, Bell, Activity } from 'lucide-react'
+import { LeadsPanel, QuotesPanel, FollowUpPanel, ToShipPanel } from '@/components/crm/LeadsAndQuotes'
+import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, ArrowRight, Bell } from 'lucide-react'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Varukorg', quote: 'Offert', pending: 'Väntande', confirmed: 'Bekräftad',
@@ -202,10 +202,6 @@ export default function AdminDashboard() {
   const todayStr = now.toISOString().slice(0, 10)
   const PRIORITY_DOT: Record<string, string> = { high: 'var(--red)', normal: 'var(--blue)', low: 'var(--text3)' }
 
-  // Activity feed
-  const ACT_LABEL: Record<string, string> = { call: 'Samtal', email: 'E-post', meeting: 'Möte', note: 'Anteckning', order: 'Order', demo: 'Demo' }
-  const ACT_COLOR: Record<string, string> = { call: 'var(--green)', email: 'var(--blue)', meeting: 'var(--gold)', note: 'var(--text3)', order: '#6AAFF0', demo: 'var(--gold)' }
-
   const revenue         = orders.filter(o => isLiveOrder(o.status)).reduce((s, o) => s + (o.subtotal || 0), 0)
   const pendingCount    = orders.filter(o => o.status === 'pending').length
   const todayOrders     = orders.filter(o => new Date(o.created_at).toDateString() === new Date().toDateString()).length
@@ -316,14 +312,13 @@ export default function AdminDashboard() {
       <VisitList />
 
       {/* Att göra: quotes and carts to follow up (shown only when there are any) */}
-      <div style={{ marginBottom: 16 }}><FollowUpPanel /></div>
+      <div style={{ marginBottom: 16 }}><FollowUpPanel onlyQuotes /></div>
       <ToShipPanel />
 
-      {/* Leads with notes, open quotes and saved carts */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 24 }}>
+      {/* Leads and open quotes (saved carts belong in the CRM) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 24, alignItems: 'start' }}>
         <LeadsPanel />
         <QuotesPanel />
-        <DraftsPanel />
       </div>
 
       {/* Chart + Budget side by side */}
@@ -467,39 +462,6 @@ export default function AdminDashboard() {
               {orders.length === 0 && <tr><td colSpan={4} style={{ padding: '24px 0', fontSize: 12, color: 'var(--text3)' }}>Inga ordrar ännu</td></tr>}
             </tbody>
           </table>
-        </div>
-
-        {/* Activity feed */}
-        <div style={{ ...card, padding: '22px 24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 18 }}>
-            <Activity size={13} color="var(--gold)" />
-            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Senaste aktivitet</span>
-          </div>
-          {activities.length === 0 ? (
-            <div style={{ fontSize: 13, color: 'var(--text2)' }}>Inga anteckningar eller samtal loggade ännu.</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', position: 'relative' }}>
-              {/* Timeline line */}
-              <div style={{ position: 'absolute', left: 9, top: 8, bottom: 8, width: 1, background: 'rgba(255,255,255,.06)' }} />
-              {activities.map((a, i) => (
-                <div key={a.id} style={{ display: 'flex', gap: 14, paddingBottom: i < activities.length - 1 ? 14 : 0 }}>
-                  <div style={{ width: 19, height: 19, borderRadius: '50%', background: `${ACT_COLOR[a.activity_type] || 'var(--text3)'}22`, border: `1.5px solid ${ACT_COLOR[a.activity_type] || 'var(--text3)'}`, flexShrink: 0, marginTop: 1 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 2 }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: ACT_COLOR[a.activity_type] || 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.05em' }}>
-                        {ACT_LABEL[a.activity_type] || a.activity_type}
-                      </span>
-                      {a.customers?.id
-                        ? <Link href={`/crm/customers/${a.customers.id}`} style={{ fontSize: 11, color: 'var(--text2)', textDecoration: 'none' }}>{a.customers.company}</Link>
-                        : <span style={{ fontSize: 11, color: 'var(--text2)' }}>{a.customers?.company}</span>}
-                    </div>
-                    {a.notes && <div style={{ fontSize: 12, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.notes}</div>}
-                    <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{new Date(a.created_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}{a.created_by ? ` · ${a.created_by}` : ''}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Low stock */}
