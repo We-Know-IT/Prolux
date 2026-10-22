@@ -1,6 +1,7 @@
 'use client'
 // Packing in the warehouse, saved on the order: who packed it, when, and
-// when the carrier is to pick it up. Shown wherever the order is opened.
+// when the carrier is to pick it up. Once the order is sent it also holds who
+// sent it and when, and all of it can be filled in afterwards.
 import { useEffect, useState } from 'react'
 import { PackageCheck, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -14,6 +15,8 @@ export interface PackableOrder {
   packed_by?: string | null
   packed_at?: string | null
   pickup_at?: string | null
+  shipped_by?: string | null
+  shipped_at?: string | null
 }
 
 // ISO → value for <input type="datetime-local"> (local time), and back.
@@ -31,12 +34,17 @@ export default function PackingForm({ order, onSaved, readOnly = false }: { orde
   const [packedBy, setPackedBy] = useState(order.packed_by || '')
   const [packedAt, setPackedAt] = useState(toLocal(order.packed_at))
   const [pickupAt, setPickupAt] = useState(toLocal(order.pickup_at))
+  const [shippedBy, setShippedBy] = useState(order.shipped_by || '')
+  const [shippedAt, setShippedAt] = useState(toLocal(order.shipped_at))
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  useEffect(() => { setPackedBy(order.packed_by || ''); setPackedAt(toLocal(order.packed_at)); setPickupAt(toLocal(order.pickup_at)) }, [order.id, order.packed_by, order.packed_at, order.pickup_at])
+  useEffect(() => {
+    setPackedBy(order.packed_by || ''); setPackedAt(toLocal(order.packed_at)); setPickupAt(toLocal(order.pickup_at))
+    setShippedBy(order.shipped_by || ''); setShippedAt(toLocal(order.shipped_at))
+  }, [order.id, order.packed_by, order.packed_at, order.pickup_at, order.shipped_by, order.shipped_at])
 
   const sent = order.status === 'shipped' || order.status === 'delivered'
-  if (readOnly || sent) {
+  if (readOnly) {
     if (!order.packed_at && !order.pickup_at) return null
     return (
       <div style={{ fontSize: 14, color: 'var(--text)', display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -51,15 +59,22 @@ export default function PackingForm({ order, onSaved, readOnly = false }: { orde
     const packed = !!packedBy.trim()
     const patch: Partial<PackableOrder> = {
       packed_by: packedBy.trim() || null,
-      packed_at: packed ? (fromLocal(packedAt) ?? new Date().toISOString()) : null,
+      // Filled in afterwards on a sent order: packed at the latest when it was sent.
+      packed_at: packed ? (fromLocal(packedAt) ?? (sent ? fromLocal(shippedAt) ?? order.shipped_at : null) ?? new Date().toISOString()) : null,
       pickup_at: fromLocal(pickupAt),
     }
-    // A confirmed order becomes "Packad"; an unconfirmed one keeps its status.
-    if (packed && order.status === 'confirmed') patch.status = 'packed'
-    if (!packed && order.status === 'packed') patch.status = 'confirmed'
+    if (sent) {
+      // Sent already: who sent it and when (e.g. filled in afterwards).
+      patch.shipped_by = shippedBy.trim() || null
+      if (shippedAt) patch.shipped_at = fromLocal(shippedAt)
+    } else {
+      // A confirmed order becomes "Packad"; an unconfirmed one keeps its status.
+      if (packed && order.status === 'confirmed') patch.status = 'packed'
+      if (!packed && order.status === 'packed') patch.status = 'confirmed'
+    }
     const { error } = await createClient().from('orders').update(patch).eq('id', order.id)
     setBusy(false)
-    if (error) { setMsg({ ok: false, text: /packed|pickup/.test(error.message) ? 'Kör migration 0023 och 0024 i Supabase.' : `Kunde inte spara: ${error.message}` }); return }
+    if (error) { setMsg({ ok: false, text: /packed|pickup|shipped_by/.test(error.message) ? 'Kör migration 0023, 0024 och 0026 i Supabase.' : `Kunde inte spara: ${error.message}` }); return }
     if (patch.packed_at) setPackedAt(toLocal(patch.packed_at))
     setMsg({ ok: true, text: 'Sparat' })
     onSaved?.(patch)
@@ -83,15 +98,29 @@ export default function PackingForm({ order, onSaved, readOnly = false }: { orde
           <label style={label} htmlFor={`pa-${order.id}`}>Packad när</label>
           <input id={`pa-${order.id}`} type="datetime-local" value={packedAt} onChange={e => setPackedAt(e.target.value)} style={field} />
         </div>
-        <div>
-          <label style={label} htmlFor={`pu-${order.id}`}>Hämtas av transportör</label>
-          <input id={`pu-${order.id}`} type="datetime-local" value={pickupAt} onChange={e => setPickupAt(e.target.value)} style={field} />
-        </div>
+        {sent ? (<>
+          <div>
+            <label style={label} htmlFor={`sb-${order.id}`}>Skickad av</label>
+            <input id={`sb-${order.id}`} list={`team-${order.id}`} value={shippedBy} onChange={e => setShippedBy(e.target.value)} placeholder="Namn" style={field} />
+          </div>
+          <div>
+            <label style={label} htmlFor={`sa-${order.id}`}>Skickad när</label>
+            <input id={`sa-${order.id}`} type="datetime-local" value={shippedAt} onChange={e => setShippedAt(e.target.value)} style={field} />
+          </div>
+        </>) : (
+          <div>
+            <label style={label} htmlFor={`pu-${order.id}`}>Hämtas av transportör</label>
+            <input id={`pu-${order.id}`} type="datetime-local" value={pickupAt} onChange={e => setPickupAt(e.target.value)} style={field} />
+          </div>
+        )}
       </div>
+      {sent && (!order.packed_by || !order.shipped_by) && (
+        <p style={{ margin: '8px 0 0', fontSize: 13, color: '#E0A85A' }}>Det saknas uppgift om vem som {!order.packed_by && !order.shipped_by ? 'packade och skickade' : !order.packed_by ? 'packade' : 'skickade'} ordern – fyll i och spara.</p>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
         <button type="button" onClick={save} disabled={busy}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 16px', borderRadius: 8, background: '#4FC1D9', border: 'none', color: '#0F1115', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: busy ? .6 : 1 }}>
-          <PackageCheck size={16} /> {busy ? 'Sparar…' : 'Spara packning'}
+          <PackageCheck size={16} /> {busy ? 'Sparar…' : sent ? 'Spara' : 'Spara packning'}
         </button>
         {msg && <span role={msg.ok ? 'status' : 'alert'} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 13, color: msg.ok ? 'var(--green)' : 'var(--red)' }}>{msg.ok && <Check size={14} />}{msg.text}</span>}
       </div>

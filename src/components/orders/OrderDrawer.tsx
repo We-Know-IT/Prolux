@@ -156,9 +156,9 @@ export default function OrderDrawer({ orderId, onClose, onChanged, extra }: {
                 </div>
               )}
 
-              {live && shipLines.length > 0 && !['shipped', 'delivered'].includes(o.status) && (
+              {live && shipLines.length > 0 && (
                 <div style={{ ...section, borderColor: 'rgba(79,193,217,.4)' }}>
-                  <div style={h}><PackageCheck size={16} color="#4FC1D9" /> Packning på lagret</div>
+                  <div style={h}><PackageCheck size={16} color="#4FC1D9" /> {['shipped', 'delivered'].includes(o.status) ? 'Packning & leverans från lagret' : 'Packning på lagret'}</div>
                   <PackingForm order={o} onSaved={p => patch(p)} />
                 </div>
               )}
