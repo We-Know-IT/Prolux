@@ -13,6 +13,8 @@ import ReminderModal, { type Reminder } from '@/components/crm/ReminderModal'
 import { LeadsPanel, DraftsPanel, FollowUpPanel, QuotesPanel, ToShipPanel } from '@/components/crm/LeadsAndQuotes'
 import { nextBirthday, formatBirthday } from '@/lib/birthdays'
 import VisitList from '@/components/crm/VisitList'
+import BudgetCard from '@/components/crm/BudgetCard'
+import { companySold, workdaysInMonth, workdaysPassed } from '@/lib/budget'
 
 const supabase = createClient()
 
@@ -23,30 +25,6 @@ const glass: React.CSSProperties = {
   border: '1px solid rgba(255,255,255,.06)',
   borderRadius: 12,
   boxShadow: '0 1px 0 rgba(255,255,255,.04) inset, 0 4px 24px rgba(0,0,0,.3)',
-}
-
-function workingDaysInMonth(year: number, month: number): number {
-  let count = 0
-  const d = new Date(year, month, 1)
-  while (d.getMonth() === month) {
-    const day = d.getDay()
-    if (day !== 0 && day !== 6) count++
-    d.setDate(d.getDate() + 1)
-  }
-  return count
-}
-
-function workingDaysPassed(year: number, month: number): number {
-  const today = new Date()
-  let count = 0
-  const d = new Date(year, month, 1)
-  const end = today.getMonth() === month && today.getFullYear() === year ? today : new Date(year, month + 1, 0)
-  while (d <= end) {
-    const day = d.getDay()
-    if (day !== 0 && day !== 6) count++
-    d.setDate(d.getDate() + 1)
-  }
-  return count
 }
 
 export default function CrmDashboardPage() {
@@ -73,6 +51,8 @@ export default function CrmDashboardPage() {
   const [pendingOrders, setPendingOrders] = useState<any[]>([])
   const [confirmingId, setConfirmingId]   = useState<string | null>(null)
   const [followCount, setFollowCount]     = useState(0)
+  const [companyBudget, setCompanyBudget] = useState(0)
+  const [companySales, setCompanySales]   = useState(0)
 
   useEffect(() => {
     currentStaff(supabase).then(me => {
@@ -96,6 +76,9 @@ export default function CrmDashboardPage() {
           .filter(c => c.daysUntil <= 30)
           .sort((a, b) => a.daysUntil - b.daysUntil))
       })
+    // Separate query: fails quietly until migration 0027 adds company_budgets.
+    supabase.from('company_budgets').select('budget').eq('year', year).eq('month', month).maybeSingle()
+      .then(({ data }) => setCompanyBudget(Number(data?.budget) || 0))
     const { start, end } = monthRange()
     Promise.all([
       // Open quotes (orders with status quote): each one opens in the order form.
@@ -118,7 +101,10 @@ export default function CrmDashboardPage() {
         for (const row of b as any[]) loaded[row.salesperson] = row.budget
         setBudgets(loaded)
       }
-      if (sold || won) setAchieved(budgetAchieved(sold || [], won || [], linked || []))
+      if (sold || won) {
+        setAchieved(budgetAchieved(sold || [], won || [], linked || []))
+        setCompanySales(companySold(sold || [], won || [], linked || []))
+      }
       if (po) setPendingOrders(po)
     })
   }
@@ -166,9 +152,8 @@ export default function CrmDashboardPage() {
 
 
   const totalBudget = Object.values(budgets).reduce((a, b) => a + b, 0)
-  const workDays    = workingDaysInMonth(year, month)
-  const daysPassed  = workingDaysPassed(year, month)
-  const dailyTarget = workDays > 0 ? Math.round(totalBudget / workDays) : 0
+  const workDays    = workdaysInMonth({ year, month })
+  const daysPassed  = workdaysPassed({ year, month })
 
   const todayStr = now.toISOString().slice(0, 10)
   const PRIORITY_DOT: Record<string, string> = { high: 'var(--red)', normal: 'var(--blue)', low: 'var(--text3)' }
@@ -190,6 +175,12 @@ export default function CrmDashboardPage() {
           {now.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
         </p>
       </div>
+
+      {/* My budget this month: what each salesperson sees first */}
+      {meLoaded && (!isAdmin || budgets[firstName] > 0) && (
+        <BudgetCard title="Din budget" budget={budgets[firstName] || 0} sold={achieved[firstName] || 0} ym={{ year, month }}
+          company={{ budget: companyBudget || totalBudget, sold: companySales }} />
+      )}
 
       {/* Primary CTA */}
       <Link href="/crm/orders" style={{ width: '100%', padding: '20px 24px', background: 'linear-gradient(135deg, #E8B84B 0%, #F5CC6A 50%, #D4A33C 100%)', borderRadius: 12, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 16, textDecoration: 'none', boxShadow: '0 2px 20px rgba(232,184,75,.28), 0 1px 0 rgba(255,255,255,.2) inset' }}>
@@ -223,7 +214,7 @@ export default function CrmDashboardPage() {
         ))}
       </div>
 
-      {/* Att göra: orders to confirm, reminders due and quotes/carts to follow up */}
+      {/* Att göra: orders to confirm, reminders due and saved carts to follow up */}
       {(() => {
         const mine = meLoaded ? pendingOrders.filter(o => canConfirmOrder(o, firstName, isAdmin)) : []
         // Every open to do, oldest date first (a new one shows here at once).
@@ -275,7 +266,7 @@ export default function CrmDashboardPage() {
                 </div>
               )
             })}
-            <FollowUpPanel bare onCount={setFollowCount} />
+            <FollowUpPanel bare onlyCarts onCount={setFollowCount} />
           </section>
         )
       })()}
@@ -346,19 +337,20 @@ export default function CrmDashboardPage() {
         </div>
       </div>
 
-      {/* Budget Widget */}
-      <div style={{ ...glass, padding: '20px 24px', marginBottom: 24 }}>
+      {/* Team budget (admins); each salesperson sees their own card at the top */}
+      {isAdmin && <div style={{ ...glass, padding: '20px 24px', marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Target size={15} color="var(--gold)" />
             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Månadsbudget — {monthNames[month]} {year}</span>
           </div>
-          {isAdmin && (
+          {isAdmin && (<div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Link href="/admin/budget" style={{ fontSize: 12, color: 'var(--text)', textDecoration: 'underline', textUnderlineOffset: 3 }}>Hela budgeten →</Link>
             <button onClick={() => editBudget ? setEditBudget(false) : openBudgetEditor()}
               style={{ fontSize: 11, padding: '4px 10px', background: 'rgba(232,184,75,.1)', border: '1px solid rgba(232,184,75,.2)', borderRadius: 6, color: 'var(--gold)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
               {editBudget ? 'Avbryt' : 'Sätt budget'}
             </button>
-          )}
+          </div>)}
         </div>
 
         {editBudget ? (
@@ -382,33 +374,6 @@ export default function CrmDashboardPage() {
           </div>
         ) : totalBudget > 0 ? (
           <div>
-            {/* My own budget highlighted */}
-            {budgets[firstName] && (
-              <div style={{ background: 'rgba(232,184,75,.07)', border: '1px solid rgba(232,184,75,.18)', borderRadius: 10, padding: '14px 18px', marginBottom: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--gold)' }}>Din budget — {monthNames[month]}</span>
-                  <span style={{ fontSize: 12, color: achieved[firstName] >= budgets[firstName] ? 'var(--green)' : 'var(--text3)' }}>
-                    {achieved[firstName] >= budgets[firstName] ? '✓ Budget uppnådd!' : `${Math.round(((achieved[firstName] || 0) / budgets[firstName]) * 100)}% av målet`}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 12 }}>
-                  {[
-                    { label: 'Månadsbudget', value: `${fmt(budgets[firstName])} kr`, color: 'var(--text)' },
-                    { label: 'Sålt', value: `${fmt(achieved[firstName] || 0)} kr`, color: (achieved[firstName] || 0) > 0 ? 'var(--green)' : 'var(--text3)' },
-                    { label: 'Kvar', value: `${fmt(Math.max(0, budgets[firstName] - (achieved[firstName] || 0)))} kr`, color: 'var(--text)' },
-                    { label: 'Dagsmål', value: `${fmt(Math.round(budgets[firstName] / workDays))} kr`, color: 'var(--gold)' },
-                  ].map(({ label, value, color }) => (
-                    <div key={label}>
-                      <div style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 2 }}>{label}</div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color }}>{value}</div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ height: 6, background: 'rgba(255,255,255,.06)', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${Math.min(((achieved[firstName] || 0) / budgets[firstName]) * 100, 100)}%`, background: 'linear-gradient(90deg, #4CAF7D, #5EC49A)', borderRadius: 3, transition: 'width .4s ease' }} />
-                </div>
-              </div>
-            )}
             {isAdmin && (
               <>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', marginBottom: 14 }}>
@@ -451,10 +416,10 @@ export default function CrmDashboardPage() {
           </div>
         ) : (
           <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: 13, padding: '12px 0' }}>
-            {isAdmin ? 'Ingen budget satt — klicka "Sätt budget" för att lägga in månadsbudget per säljare' : 'Ingen budget satt för denna månad ännu'}
+            Ingen budget satt — klicka Sätt budget eller öppna Hela budgeten för att lägga in årsbudget och månadsbudget per säljare
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Budget history: own for salespeople, whole team for admins */}
       {meLoaded && (() => {

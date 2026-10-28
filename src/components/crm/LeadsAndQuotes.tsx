@@ -233,13 +233,13 @@ export function DraftsPanel({ limit = 10 }: { limit?: number }) {
 // Shown only when there is something to follow up.
 // bare: just the rows, for use inside another box (the overview's "Att göra");
 // onCount tells that box how many there are.
-export function FollowUpPanel({ days = 3, bare = false, onCount, onlyQuotes = false }: { days?: number; bare?: boolean; onCount?: (n: number) => void; onlyQuotes?: boolean }) {
+export function FollowUpPanel({ days = 3, bare = false, onCount, onlyQuotes = false, onlyCarts = false }: { days?: number; bare?: boolean; onCount?: (n: number) => void; onlyQuotes?: boolean; onlyCarts?: boolean }) {
   const orderHref = useOrderHref()
   const [rows, setRows] = useState<any[]>([])
   function load() {
     const before = new Date(Date.now() - days * 86_400_000).toISOString()
     createClient().from('orders').select('id,order_nr,status,subtotal,created_at,customers(company,email)')
-      .in('status', onlyQuotes ? ['quote'] : ['quote', 'draft']).lt('created_at', before).order('created_at', { ascending: true }).limit(8)
+      .in('status', onlyQuotes ? ['quote'] : onlyCarts ? ['draft'] : ['quote', 'draft']).lt('created_at', before).order('created_at', { ascending: true }).limit(8)
       .then(({ data }) => { setRows(data ?? []); onCount?.((data ?? []).length) })
   }
   useEffect(load, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -263,14 +263,14 @@ export function FollowUpPanel({ days = 3, bare = false, onCount, onlyQuotes = fa
   )
   if (bare) return (
     <div style={{ marginTop: 4 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', margin: '10px 0 8px' }}>Följ upp – legat orörda i {days}+ dagar</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', margin: '10px 0 8px' }}>Följ upp {onlyCarts ? 'sparade varukorgar ' : ''}– legat orörda i {days}+ dagar</div>
       {list}
     </div>
   )
   return (
     <div style={{ ...accentPanel(ACCENT.follow), padding: '14px 16px' }}>
       <Head icon={BellRing} color={ACCENT.follow} title="Följ upp" count={rows.length} />
-      <div style={{ fontSize: 13, color: 'var(--text2)', margin: '-4px 0 10px' }}>{onlyQuotes ? 'Offerter' : 'Offerter och varukorgar'} som legat orörda i {days} dagar eller mer</div>
+      <div style={{ fontSize: 13, color: 'var(--text2)', margin: '-4px 0 10px' }}>{onlyQuotes ? 'Offerter' : onlyCarts ? 'Varukorgar' : 'Offerter och varukorgar'} som legat orörda i {days} dagar eller mer</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {rows.map(o => (
           <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '8px 10px', background: 'rgba(255,255,255,.03)', borderRadius: 8 }}>

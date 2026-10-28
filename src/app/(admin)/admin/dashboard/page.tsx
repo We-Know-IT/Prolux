@@ -9,6 +9,7 @@ import { monthRange, budgetAchieved, isLiveOrder } from '@/lib/team'
 import { useTeam } from '@/hooks/useTeam'
 import { useBudgetHistory } from '@/hooks/useBudgetHistory'
 import BudgetHistoryChart from '@/components/BudgetHistoryChart'
+import { workdaysInMonth } from '@/lib/budget'
 import { LeadsPanel, QuotesPanel, FollowUpPanel, ToShipPanel } from '@/components/crm/LeadsAndQuotes'
 import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, ArrowRight } from 'lucide-react'
 
@@ -25,17 +26,6 @@ const STATUS_CSS: Record<string, { bg: string; color: string }> = {
   cancelled: { bg: 'rgba(224,82,82,.12)',   color: '#E05252' },
   draft:     { bg: 'rgba(155,160,171,.12)', color: '#9BA0AB' },
   quote:     { bg: 'rgba(155,110,232,.12)', color: '#9B6EE8' },
-}
-
-function workingDaysInMonth(year: number, month: number) {
-  let count = 0
-  const d = new Date(year, month, 1)
-  while (d.getMonth() === month) {
-    const day = d.getDay()
-    if (day !== 0 && day !== 6) count++
-    d.setDate(d.getDate() + 1)
-  }
-  return count
 }
 
 export default function AdminDashboard() {
@@ -201,7 +191,7 @@ export default function AdminDashboard() {
   const lowStock        = products.filter(p => p.stock_qty < 20).sort((a, b) => a.stock_qty - b.stock_qty)
   const pipelineValue   = deals.reduce((s, d) => s + (d.value || 0), 0)
   const totalBudget     = Object.values(budgets).reduce((a, b) => a + b, 0)
-  const workDays        = workingDaysInMonth(year, month)
+  const workDays        = workdaysInMonth({ year, month })
 
   // Budget credit: this month's orders per assignee.
   const { start: salesStart, end: salesEnd } = monthRange(now)
@@ -318,10 +308,13 @@ export default function AdminDashboard() {
               <Target size={14} color="var(--gold)" />
               <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Budget — {monthNames[month]}</span>
             </div>
+<div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Link href="/admin/budget" style={{ fontSize: 12, color: 'var(--text)', textDecoration: 'underline', textUnderlineOffset: 3 }}>Hela budgeten →</Link>
             <button onClick={() => editBudget ? setEditBudget(false) : openBudgetEditor()}
               style={{ fontSize: 11, padding: '4px 10px', background: 'rgba(232,184,75,.1)', border: '1px solid rgba(232,184,75,.2)', borderRadius: 6, color: 'var(--gold)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 600 }}>
               {editBudget ? 'Avbryt' : 'Sätt budget'}
             </button>
+            </div>
           </div>
 
           {editBudget ? (

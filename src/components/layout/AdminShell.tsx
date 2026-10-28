@@ -13,7 +13,7 @@ import { ADMIN_GUIDE } from '@/components/onboarding/guides'
 import { createClient } from '@/lib/supabase/client'
 import { CRM_SECTIONS } from '@/components/layout/CrmShell'
 import SideNav, { type SideNavGroup } from '@/components/layout/SideNav'
-import { LayoutDashboard, ShoppingBag, Users, Tag, Megaphone, Zap, LogOut, UserCog, Menu, X, Bell, FileText, Plug, FileCheck, Sparkles, PackageCheck } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, Users, Tag, Megaphone, Zap, LogOut, UserCog, Menu, X, Bell, FileText, Plug, FileCheck, Sparkles, PackageCheck, Target } from 'lucide-react'
 
 // Admin: overview of the business, the salespeople and what to follow up.
 const ADMIN_NAV = [
@@ -24,6 +24,7 @@ const ADMIN_NAV = [
   { href: '/admin/crm/leads',    label: 'Leads',         icon: Sparkles },
   { href: '/admin/customers',    label: 'Kunder',        icon: Users },
   { href: '/admin/products',     label: 'Produkter',     icon: Tag },
+  { href: '/admin/budget',       label: 'Budget',        icon: Target },
 ]
 // Settings and content, used less often: last in the menu.
 const ADMIN_SETTINGS = [
