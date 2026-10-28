@@ -12,6 +12,7 @@ import GuideTour, { GuideButton } from '@/components/onboarding/GuideTour'
 import { CRM_GUIDE } from '@/components/onboarding/guides'
 import { createClient } from '@/lib/supabase/client'
 import { currentStaff } from '@/lib/team'
+import SideNav, { type SideNavGroup } from '@/components/layout/SideNav'
 import { LayoutDashboard, GitBranch, Users, ShoppingCart, LogOut, Menu, X, StickyNote, ClipboardList, Truck, FileCheck, PackageCheck, Sparkles } from 'lucide-react'
 
 export const CRM_SECTIONS = [
@@ -39,7 +40,10 @@ export default function CrmShell({ children }: { children: ReactNode }) {
     if (path === '/crm/orders') return pathname.startsWith(path) && (query ? search.includes(query) : !search.includes('view=history'))
     return pathname.startsWith(path)
   }
-  const nav = CRM_SECTIONS
+  const groups: SideNavGroup[] = [{ title: 'CRM', color: '#6AAFF0', items: CRM_SECTIONS.map(n => ({
+    ...n, active: isActive(n.href), onClick: () => setSearch(n.href.includes('?') ? '?' + n.href.split('?')[1] : ''),
+  })) }]
+  useEffect(() => { setMenuOpen(false) }, [pathname])
   const supabase = createClient()
 
   // Tell the salesperson when a new order is assigned to them, wherever they are in the app.
@@ -87,32 +91,18 @@ export default function CrmShell({ children }: { children: ReactNode }) {
         display: 'flex', alignItems: 'center',
         paddingInline: 20, gap: 12,
       }}>
+        {/* Mobile hamburger */}
+        <button
+          onClick={() => setMenuOpen(o => !o)}
+          className="crm-mobile-btn"
+          aria-label="Meny"
+          style={{ marginLeft: -6, marginRight: 2, padding: 8, background: 'transparent', border: 'none', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          {menuOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
         {/* Logo */}
         <Link href="/crm/dashboard" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', flexShrink: 0, marginRight: 4 }}>
           <Image src="/logo.svg" alt="Prolux Shine" width={166} height={30} priority style={{ display: 'block', height: 30, width: 'auto' }} />
         </Link>
-
-        {/* Desktop nav pills */}
-        <nav className="crm-desktop-nav swipe-nav" style={{ display: 'none', gap: 2, flex: 1, alignItems: 'center', minWidth: 0 }}>
-          {nav.map(({ href, label, icon: Icon }) => {
-            const active = isActive(href)
-            return (
-              <Link key={href} href={href} onClick={() => setSearch(href.includes('?') ? '?' + href.split('?')[1] : '')} aria-current={active ? 'page' : undefined} style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '6px 13px', borderRadius: 7,
-                background: active ? 'rgba(232,184,75,.09)' : 'transparent',
-                color: active ? 'var(--gold)' : 'var(--text)',
-                fontSize: 13, fontWeight: active ? 700 : 500,
-                textDecoration: 'none',
-                border: `1px solid ${active ? 'var(--line-gold)' : 'transparent'}`,
-                transition: 'all .15s',
-              }}>
-                <Icon size={14} style={{ opacity: active ? 1 : 0.75 }} />
-                {label}
-              </Link>
-            )
-          })}
-        </nav>
 
         {/* Right side */}
         <div className="crm-desktop-right" style={{ display: 'none', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
@@ -137,58 +127,21 @@ export default function CrmShell({ children }: { children: ReactNode }) {
         </div>
 
         <div className="crm-mobile-btn" style={{ marginLeft: 'auto', alignItems: 'center' }}><CartButton /></div>
-        {/* Mobile hamburger */}
-        <button
-          onClick={() => setMenuOpen(o => !o)}
-          className="crm-mobile-btn"
-          aria-label="Meny"
-          style={{ marginLeft: 4, padding: 8, background: 'transparent', border: 'none', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-          {menuOpen ? <X size={22} /> : <Menu size={22} />}
-        </button>
       </header>
 
-      {/* ── Mobile fullscreen menu ───────────────────────── */}
+      {/* ── Narrow screens: the menu slides in from the left ── */}
       {menuOpen && (
-        <div style={{
-          position: 'fixed', top: 'var(--nav-h)', left: 0, right: 0, bottom: 0,
-          background: 'rgba(8,10,14,.97)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          zIndex: 199,
-          padding: '20px 16px 32px',
-          display: 'flex', flexDirection: 'column', gap: 6,
-          animation: 'fadeIn .15s ease',
-        }}>
-          {nav.map(({ href, label, icon: Icon }) => {
-            const active = isActive(href)
-            return (
-              <Link key={href} href={href} onClick={() => { setMenuOpen(false); setSearch(href.includes('?') ? '?' + href.split('?')[1] : '') }} style={{
-                display: 'flex', alignItems: 'center', gap: 14,
-                padding: '14px 18px', borderRadius: 10,
-                background: active ? 'rgba(232,184,75,.08)' : 'rgba(255,255,255,.03)',
-                color: active ? 'var(--gold)' : 'var(--text)',
-                fontSize: 15, fontWeight: active ? 600 : 400,
-                textDecoration: 'none',
-                border: `1px solid ${active ? 'var(--line-gold)' : 'var(--line)'}`,
-                boxShadow: active ? '0 0 20px rgba(232,184,75,.08)' : 'none',
-              }}>
-                <Icon size={18} style={{ color: active ? 'var(--gold)' : 'var(--text3)', opacity: active ? 1 : 0.7 }} />
-                {label}
-              </Link>
-            )
-          })}
-          <div style={{ flex: 1 }} />
-          <TextSizeButton variant="menu" />
-          <GuideButton variant="menu" />
-          <WebshopLink variant="menu" />
-          <button onClick={logout} style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            padding: '14px 18px', background: 'rgba(255,255,255,.03)',
-            border: '1px solid var(--line)', borderRadius: 10,
-            color: 'var(--text2)', fontSize: 15, cursor: 'pointer',
-          }}>
-            <LogOut size={18} /> Logga ut
-          </button>
+        <div onClick={() => setMenuOpen(false)} style={{ position: 'fixed', inset: 0, top: 'var(--nav-h)', zIndex: 199, background: 'rgba(0,0,0,.5)' }}>
+          <aside onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 'min(300px, 86vw)', background: 'var(--bg2)', borderRight: '1px solid var(--line)', overflowY: 'auto', animation: 'slideInLeft .18s ease' }}>
+            <SideNav groups={groups} onNavigate={() => setMenuOpen(false)} footer={<>
+              <TextSizeButton variant="menu" />
+              <GuideButton variant="menu" />
+              <WebshopLink variant="menu" />
+              <button onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', background: 'rgba(255,255,255,.03)', border: '1px solid var(--line)', borderRadius: 10, color: 'var(--text2)', fontSize: 15, cursor: 'pointer' }}>
+                <LogOut size={18} /> Logga ut
+              </button>
+            </>} />
+          </aside>
         </div>
       )}
 
@@ -201,22 +154,29 @@ export default function CrmShell({ children }: { children: ReactNode }) {
           <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{orderToast.name} · tryck för att hantera</div>
         </Link>
       )}
-      <main style={{ flex: 1, zoom: 'var(--ui-zoom, 1.15)', ['--vz' as string]: 'var(--ui-zoom, 1.15)' }}>
-        {children}
-      </main>
+      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+        <aside className="side-nav" style={{ width: 236, flexShrink: 0, position: 'sticky', top: 'var(--nav-h)', alignSelf: 'flex-start', height: 'calc(100vh - var(--nav-h))', overflowY: 'auto', borderRight: '1px solid var(--line)', background: 'rgba(10,13,18,.6)' }}>
+          <SideNav groups={groups} />
+        </aside>
+        <main style={{ flex: 1, minWidth: 0, zoom: 'var(--ui-zoom, 1.15)', ['--vz' as string]: 'var(--ui-zoom, 1.15)' }}>
+          {children}
+        </main>
+      </div>
 
       <style>{`
-        .crm-desktop-nav   { display: none !important; }
+        .side-nav          { display: none; }
         .crm-desktop-right { display: none !important; }
         .crm-mobile-btn    { display: flex !important; }
         @media (max-width: 1299px) {
           .crm-logout-label, .crm-desktop-right .wsl-label { display: none; }
         }
-        @media (min-width: 1020px) {
-          .crm-desktop-nav   { display: flex !important; }
+        /* iPad in landscape and wider: the menu stays on the left. */
+        @media (min-width: 1000px) {
+          .side-nav          { display: block; }
           .crm-desktop-right { display: flex !important; }
           .crm-mobile-btn    { display: none !important; }
         }
+        @keyframes slideInLeft { from { transform: translateX(-100%); } to { transform: none; } }
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(-8px); }
           to   { opacity: 1; transform: translateY(0); }

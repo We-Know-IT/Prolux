@@ -12,37 +12,55 @@ import GuideTour, { GuideButton } from '@/components/onboarding/GuideTour'
 import { ADMIN_GUIDE } from '@/components/onboarding/guides'
 import { createClient } from '@/lib/supabase/client'
 import { CRM_SECTIONS } from '@/components/layout/CrmShell'
-import { LayoutDashboard, ShoppingBag, Users, Tag, Megaphone, Zap, LogOut, UserCog, Menu, X, GitBranch, Bell, FileText, Plug, FileCheck, Sparkles, PackageCheck } from 'lucide-react'
+import SideNav, { type SideNavGroup } from '@/components/layout/SideNav'
+import { LayoutDashboard, ShoppingBag, Users, Tag, Megaphone, Zap, LogOut, UserCog, Menu, X, Bell, FileText, Plug, FileCheck, Sparkles, PackageCheck } from 'lucide-react'
 
+// Admin: overview of the business, the salespeople and what to follow up.
 const ADMIN_NAV = [
-  { href: '/admin/dashboard',  label: 'Översikt',  icon: LayoutDashboard },
-  { href: '/admin/orders',     label: 'Ordrar',    icon: ShoppingBag },
-  { href: '/admin/crm/shipping', label: 'Leveranser', icon: PackageCheck },
-  { href: '/admin/crm/quotes', label: 'Offerter', icon: FileCheck },
-  { href: '/admin/crm/leads',  label: 'Leads',    icon: Sparkles },
-  { href: '/admin/customers',  label: 'Kunder',    icon: Users },
-  { href: '/admin/products',   label: 'Produkter', icon: Tag },
-  { href: '/admin/content',    label: 'Innehåll',  icon: FileText },
-  { href: '/admin/campaigns',  label: 'Kampanjer', icon: Megaphone },
-  { href: '/admin/staff',      label: 'Team',      icon: UserCog },
+  { href: '/admin/dashboard',    label: 'Översikt',      icon: LayoutDashboard },
+  { href: '/admin/orders',       label: 'Ordrar',        icon: ShoppingBag },
+  { href: '/admin/crm/shipping', label: 'Leveranser',    icon: PackageCheck },
+  { href: '/admin/crm/quotes',   label: 'Offerter',      icon: FileCheck },
+  { href: '/admin/crm/leads',    label: 'Leads',         icon: Sparkles },
+  { href: '/admin/customers',    label: 'Kunder',        icon: Users },
+  { href: '/admin/products',     label: 'Produkter',     icon: Tag },
+]
+// Settings and content, used less often: last in the menu.
+const ADMIN_SETTINGS = [
+  { href: '/admin/campaigns',    label: 'Kampanjer',     icon: Megaphone },
+  { href: '/admin/content',      label: 'Innehåll',      icon: FileText },
+  { href: '/admin/staff',        label: 'Team',          icon: UserCog },
   { href: '/admin/integrations', label: 'Integrationer', icon: Plug },
+  { href: '/admin/automations',  label: 'Automationer',  icon: Zap },
 ]
 
-const ADMIN_NAV_ALL = [
-  ...ADMIN_NAV,
-  { href: '/admin/automations', label: 'Automationer', icon: Zap },
-]
-
-// Mobile menu: the same CRM sections as the bar under the top menu.
-const CRM_NAV = CRM_SECTIONS
+// The admin's own sales work in the CRM (to do, visits, customers, orders).
+const MY_CRM = ['/crm/dashboard', '/crm/orders', '/crm/orders?view=history', '/crm/customers', '/crm/pipeline', '/crm/car', '/crm/notes']
+const MY_CRM_LABEL: Record<string, string> = { '/crm/dashboard': 'Min översikt', '/crm/orders?view=history': 'Mina ordrar' }
 
 export function AdminShell({ children, email }: { children: ReactNode; email: string }) {
   const pathname = usePathname()
   const router   = useRouter()
-  const inCrm    = pathname.startsWith('/crm') || pathname.startsWith('/admin/crm')
   const [crmSearch, setCrmSearch] = useState('')
   useEffect(() => { setCrmSearch(window.location.search) }, [pathname])
   const [menuOpen, setMenuOpen] = useState(false)
+  useEffect(() => { setMenuOpen(false) }, [pathname])
+  // Which menu row is the current page. CRM pages also open under /admin/crm.
+  const crmActive = (href: string) => {
+    const [path, query] = href.split('?')
+    const here = pathname.replace(/^\/admin\/crm/, '/crm')
+    if (path === '/crm/orders') return here.startsWith(path) && (query ? crmSearch.includes(query) : !crmSearch.includes('view=history'))
+    return here === path || here.startsWith(path + '/')
+  }
+  const groups: SideNavGroup[] = [
+    { title: 'Admin', color: 'var(--gold)', items: ADMIN_NAV.map(n => ({ ...n, active: pathname === n.href || pathname.startsWith(n.href + '/') })) },
+    { title: 'Mitt säljarbete', color: '#6AAFF0', items: CRM_SECTIONS.filter(n => MY_CRM.includes(n.href)).map(n => ({
+      ...n, label: MY_CRM_LABEL[n.href] || n.label,
+      active: !ADMIN_NAV.some(a => pathname.startsWith(a.href)) && crmActive(n.href),
+      onClick: () => setCrmSearch(n.href.includes('?') ? '?' + n.href.split('?')[1] : ''),
+    })) },
+    { title: 'Inställningar', items: ADMIN_SETTINGS.map(n => ({ ...n, active: pathname === n.href || pathname.startsWith(n.href + '/') })) },
+  ]
   const [newOrderCount, setNewOrderCount] = useState(0)
   const [realtimeToast, setRealtimeToast] = useState<{nr: number; company: string} | null>(null)
   const supabase = createClient()
@@ -86,53 +104,18 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
         display: 'flex', alignItems: 'center',
         paddingInline: 20, gap: 12,
       }}>
+        {/* Mobile hamburger */}
+        <button
+          onClick={() => setMenuOpen(o => !o)}
+          className="admin-mobile-btn"
+          aria-label="Meny"
+          style={{ marginLeft: -6, marginRight: 2, padding: 8, background: 'transparent', border: 'none', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          {menuOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
         {/* Logo */}
         <Link href="/admin/dashboard" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', flexShrink: 0, marginRight: 4 }}>
           <Image src="/logo.svg" alt="Prolux Shine" width={166} height={30} priority style={{ display: 'block', height: 30, width: 'auto' }} />
         </Link>
-
-        {/* Desktop nav pills */}
-        <nav className="admin-desktop-nav swipe-nav" style={{ display: 'none', gap: 1, alignItems: 'center', flex: 1, minWidth: 0 }}>
-          {ADMIN_NAV.map(({ href, label, icon: Icon }) => {
-            const active = pathname.startsWith(href)
-            return (
-              <Link key={href} href={href} aria-current={active ? 'page' : undefined} style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                padding: '6px 9px', borderRadius: 7,
-                background: active ? 'rgba(232,184,75,.09)' : 'transparent',
-                color: active ? 'var(--gold)' : 'var(--text)',
-                fontSize: 13, fontWeight: active ? 700 : 500,
-                textDecoration: 'none',
-                border: `1px solid ${active ? 'var(--line-gold)' : 'transparent'}`,
-                transition: 'all .15s',
-              }}>
-                <Icon size={14} style={{ opacity: active ? 1 : 0.75 }} />
-                {label}
-              </Link>
-            )
-          })}
-          {/* Separator */}
-          <div style={{ width: 1, height: 16, background: 'var(--line)', margin: '0 4px' }} />
-          {/* Single CRM pill */}
-          {(() => {
-            const crmActive = pathname.startsWith('/crm') || pathname.startsWith('/admin/crm')
-            return (
-              <Link href="/crm/dashboard" style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                padding: '6px 9px', borderRadius: 7,
-                background: crmActive ? 'rgba(74,143,212,.1)' : 'transparent',
-                color: crmActive ? '#6AAFF0' : 'var(--text)',
-                fontSize: 13, fontWeight: crmActive ? 700 : 500,
-                textDecoration: 'none',
-                border: `1px solid ${crmActive ? 'rgba(74,143,212,.25)' : 'transparent'}`,
-                transition: 'all .15s',
-              }}>
-                <GitBranch size={14} style={{ opacity: crmActive ? 1 : 0.75 }} />
-                CRM
-              </Link>
-            )
-          })()}
-        </nav>
 
         {/* Realtime toast */}
         {realtimeToast && (
@@ -198,126 +181,52 @@ export function AdminShell({ children, email }: { children: ReactNode; email: st
         </div>
 
         <div className="admin-mobile-btn" style={{ marginLeft: 'auto', alignItems: 'center' }}><CartButton /></div>
-        {/* Mobile hamburger */}
-        <button
-          onClick={() => setMenuOpen(o => !o)}
-          className="admin-mobile-btn"
-          aria-label="Meny"
-          style={{ marginLeft: 4, padding: 8, background: 'transparent', border: 'none', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-          {menuOpen ? <X size={22} /> : <Menu size={22} />}
-        </button>
       </header>
 
-      {/* ── Mobile fullscreen menu ───────────────────────── */}
+      {/* ── Narrow screens: the menu slides in from the left ── */}
       {menuOpen && (
-        <div style={{
-          position: 'fixed', top: 'var(--nav-h)', left: 0, right: 0, bottom: 0,
-          background: 'rgba(8,10,14,.97)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          zIndex: 199,
-          padding: '20px 16px 32px',
-          display: 'flex', flexDirection: 'column', gap: 6,
-          animation: 'fadeIn .15s ease',
-        }}>
-          {ADMIN_NAV_ALL.map(({ href, label, icon: Icon }) => {
-            const active = pathname.startsWith(href)
-            return (
-              <Link key={href} href={href} onClick={() => setMenuOpen(false)} style={{
-                display: 'flex', alignItems: 'center', gap: 14,
-                padding: '14px 18px', borderRadius: 10,
-                background: active ? 'rgba(232,184,75,.08)' : 'rgba(255,255,255,.03)',
-                color: active ? 'var(--gold)' : 'var(--text)',
-                fontSize: 15, fontWeight: active ? 600 : 400,
-                textDecoration: 'none',
-                border: `1px solid ${active ? 'var(--line-gold)' : 'var(--line)'}`,
-                boxShadow: active ? '0 0 20px rgba(232,184,75,.08)' : 'none',
-              }}>
-                <Icon size={18} style={{ color: active ? 'var(--gold)' : 'var(--text3)', opacity: active ? 1 : 0.7 }} />
-                {label}
-              </Link>
-            )
-          })}
-          {/* CRM section */}
-          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.1em', padding: '10px 18px 4px' }}>Säljverktyg</div>
-          {CRM_NAV.map(({ href, label, icon: Icon }) => {
-            const active = pathname.startsWith(href)
-            return (
-              <Link key={href} href={href} onClick={() => setMenuOpen(false)} style={{
-                display: 'flex', alignItems: 'center', gap: 14,
-                padding: '14px 18px', borderRadius: 10,
-                background: active ? 'rgba(74,143,212,.08)' : 'rgba(255,255,255,.03)',
-                color: active ? '#6AAFF0' : 'var(--text)',
-                fontSize: 15, fontWeight: active ? 600 : 400,
-                textDecoration: 'none',
-                border: `1px solid ${active ? 'rgba(74,143,212,.25)' : 'var(--line)'}`,
-              }}>
-                <Icon size={18} style={{ color: active ? '#6AAFF0' : 'var(--text3)', opacity: active ? 1 : 0.7 }} />
-                {label}
-              </Link>
-            )
-          })}
-          <div style={{ flex: 1 }} />
-          <div style={{ padding: '14px 18px', background: 'rgba(255,255,255,.03)', border: '1px solid var(--line)', borderRadius: 10, marginBottom: 6 }}>
-            <div style={{ fontSize: 13, color: 'var(--text2)', fontWeight: 500 }}>{email}</div>
-            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Administratör</div>
-          </div>
-          <TextSizeButton variant="menu" />
-          <GuideButton variant="menu" />
-          <WebshopLink variant="menu" />
-          <button onClick={logout} style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            padding: '14px 18px', background: 'rgba(255,255,255,.03)',
-            border: '1px solid var(--line)', borderRadius: 10,
-            color: 'var(--text2)', fontSize: 15, cursor: 'pointer',
-          }}>
-            <LogOut size={18} /> Logga ut
-          </button>
+        <div onClick={() => setMenuOpen(false)} style={{ position: 'fixed', inset: 0, top: 'var(--nav-h)', zIndex: 199, background: 'rgba(0,0,0,.5)' }}>
+          <aside onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 'min(300px, 86vw)', background: 'var(--bg2)', borderRight: '1px solid var(--line)', overflowY: 'auto', animation: 'slideInLeft .18s ease' }}>
+            <SideNav groups={groups} onNavigate={() => setMenuOpen(false)} footer={<>
+            <div style={{ padding: '10px 12px', fontSize: 13, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email} · Administratör</div>
+            <TextSizeButton variant="menu" />
+            <GuideButton variant="menu" />
+            <WebshopLink variant="menu" />
+            <button onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', background: 'rgba(255,255,255,.03)', border: '1px solid var(--line)', borderRadius: 10, color: 'var(--text2)', fontSize: 15, cursor: 'pointer' }}>
+              <LogOut size={18} /> Logga ut
+            </button>
+          </>} />
+          </aside>
         </div>
       )}
 
       <ServiceWorkerRegister />
       <LeadToast href="/admin/crm/pipeline" />
       <GuideTour steps={ADMIN_GUIDE} storageKey="prolux-guide-admin-v2" />
-      {/* In the CRM: its own sections under the admin bar */}
-      {inCrm && (
-        <nav aria-label="CRM" className="swipe-nav" style={{ position: 'sticky', top: 'var(--nav-h)', zIndex: 150, display: 'flex', gap: 4, alignItems: 'center', padding: '8px 20px', overflowX: 'auto', background: 'rgba(10,13,18,.92)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', borderBottom: '1px solid var(--line)' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#6AAFF0', textTransform: 'uppercase', letterSpacing: '.1em', marginRight: 8, flexShrink: 0 }}>CRM</span>
-          {CRM_SECTIONS.map(({ href, label, icon: Icon }) => {
-            const [path, query] = href.split('?')
-            const here = pathname.replace(/^\/admin\/crm/, '/crm')
-            const active = path === '/crm/orders'
-              ? here.startsWith(path) && (query ? crmSearch.includes(query) : !crmSearch.includes('view=history'))
-              : here.startsWith(path)
-            return (
-              <Link key={href} href={href} onClick={() => setCrmSearch(query ? `?${query}` : '')} aria-current={active ? 'page' : undefined}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 7, flexShrink: 0, whiteSpace: 'nowrap', textDecoration: 'none', fontSize: 13,
-                  fontWeight: active ? 600 : 500, color: active ? 'var(--gold)' : 'var(--text2)',
-                  background: active ? 'rgba(232,184,75,.09)' : 'transparent', border: `1px solid ${active ? 'var(--line-gold)' : 'transparent'}` }}>
-                <Icon size={14} /> {label}
-              </Link>
-            )
-          })}
-        </nav>
-      )}
-
-      <main style={{ flex: 1, zoom: 'var(--ui-zoom, 1.15)', ['--vz' as string]: 'var(--ui-zoom, 1.15)' }}>
-        {children}
-      </main>
+      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+        <aside className="side-nav" style={{ width: 236, flexShrink: 0, position: 'sticky', top: 'var(--nav-h)', alignSelf: 'flex-start', height: 'calc(100vh - var(--nav-h))', overflowY: 'auto', borderRight: '1px solid var(--line)', background: 'rgba(10,13,18,.6)' }}>
+          <SideNav groups={groups} />
+        </aside>
+        <main style={{ flex: 1, minWidth: 0, zoom: 'var(--ui-zoom, 1.15)', ['--vz' as string]: 'var(--ui-zoom, 1.15)' }}>
+          {children}
+        </main>
+      </div>
 
       <style>{`
-        .admin-desktop-nav   { display: none !important; }
+        .side-nav            { display: none; }
         .admin-desktop-right { display: none !important; }
         .admin-mobile-btn    { display: flex !important; }
         /* Compact top bar (icons only on the right) until there is room for the labels. */
         @media (max-width: 1599px) {
           .admin-email, .admin-logout-label, .admin-desktop-right .wsl-label { display: none; }
         }
-        @media (min-width: 1200px) {
-          .admin-desktop-nav   { display: flex !important; }
+        /* iPad in landscape and wider: the menu stays on the left. */
+        @media (min-width: 1000px) {
+          .side-nav            { display: block; }
           .admin-desktop-right { display: flex !important; }
           .admin-mobile-btn    { display: none !important; }
         }
+        @keyframes slideInLeft { from { transform: translateX(-100%); } to { transform: none; } }
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(-8px); }
           to   { opacity: 1; transform: translateY(0); }

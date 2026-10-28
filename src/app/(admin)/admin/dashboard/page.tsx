@@ -9,10 +9,8 @@ import { monthRange, budgetAchieved, isLiveOrder } from '@/lib/team'
 import { useTeam } from '@/hooks/useTeam'
 import { useBudgetHistory } from '@/hooks/useBudgetHistory'
 import BudgetHistoryChart from '@/components/BudgetHistoryChart'
-import ReminderModal, { type Reminder } from '@/components/crm/ReminderModal'
-import VisitList from '@/components/crm/VisitList'
 import { LeadsPanel, QuotesPanel, FollowUpPanel, ToShipPanel } from '@/components/crm/LeadsAndQuotes'
-import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, ArrowRight, Bell } from 'lucide-react'
+import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, ArrowRight } from 'lucide-react'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Varukorg', quote: 'Offert', pending: 'Väntande', confirmed: 'Bekräftad',
@@ -56,7 +54,6 @@ export default function AdminDashboard() {
   const [editBudget, setEditBudget]     = useState(false)
   const [budgetInput, setBudgetInput]   = useState<Record<string, string>>({})
   const [savingBudget, setSavingBudget] = useState(false)
-  const [remModal, setRemModal]         = useState<{ reminder: Reminder | null } | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const now   = new Date()
@@ -128,11 +125,7 @@ export default function AdminDashboard() {
   }
 
 
-  async function markReminderDone(id: string) {
-    const sb = createClient()
-    await sb.from('reminders').update({ status: 'done' }).eq('id', id)
-    setReminders(rs => rs.filter(r => r.id !== id))
-  }
+
 
   function drawChart() {
     const canvas = canvasRef.current
@@ -200,7 +193,6 @@ export default function AdminDashboard() {
   }
 
   const todayStr = now.toISOString().slice(0, 10)
-  const PRIORITY_DOT: Record<string, string> = { high: 'var(--red)', normal: 'var(--blue)', low: 'var(--text3)' }
 
   const revenue         = orders.filter(o => isLiveOrder(o.status)).reduce((s, o) => s + (o.subtotal || 0), 0)
   const pendingCount    = orders.filter(o => o.status === 'pending').length
@@ -253,7 +245,7 @@ export default function AdminDashboard() {
           padding: '8px 14px', background: 'rgba(74,143,212,.08)', border: '1px solid rgba(74,143,212,.2)',
           borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#6AAFF0', textDecoration: 'none',
         }}>
-          <GitBranch size={13} /> CRM-verktyg <ArrowRight size={12} />
+          <GitBranch size={13} /> Mitt säljarbete <ArrowRight size={12} />
         </Link>
       </div>
 
@@ -284,32 +276,6 @@ export default function AdminDashboard() {
           )
         })}
       </div>
-
-      {/* To do */}
-      <div style={{ ...card, padding: '20px 24px', marginBottom: 16, border: `1px solid ${reminders.length ? 'rgba(232,184,75,.45)' : 'var(--line)'}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 14 }}>
-          <span style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(232,184,75,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Bell size={15} color="var(--gold)" /></span>
-          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', flex: 1 }}>To do {reminders.length > 0 && <span style={{ fontSize: 12, fontWeight: 800, padding: '1px 9px', borderRadius: 10, background: 'var(--gold)', color: '#111', marginLeft: 6 }}>{reminders.length}</span>}</span>
-          <button onClick={() => setRemModal({ reminder: null })} style={{ fontSize: 13, padding: '6px 12px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>+ Ny to do</button>
-        </div>
-        {reminders.length === 0 && <div style={{ fontSize: 14, color: 'var(--green)', fontWeight: 600 }}>✓ Inget som väntar just nu</div>}
-        {[...reminders].sort((x, y) => (x.due_date || '').localeCompare(y.due_date || '')).map((r, i) => {
-          const d = (r.due_date || '').slice(0, 10)
-          const late = d < todayStr
-          return (
-            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderTop: i ? '1px solid var(--line2)' : 'none' }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: PRIORITY_DOT[r.priority] || 'var(--blue)', flexShrink: 0 }} />
-              <button type="button" onClick={() => setRemModal({ reminder: r })} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{r.title}</div>
-                <div style={{ fontSize: 13, color: late ? '#E0A85A' : 'var(--text2)' }}>{r.customers?.company ? `${r.customers.company} · ` : ''}{late ? `försenad sedan ${d}` : d === todayStr ? 'idag' : d}</div>
-              </button>
-              <button onClick={() => markReminderDone(r.id)} style={{ padding: '6px 12px', background: 'rgba(76,175,125,.12)', border: '1px solid rgba(76,175,125,.35)', borderRadius: 7, color: 'var(--green)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Klar</button>
-            </div>
-          )
-        })}
-      </div>
-
-      <VisitList />
 
       {/* Att göra: quotes and carts to follow up (shown only when there are any) */}
       <div style={{ marginBottom: 16 }}><FollowUpPanel onlyQuotes /></div>
@@ -522,13 +488,6 @@ export default function AdminDashboard() {
       `}</style>
 
       {/* Create / edit calendar activity */}
-      {remModal && (
-        <ReminderModal reminder={remModal.reminder} defaultDate={todayStr}
-          customers={customers} createdBy="Admin"
-          onSaved={saved => setReminders(rs => [...rs.filter(r => r.id !== saved.id), saved].sort((a, b) => a.due_date.localeCompare(b.due_date)))}
-          onRemoved={id => setReminders(rs => rs.filter(r => r.id !== id))}
-          onClose={() => setRemModal(null)} />
-      )}
     </div>
   )
 }
