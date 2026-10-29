@@ -70,8 +70,12 @@ function ImportCustomers({ onClose, onImported }: { onClose: () => void; onImpor
     setBusy(true); setError('')
     const failed: string[] = []
     let created = 0, updated = 0
+    // contact_name and email are required (not null) in the database, but a
+    // list of companies often lacks them: store them empty, fill in later.
     const base = (v: Record<string, string>) => ({
       ...v,
+      contact_name: v.contact_name || '',
+      email: v.email || '',
       price_list_id: v.price_list_id || 'Standard',
       customer_type: v.customer_type || 'business',
       status: 'active',
