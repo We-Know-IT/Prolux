@@ -102,6 +102,13 @@ export default function BudgetPage() {
     setShares(Object.fromEntries(team.map(p => [p, String(each)])))
   }, [team]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Links like /admin/budget#manuell: scroll there once the page is drawn.
+  useEffect(() => {
+    if (!range || !window.location.hash) return
+    const t = setTimeout(() => document.querySelector(window.location.hash)?.scrollIntoView({ block: 'start' }), 300)
+    return () => clearTimeout(t)
+  }, [!!range]) // eslint-disable-line react-hooks/exhaustive-deps
+
   async function loadBudgets() {
     if (!months.length) return
     const years = [...new Set(months.map(m => m.year))]
@@ -315,6 +322,13 @@ export default function BudgetPage() {
       <p style={help}>Lägg in en årsbudget för bolaget så fördelas den på månader och arbetsdagar, eller skriv in budgeten för varje månad själv – för bolaget och för varje säljare. Säljarna ser sin månadsbudget, dagsbudget, vad de sålt och vad som är kvar på sin översikt i CRM:et.</p>
       {missingTable && <p role="alert" style={{ ...help, color: '#E0A85A', fontWeight: 600 }}>Kör migration 0027 i Supabase (SQL Editor) för att kunna spara bolagets budget och årsbudgetar. Säljarnas budget fungerar redan.</p>}
 
+      {/* Shortcuts to the parts of the page */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+        {[['#arsbudget', 'Fördela årsbudget'], ['#manader', 'Budget per månad och säljare'], ['#manuell', 'Registrera försäljning manuellt']].map(([h, l]) => (
+          <a key={h} href={h} style={{ padding: '10px 14px', borderRadius: 9, background: 'var(--bg3)', border: '1px solid rgba(232,184,75,.35)', color: 'var(--text)', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>{l} ↓</a>
+        ))}
+      </div>
+
       {/* Period */}
       <div style={{ ...card, display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <MonthPicker label="Period från" value={range.from} onChange={v => changeRange({ ...range, from: v })} />
@@ -390,7 +404,7 @@ export default function BudgetPage() {
       )}
 
       {/* Annual budget → months */}
-      <div style={card}>
+      <div id="arsbudget" style={{ ...card, scrollMarginTop: 80 }}>
         <h2 style={h2}><Wand2 size={18} color="var(--gold)" /> Fördela en årsbudget</h2>
         <p style={help}>Skriv in bolagets budget för hela perioden. Den fördelas på månaderna efter antal arbetsdagar (eller lika mycket per månad) och kan sedan delas på säljarna. Inget sparas förrän du trycker Spara budget – du kan justera varje månad först.</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, alignItems: 'start' }}>
@@ -432,7 +446,7 @@ export default function BudgetPage() {
       </div>
 
       {/* Month by month */}
-      <div style={card}>
+      <div id="manader" style={{ ...card, scrollMarginTop: 80 }}>
         <h2 style={h2}><Target size={18} color="var(--gold)" /> Månad för månad</h2>
         <p style={help}>Skriv in eller justera budgeten för bolaget och varje säljare. Lämnar du bolagets ruta tom räknas säljarnas summa som bolagets budget. Tryck på en månad för att se den dag för dag.</p>
         <div style={{ overflowX: 'auto' }}>
@@ -513,7 +527,7 @@ export default function BudgetPage() {
       </div>
 
       {/* Sales entered by hand */}
-      <div style={card}>
+      <div id="manuell" style={{ ...card, scrollMarginTop: 80 }}>
         <h2 style={h2}><PenLine size={18} color="var(--gold)" /> Registrera försäljning manuellt</h2>
         <p style={help}>För försäljning som inte finns som ordrar i systemet, t.ex. augusti och september innan CRM:et användes. Beloppet (kr exkl. moms) läggs till det som säljaren sålt i systemet och räknas in i budgeten. Skriv bara in det som saknas, annars räknas det två gånger.</p>
         {manualMissing && <p role="alert" style={{ ...help, color: '#E0A85A', fontWeight: 600 }}>Kör migration 0028 i Supabase (SQL Editor) för att kunna registrera försäljning manuellt.</p>}

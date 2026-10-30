@@ -44,9 +44,6 @@ export default function AdminDashboard() {
   const [reminders, setReminders]   = useState<any[]>([])
   const [activities, setActivities] = useState<any[]>([])
   const [chartPeriod, setChartPeriod] = useState<'week' | 'month'>('week')
-  const [editBudget, setEditBudget]     = useState(false)
-  const [budgetInput, setBudgetInput]   = useState<Record<string, string>>({})
-  const [savingBudget, setSavingBudget] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const now   = new Date()
@@ -92,38 +89,7 @@ export default function AdminDashboard() {
   useEffect(() => { loadData() }, [])
   useLiveRefresh(['orders', 'products', 'customers', 'deals', 'sales_budgets', 'company_budgets', 'manual_sales', 'reminders', 'activities'], loadData)
 
-  // Seed the form from the latest saved budgets when opening it, so a background
-  // refresh never overwrites what the user is typing.
-  function openBudgetEditor() {
-    setBudgetInput(Object.fromEntries(SALESPEOPLE.map(sp => [sp, budgets[sp] ? String(budgets[sp]) : ''])))
-    setEditBudget(true)
-  }
-
   useEffect(() => { drawChart() }, [orders, chartPeriod])
-
-  async function saveBudgets() {
-    setSavingBudget(true)
-    const sb = createClient()
-    const rows = SALESPEOPLE
-      .map(sp => ({ salesperson: sp, year, month, budget: parseInt(budgetInput[sp] || '0') || 0 }))
-      .filter(r => r.budget > 0)
-    await sb.from('sales_budgets').upsert(rows, { onConflict: 'salesperson,year,month' })
-    const removed = SALESPEOPLE.filter(sp => !(parseInt(budgetInput[sp] || '0') > 0))
-    for (const sp of removed) {
-      await sb.from('sales_budgets').delete().eq('salesperson', sp).eq('year', year).eq('month', month)
-    }
-    const newBudgets: Record<string, number> = {}
-    for (const sp of SALESPEOPLE) {
-      const v = parseInt(budgetInput[sp] || '0')
-      if (v > 0) newBudgets[sp] = v
-    }
-    setBudgets(newBudgets)
-    setSavingBudget(false)
-    setEditBudget(false)
-  }
-
-
-
 
   function drawChart() {
     const canvas = canvasRef.current
@@ -321,35 +287,13 @@ export default function AdminDashboard() {
               <Target size={14} color="var(--gold)" />
               <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Budget — {monthNames[month]}</span>
             </div>
-<div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Link href="/admin/budget" style={{ fontSize: 12, color: 'var(--text)', textDecoration: 'underline', textUnderlineOffset: 3 }}>Hela budgeten →</Link>
-            <button onClick={() => editBudget ? setEditBudget(false) : openBudgetEditor()}
-              style={{ fontSize: 11, padding: '4px 10px', background: 'rgba(232,184,75,.1)', border: '1px solid rgba(232,184,75,.2)', borderRadius: 6, color: 'var(--gold)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 600 }}>
-              {editBudget ? 'Avbryt' : 'Sätt budget'}
-            </button>
+<div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <Link href="/admin/budget#manuell" style={{ fontSize: 12, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', color: 'var(--text)', textDecoration: 'none', fontWeight: 600 }}>Registrera försäljning</Link>
+              <Link href="/admin/budget" style={{ fontSize: 12, padding: '6px 10px', background: 'rgba(232,184,75,.12)', border: '1px solid rgba(232,184,75,.35)', borderRadius: 6, color: 'var(--text)', textDecoration: 'none', fontWeight: 700 }}>Lägg in budget</Link>
             </div>
           </div>
 
-          {editBudget ? (
-            <div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
-                {SALESPEOPLE.map(sp => (
-                  <div key={sp}>
-                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }}>{sp}</label>
-                    <div style={{ position: 'relative' }}>
-                      <input type="number" placeholder="0" value={budgetInput[sp] || ''} onChange={e => setBudgetInput(b => ({ ...b, [sp]: e.target.value }))}
-                        style={{ width: '100%', padding: '8px 32px 8px 10px', background: 'var(--bg4)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 7, color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
-                      <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'var(--text3)' }}>kr</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <button onClick={saveBudgets} disabled={savingBudget}
-                style={{ width: '100%', padding: '9px 20px', background: 'var(--gold)', border: 'none', borderRadius: 7, color: '#111', fontSize: 13, fontWeight: 700, cursor: savingBudget ? 'default' : 'pointer', fontFamily: 'var(--font-sans)', opacity: savingBudget ? 0.7 : 1 }}>
-                {savingBudget ? 'Sparar...' : 'Spara budget'}
-              </button>
-            </div>
-          ) : totalBudget > 0 ? (
+          {totalBudget > 0 ? (
             <>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
                 {SALESPEOPLE.filter(sp => budgets[sp]).map(sp => {
@@ -389,11 +333,13 @@ export default function AdminDashboard() {
           ) : (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
               <Target size={28} color="rgba(232,184,75,.25)" />
-              <div style={{ fontSize: 13, color: 'var(--text3)', textAlign: 'center' }}>Ingen budget satt</div>
-              <button onClick={openBudgetEditor}
-                style={{ fontSize: 12, color: 'var(--gold)', background: 'rgba(232,184,75,.08)', border: '1px solid rgba(232,184,75,.2)', borderRadius: 7, padding: '6px 14px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                Sätt budget →
-              </button>
+              <div style={{ fontSize: 14, color: 'var(--text2)', textAlign: 'center' }}>
+                {companyBudget > 0 ? `Bolagets budget är ${fmt(companyBudget)} kr men den är inte fördelad på säljarna för ${monthNames[month].toLowerCase()}.` : `Ingen budget satt för ${monthNames[month].toLowerCase()}.`}
+              </div>
+              <Link href="/admin/budget"
+                style={{ fontSize: 13, color: '#111', background: 'var(--gold)', borderRadius: 7, padding: '8px 14px', fontWeight: 700, textDecoration: 'none' }}>
+                {companyBudget > 0 ? 'Fördela på säljarna →' : 'Lägg in budget →'}
+              </Link>
             </div>
           )}
         </div>
