@@ -2,17 +2,19 @@
 // The month's budget at a glance: budget, daily budget, sold so far, what is
 // left and how it stands in percent, with a marker for where you should be
 // today. Used for each salesperson's own budget and for the whole company.
+import Link from 'next/link'
 import { Target, TrendingUp, TrendingDown } from 'lucide-react'
 import { fmt } from '@/lib/utils'
 import { budgetStatus, MONTHS, type YM } from '@/lib/budget'
 
-export default function BudgetCard({ title, budget, sold, ym, company, compact = false }: {
+export default function BudgetCard({ title, budget, sold, ym, company, compact = false, setupHref }: {
   title: string
   budget: number
   sold: number
   ym: YM
   company?: { budget: number; sold: number }
   compact?: boolean
+  setupHref?: string     // where admin enters the budget, shown when none is set
 }) {
   const s = budgetStatus(budget, sold, ym)
   const reached = budget > 0 && sold >= budget
@@ -24,9 +26,10 @@ export default function BudgetCard({ title, budget, sold, ym, company, compact =
   const val = (c = 'var(--text)'): React.CSSProperties => ({ fontSize: compact ? 18 : 22, fontWeight: 800, color: c, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' })
 
   if (!(budget > 0)) return (
-    <section style={{ background: 'var(--bg3)', border: '1px solid var(--line)', borderRadius: 14, padding: '16px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
+    <section style={{ background: 'var(--bg3)', border: '1px solid var(--line)', borderRadius: 14, padding: '16px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
       <Target size={18} color="var(--text2)" />
       <span style={{ fontSize: 15, color: 'var(--text2)' }}>{title}: ingen budget satt för {MONTHS[ym.month].toLowerCase()} ännu. Sålt hittills <strong style={{ color: 'var(--text)' }}>{fmt(sold)} kr</strong>.</span>
+      {setupHref && <Link href={setupHref} style={{ marginLeft: 'auto', padding: '9px 14px', borderRadius: 8, background: 'var(--gold)', color: '#111', fontSize: 14, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>Lägg in budget →</Link>}
     </section>
   )
 

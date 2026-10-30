@@ -14,7 +14,7 @@ import { LeadsPanel, DraftsPanel, FollowUpPanel, QuotesPanel, ToShipPanel } from
 import { nextBirthday, formatBirthday } from '@/lib/birthdays'
 import VisitList from '@/components/crm/VisitList'
 import BudgetCard from '@/components/crm/BudgetCard'
-import { companySold, workdaysInMonth, workdaysPassed } from '@/lib/budget'
+import { companySold, workdaysInMonth, workdaysPassed, manualFor, withManual, sumOf } from '@/lib/budget'
 
 const supabase = createClient()
 
@@ -53,6 +53,7 @@ export default function CrmDashboardPage() {
   const [followCount, setFollowCount]     = useState(0)
   const [companyBudget, setCompanyBudget] = useState(0)
   const [companySales, setCompanySales]   = useState(0)
+  const [manualSold, setManualSold]       = useState<Record<string, number>>({})
 
   useEffect(() => {
     currentStaff(supabase).then(me => {
@@ -63,7 +64,7 @@ export default function CrmDashboardPage() {
     loadData()
   }, [])
 
-  useLiveRefresh(['deals', 'customers', 'reminders', 'sales_budgets', 'orders'], loadData)
+  useLiveRefresh(['deals', 'customers', 'reminders', 'sales_budgets', 'company_budgets', 'manual_sales', 'orders'], loadData)
 
   function loadData() {
     // Separate query: fails quietly until migration 0009 adds birthday.
@@ -79,6 +80,9 @@ export default function CrmDashboardPage() {
     // Separate query: fails quietly until migration 0027 adds company_budgets.
     supabase.from('company_budgets').select('budget').eq('year', year).eq('month', month).maybeSingle()
       .then(({ data }) => setCompanyBudget(Number(data?.budget) || 0))
+    // Sales entered by hand (migration 0028); none until it has been run.
+    supabase.from('manual_sales').select('salesperson,year,month,amount').eq('year', year).eq('month', month)
+      .then(({ data }) => setManualSold(manualFor(data ?? [], { year, month })))
     const { start, end } = monthRange()
     Promise.all([
       // Open quotes (orders with status quote): each one opens in the order form.
@@ -152,6 +156,11 @@ export default function CrmDashboardPage() {
 
 
   const totalBudget = Object.values(budgets).reduce((a, b) => a + b, 0)
+  const soldAll     = withManual(achieved, manualSold)
+  // My name as the budget is stored (first name; case may differ).
+  const myKey       = Object.keys(budgets).find(k => k.toLowerCase() === firstName.toLowerCase()) || firstName
+  const myBudget    = budgets[myKey] || 0
+  const companyTotal = { budget: companyBudget || totalBudget, sold: companySales + sumOf(manualSold) }
   const workDays    = workdaysInMonth({ year, month })
   const daysPassed  = workdaysPassed({ year, month })
 
@@ -176,10 +185,13 @@ export default function CrmDashboardPage() {
         </p>
       </div>
 
-      {/* My budget this month: what each salesperson sees first */}
-      {meLoaded && (!isAdmin || budgets[firstName] > 0) && (
-        <BudgetCard title="Din budget" budget={budgets[firstName] || 0} sold={achieved[firstName] || 0} ym={{ year, month }}
-          company={{ budget: companyBudget || totalBudget, sold: companySales }} />
+      {/* My budget this month: what each salesperson sees first. Admins
+          without a budget of their own see the company's. */}
+      {meLoaded && (!isAdmin || myBudget > 0) && (
+        <BudgetCard title="Din budget" budget={myBudget} sold={soldAll[myKey] || 0} ym={{ year, month }} company={companyTotal} />
+      )}
+      {meLoaded && isAdmin && myBudget <= 0 && (
+        <BudgetCard title="Bolagets budget" budget={companyTotal.budget} sold={companyTotal.sold} ym={{ year, month }} setupHref="/admin/budget" />
       )}
 
       {/* Primary CTA */}
@@ -379,7 +391,7 @@ export default function CrmDashboardPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', marginBottom: 14 }}>
                   {SALESPEOPLE.filter(sp => budgets[sp]).map(sp => {
                     const spBudget   = budgets[sp]
-                    const spAchieved = achieved[sp] || 0
+                    const spAchieved = soldAll[sp] || 0
                     const spPct      = Math.min((spAchieved / spBudget) * 100, 100)
                     const isMe       = sp === firstName
                     const isGreen    = spAchieved >= spBudget
@@ -402,7 +414,7 @@ export default function CrmDashboardPage() {
                 <div style={{ display: 'flex', gap: 24, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,.06)' }}>
                   {[
                     { label: 'Total månadsbudget', value: `${fmt(totalBudget)} kr` },
-                    { label: 'Teamets försäljning', value: `${fmt(Object.values(achieved).reduce((a,b) => a+b, 0))} kr` },
+                    { label: 'Teamets försäljning', value: `${fmt(sumOf(soldAll))} kr` },
                     { label: 'Arbetsdagar kvar', value: `${workDays - daysPassed} av ${workDays}` },
                   ].map(({ label, value }) => (
                     <div key={label}>

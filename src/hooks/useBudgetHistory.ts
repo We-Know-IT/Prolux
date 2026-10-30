@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { budgetAchieved, NOT_LIVE_FILTER } from '@/lib/team'
+import { manualFor, withManual } from '@/lib/budget'
 
 export interface BudgetMonth {
   year: number
@@ -37,7 +38,9 @@ export function useBudgetHistory(count = 6) {
       sb.from('deals').select('id,assigned_to,value,updated_at').eq('stage', 'Vunnen').gte('updated_at', from),
       sb.from('orders').select('deal_id').not('deal_id', 'is', null).not('status', 'in', NOT_LIVE_FILTER),
       sb.from('sales_budgets').select('salesperson,budget,year,month').in('year', years),
-    ]).then(([{ data: orders }, { data: won }, { data: linked }, { data: budgets }]) => {
+      // Sales entered by hand (migration 0028); empty until it has been run.
+      sb.from('manual_sales').select('salesperson,year,month,amount').in('year', years),
+    ]).then(([{ data: orders }, { data: won }, { data: linked }, { data: budgets }, { data: manual }]) => {
       const inMonth = (iso: string, s: { year: number; month: number }) => {
         const d = new Date(iso)
         return d.getFullYear() === s.year && d.getMonth() === s.month
@@ -48,11 +51,11 @@ export function useBudgetHistory(count = 6) {
         return {
           ...s,
           label: SHORT[s.month],
-          sold: budgetAchieved(
+          sold: withManual(budgetAchieved(
             (orders || []).filter(o => inMonth(o.created_at, s)),
             (won || []).filter(d => inMonth(d.updated_at, s)),
             linked || [],
-          ),
+          ), manualFor(manual || [], s)),
           budget,
         }
       }))
@@ -61,7 +64,7 @@ export function useBudgetHistory(count = 6) {
   }, [count])
 
   useEffect(() => { load() }, [load])
-  useLiveRefresh(['orders', 'deals', 'sales_budgets'], load)
+  useLiveRefresh(['orders', 'deals', 'sales_budgets', 'manual_sales'], load)
 
   return { months, loading }
 }

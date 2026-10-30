@@ -9,7 +9,8 @@ import { monthRange, budgetAchieved, isLiveOrder } from '@/lib/team'
 import { useTeam } from '@/hooks/useTeam'
 import { useBudgetHistory } from '@/hooks/useBudgetHistory'
 import BudgetHistoryChart from '@/components/BudgetHistoryChart'
-import { workdaysInMonth } from '@/lib/budget'
+import { workdaysInMonth, companySold, manualFor, withManual, sumOf } from '@/lib/budget'
+import BudgetCard from '@/components/crm/BudgetCard'
 import { LeadsPanel, QuotesPanel, FollowUpPanel, ToShipPanel } from '@/components/crm/LeadsAndQuotes'
 import { TrendingUp, ShoppingBag, Clock, Users, AlertTriangle, GitBranch, Target, ArrowRight } from 'lucide-react'
 
@@ -38,6 +39,8 @@ export default function AdminDashboard() {
   const [wonDeals, setWonDeals]     = useState<any[]>([])
   const { months: budgetHistory }   = useBudgetHistory(6)
   const [budgets, setBudgets]       = useState<Record<string, number>>({})
+  const [companyBudget, setCompanyBudget] = useState(0)
+  const [manualSold, setManualSold] = useState<Record<string, number>>({})
   const [reminders, setReminders]   = useState<any[]>([])
   const [activities, setActivities] = useState<any[]>([])
   const [chartPeriod, setChartPeriod] = useState<'week' | 'month'>('week')
@@ -55,6 +58,11 @@ export default function AdminDashboard() {
 
   function loadData() {
     const sb = createClient()
+    // Separate queries: fail quietly until migrations 0027 and 0028 are run.
+    sb.from('company_budgets').select('budget').eq('year', year).eq('month', month).maybeSingle()
+      .then(({ data }) => setCompanyBudget(Number(data?.budget) || 0))
+    sb.from('manual_sales').select('salesperson,year,month,amount').eq('year', year).eq('month', month)
+      .then(({ data }) => setManualSold(manualFor(data ?? [], { year, month })))
     Promise.all([
       sb.from('orders').select('*,customers(company,contact_name)').order('created_at', { ascending: false }),
       sb.from('products').select('*').order('sort_order'),
@@ -82,7 +90,7 @@ export default function AdminDashboard() {
   }
 
   useEffect(() => { loadData() }, [])
-  useLiveRefresh(['orders', 'products', 'customers', 'deals', 'sales_budgets', 'reminders', 'activities'], loadData)
+  useLiveRefresh(['orders', 'products', 'customers', 'deals', 'sales_budgets', 'company_budgets', 'manual_sales', 'reminders', 'activities'], loadData)
 
   // Seed the form from the latest saved budgets when opening it, so a background
   // refresh never overwrites what the user is typing.
@@ -196,8 +204,10 @@ export default function AdminDashboard() {
   // Budget credit: this month's orders per assignee.
   const { start: salesStart, end: salesEnd } = monthRange(now)
   const ordersThisMonth = orders.filter(o => o.created_at >= salesStart && o.created_at <= salesEnd)
-  const soldBySP        = budgetAchieved(ordersThisMonth, wonDeals, orders.filter(o => isLiveOrder(o.status)))
-  const soldThisMonth   = Object.values(soldBySP).reduce((a, b) => a + b, 0)
+  const liveOrders      = orders.filter(o => isLiveOrder(o.status))
+  const soldBySP        = withManual(budgetAchieved(ordersThisMonth, wonDeals, liveOrders), manualSold)
+  const soldThisMonth   = sumOf(soldBySP)
+  const companySoldNow  = companySold(ordersThisMonth, wonDeals, liveOrders) + sumOf(manualSold)
   const unassignedCount = orders.filter(o => !o.assigned_to && o.status === 'pending').length
 
   const card: React.CSSProperties = {
@@ -238,6 +248,9 @@ export default function AdminDashboard() {
           <GitBranch size={13} /> Mitt säljarbete <ArrowRight size={12} />
         </Link>
       </div>
+
+      {/* The company's budget this month, at the top */}
+      <BudgetCard title="Bolagets budget" budget={companyBudget || totalBudget} sold={companySoldNow} ym={{ year, month }} setupHref="/admin/budget" />
 
       {/* KPI grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px,1fr))', gap: 12, marginBottom: 24 }}>

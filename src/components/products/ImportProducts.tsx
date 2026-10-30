@@ -39,7 +39,7 @@ function ImportProducts({ onClose, onImported }: { onClose: () => void; onImport
     setError(''); setResult(null); setFileName(file.name)
     try {
       let rows: Cell[][]
-      if (/\.(xlsx|xlsm)$/i.test(file.name)) {
+      if (/\.(xlsx|xlsm|xltx|xltm)$/i.test(file.name)) {
         const { readSheet } = await import('read-excel-file/browser')
         rows = (await readSheet(file)) as Cell[][]
       } else if (/\.(csv|txt)$/i.test(file.name)) {
@@ -120,7 +120,7 @@ function ImportProducts({ onClose, onImported }: { onClose: () => void; onImport
 
         {!result && (
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 20 }}>
-            <input ref={fileRef} type="file" accept=".xlsx,.xlsm,.csv,.txt" hidden onChange={e => { const f = e.target.files?.[0]; if (f) readFile(f); e.target.value = '' }} />
+            <input ref={fileRef} type="file" accept=".xlsx,.xlsm,.xltx,.xltm,.csv,.txt" hidden onChange={e => { const f = e.target.files?.[0]; if (f) readFile(f); e.target.value = '' }} />
             <button onClick={() => fileRef.current?.click()} style={btn(!sheet)}><FileSpreadsheet size={14} /> {sheet ? 'Välj annan fil' : 'Välj fil'}</button>
             <button onClick={downloadTemplate} style={btn()}><Download size={14} /> Ladda ner mall</button>
             {fileName && <span style={{ fontSize: 13, color: 'var(--text2)' }}>{fileName}</span>}

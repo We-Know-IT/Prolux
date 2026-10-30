@@ -37,7 +37,7 @@ function ImportCustomers({ onClose, onImported }: { onClose: () => void; onImpor
     setError(''); setResult(null); setFileName(file.name)
     try {
       let rows: Cell[][]
-      if (/\.(xlsx|xlsm)$/i.test(file.name)) {
+      if (/\.(xlsx|xlsm|xltx|xltm)$/i.test(file.name)) {
         const { readSheet } = await import('read-excel-file/browser')
         rows = (await readSheet(file)) as Cell[][]
       } else if (/\.(csv|txt)$/i.test(file.name)) {
@@ -86,7 +86,10 @@ function ImportCustomers({ onClose, onImported }: { onClose: () => void; onImpor
       if (error) {
         // Retry one by one so a single bad row does not stop the rest.
         for (const r of chunk) {
-          const { error: e1 } = await supabase.from('customers').insert(base(r.values as Record<string, string>))
+          const row = base(r.values as Record<string, string>)
+          let { error: e1 } = await supabase.from('customers').insert(row)
+          // An empty e-mail that clashes with another: save it without (migration 0028).
+          if (e1 && !row.email && /duplicate|unique/i.test(e1.message)) ({ error: e1 } = await supabase.from('customers').insert({ ...row, email: null }))
           if (e1) failed.push(`Rad ${r.line}: ${e1.message}`); else created++
         }
       } else created += chunk.length
@@ -117,13 +120,13 @@ function ImportCustomers({ onClose, onImported }: { onClose: () => void; onImpor
           <button onClick={onClose} aria-label="Stäng" style={{ background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer' }}><X size={18} /></button>
         </div>
         <p style={{ fontSize: 13, color: 'var(--text2)', margin: '0 0 20px', lineHeight: 1.6 }}>
-          Excel (.xlsx) eller CSV. Första raden ska vara kolumnrubriker, t.ex. Företag, Org.nr, E-post, Telefon, Adress, Postnummer, Ort.
+          Excel (.xlsx eller .xltx) eller CSV. Första raden ska vara kolumnrubriker, t.ex. Företag, Org.nr, E-post, Telefon, Adress, Postnummer, Ort.
           Kunder som redan finns (samma org.nr eller e-post) känns igen.
         </p>
 
         {!result && (
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 20 }}>
-            <input ref={fileRef} type="file" accept=".xlsx,.xlsm,.csv,.txt" hidden onChange={e => { const f = e.target.files?.[0]; if (f) readFile(f); e.target.value = '' }} />
+            <input ref={fileRef} type="file" accept=".xlsx,.xlsm,.xltx,.xltm,.csv,.txt" hidden onChange={e => { const f = e.target.files?.[0]; if (f) readFile(f); e.target.value = '' }} />
             <button onClick={() => fileRef.current?.click()} style={btn(!sheet)}><FileSpreadsheet size={14} /> {sheet ? 'Välj annan fil' : 'Välj fil'}</button>
             <button onClick={downloadTemplate} style={btn()}><Download size={14} /> Ladda ner mall</button>
             {fileName && <span style={{ fontSize: 13, color: 'var(--text2)' }}>{fileName}</span>}

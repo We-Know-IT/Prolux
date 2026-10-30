@@ -3,7 +3,7 @@
 // months and working days, each salesperson's monthly budget, and how the
 // company and every salesperson stand against it.
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { Target, Wand2, Save, Check, ChevronDown, ChevronRight, Users } from 'lucide-react'
+import { Target, Wand2, Save, Check, ChevronDown, ChevronRight, Users, PenLine } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt } from '@/lib/utils'
 import { useTeam } from '@/hooks/useTeam'
@@ -11,7 +11,7 @@ import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { budgetAchieved, NOT_LIVE_FILTER } from '@/lib/team'
 import {
   MONTHS, type YM, ymKey, ymLabel, dayKey, monthsBetween, workdaysOf, workdaysInMonth,
-  splitBudget, splitByShare, companySold, budgetStatus, defaultBudgetYear,
+  splitBudget, splitByShare, companySold, budgetStatus, defaultBudgetYear, withManual, sumOf,
 } from '@/lib/budget'
 
 const num = (v?: string) => parseInt((v || '').replace(/[^\d]/g, ''), 10) || 0
@@ -61,6 +61,12 @@ export default function BudgetPage() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [openMonth, setOpenMonth] = useState<string | null>(null)
   const [dayWho, setDayWho] = useState('')
+  // Sales entered by hand per salesperson and month (migration 0028).
+  const [manual, setManual] = useState<Record<string, Record<string, string>>>({})
+  const [manualDirty, setManualDirty] = useState(false)
+  const [manualSaving, setManualSaving] = useState(false)
+  const [manualMsg, setManualMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [manualMissing, setManualMissing] = useState(false)
 
   // Annual budget tool
   const [annual, setAnnual] = useState('')
@@ -118,6 +124,41 @@ export default function BudgetPage() {
     setCompany(comp); setSeller(sel); setExtraPeople([...extra]); setDirty(false)
   }
 
+  async function loadManual() {
+    if (!months.length) return
+    const years = [...new Set(months.map(m => m.year))]
+    const keys = new Set(months.map(ymKey))
+    const { data, error } = await sb.from('manual_sales').select('salesperson,year,month,amount').in('year', years)
+    setManualMissing(!!error)
+    const out: Record<string, Record<string, string>> = {}
+    for (const r of data ?? []) {
+      const k = ymKey(r)
+      if (keys.has(k) && Number(r.amount) > 0) (out[k] ??= {})[r.salesperson] = String(Math.round(Number(r.amount)))
+    }
+    setManual(out); setManualDirty(false)
+    setExtraPeople(p => [...new Set([...p, ...(data ?? []).filter(r => keys.has(ymKey(r))).map(r => r.salesperson)])])
+  }
+
+  async function saveManual() {
+    setManualSaving(true); setManualMsg(null)
+    const rows: { salesperson: string; year: number; month: number; amount: number; updated_at: string }[] = []
+    const zero: { salesperson: string; ym: YM }[] = []
+    for (const ym of months) for (const p of people) {
+      const v = num(manual[ymKey(ym)]?.[p])
+      if (v > 0) rows.push({ salesperson: p, year: ym.year, month: ym.month, amount: v, updated_at: new Date().toISOString() })
+      else zero.push({ salesperson: p, ym })
+    }
+    let error = rows.length ? (await sb.from('manual_sales').upsert(rows, { onConflict: 'salesperson,year,month' })).error : null
+    if (!error) for (const z of zero) {
+      const r = await sb.from('manual_sales').delete().eq('salesperson', z.salesperson).eq('year', z.ym.year).eq('month', z.ym.month)
+      if (r.error) { error = r.error; break }
+    }
+    setManualSaving(false)
+    if (error) { setManualMsg({ ok: false, text: /manual_sales/.test(error.message) ? 'Kör migration 0028 i Supabase först.' : `Kunde inte spara: ${error.message}` }); return }
+    setManualDirty(false)
+    setManualMsg({ ok: true, text: 'Försäljningen är sparad och räknas in i budgeten.' })
+  }
+
   async function loadSales() {
     if (!months.length) return
     const from = startOf(months[0]), to = endOf(months[months.length - 1])
@@ -137,19 +178,24 @@ export default function BudgetPage() {
     setSales(all); setWon((w.data ?? []) as Won[]); setLinked(l.data ?? [])
   }
 
-  useEffect(() => { loadBudgets(); loadSales() }, [months]) // eslint-disable-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
+  useEffect(() => { loadBudgets(); loadManual(); loadSales() }, [months]) // eslint-disable-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
   useLiveRefresh(['orders', 'deals'], loadSales)
 
   // Sold per month: per salesperson and for the whole company.
   const soldByMonth = useMemo(() => {
-    const out: Record<string, { people: Record<string, number>; company: number }> = {}
+    // system: from orders and won deals; people/company also count the
+    // sales entered by hand.
+    const out: Record<string, { people: Record<string, number>; company: number; system: Record<string, number> }> = {}
     for (const ym of months) {
+      const k = ymKey(ym)
       const o = sales.filter(x => inMonth(x.created_at, ym))
       const d = won.filter(x => inMonth(x.updated_at, ym))
-      out[ymKey(ym)] = { people: budgetAchieved(o, d, linked), company: companySold(o, d, linked) }
+      const system = budgetAchieved(o, d, linked)
+      const hand = Object.fromEntries(Object.entries(manual[k] ?? {}).map(([p, v]) => [p, num(v)]).filter(([, v]) => (v as number) > 0))
+      out[k] = { system, people: withManual(system, hand), company: companySold(o, d, linked) + sumOf(hand) }
     }
     return out
-  }, [months, sales, won, linked])
+  }, [months, sales, won, linked, manual])
 
   const sellerSum = (k: string) => people.reduce((n, p) => n + num(seller[k]?.[p]), 0)
   // Company budget for a month: what admin entered, else the salespeople's total.
@@ -463,7 +509,51 @@ export default function BudgetPage() {
             </tr></tfoot>
           </table>
         </div>
-        <p style={{ fontSize: 13, color: 'var(--text2)', margin: '10px 0 0' }}>Sålt räknas som säljarnas budget gör i övrigt: ordrar exkl. moms (inte varukorgar, offerter eller makulerade) plus vunna affärer utan kopplad order. Helgdagar, midsommarafton, julafton och nyårsafton räknas inte som arbetsdagar.</p>
+        <p style={{ fontSize: 13, color: 'var(--text2)', margin: '10px 0 0' }}>Sålt räknas som säljarnas budget gör i övrigt: ordrar exkl. moms (inte varukorgar, offerter eller makulerade) plus vunna affärer utan kopplad order och försäljning du registrerat manuellt. Helgdagar, midsommarafton, julafton och nyårsafton räknas inte som arbetsdagar.</p>
+      </div>
+
+      {/* Sales entered by hand */}
+      <div style={card}>
+        <h2 style={h2}><PenLine size={18} color="var(--gold)" /> Registrera försäljning manuellt</h2>
+        <p style={help}>För försäljning som inte finns som ordrar i systemet, t.ex. augusti och september innan CRM:et användes. Beloppet (kr exkl. moms) läggs till det som säljaren sålt i systemet och räknas in i budgeten. Skriv bara in det som saknas, annars räknas det två gånger.</p>
+        {manualMissing && <p role="alert" style={{ ...help, color: '#E0A85A', fontWeight: 600 }}>Kör migration 0028 i Supabase (SQL Editor) för att kunna registrera försäljning manuellt.</p>}
+        {months.filter(started).length === 0 ? <p style={help}>Perioden har inte börjat än.</p> : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 260 + people.length * 150 }}>
+              <thead><tr style={{ borderBottom: '1px solid var(--border)' }}>
+                <th style={{ ...th, textAlign: 'left' }}>Månad</th>
+                {people.map(p => <th key={p} style={th}>{p}</th>)}
+                <th style={th}>Manuellt totalt</th>
+              </tr></thead>
+              <tbody>
+                {months.filter(started).map(ym => {
+                  const k = ymKey(ym)
+                  return (
+                    <tr key={k} style={{ borderBottom: '1px solid var(--border2)' }}>
+                      <td style={{ ...td, textAlign: 'left', fontWeight: 700, fontSize: 15 }}>{MONTHS[ym.month]} {ym.year}</td>
+                      {people.map(sp => (
+                        <td key={sp} style={td}>
+                          <input inputMode="numeric" aria-label={`Manuell försäljning ${sp} ${ymLabel(ym)}`} placeholder="0"
+                            value={manual[k]?.[sp] ? fmt(num(manual[k][sp])) : ''}
+                            onChange={e => { const v = e.target.value.replace(/[^\d]/g, ''); setManual(m => ({ ...m, [k]: { ...m[k], [sp]: v } })); setManualDirty(true); setManualMsg(null) }}
+                            style={cellIn} />
+                          <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 3 }}>i systemet {fmt(soldByMonth[k]?.system[sp] || 0)} kr</div>
+                        </td>
+                      ))}
+                      <td style={{ ...td, fontWeight: 700 }}>{fmt(people.reduce((n, p) => n + num(manual[k]?.[p]), 0))} kr</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
+          <button onClick={saveManual} disabled={manualSaving || !manualDirty} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 20px', borderRadius: 9, background: manualDirty ? 'var(--gold)' : 'var(--bg4)', border: 'none', color: manualDirty ? '#111' : 'var(--text2)', fontSize: 15, fontWeight: 800, cursor: manualDirty ? 'pointer' : 'default', opacity: manualSaving ? .6 : 1 }}>
+            <Save size={16} /> {manualSaving ? 'Sparar…' : 'Spara försäljning'}
+          </button>
+          {manualMsg && <span role={manualMsg.ok ? 'status' : 'alert'} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, color: manualMsg.ok ? 'var(--green)' : 'var(--red)' }}>{manualMsg.ok && <Check size={15} />}{manualMsg.text}</span>}
+        </div>
       </div>
 
       {/* Save bar */}

@@ -147,3 +147,24 @@ export function defaultBudgetYear(d = new Date()): { from: YM; to: YM } {
   const y = d.getMonth() >= 7 ? d.getFullYear() : d.getFullYear() - 1
   return { from: { year: y, month: 7 }, to: { year: y + 1, month: 6 } }
 }
+
+// Sales entered by hand per salesperson and month (migration 0028), added to
+// what the orders in the system give.
+export interface ManualSale { salesperson: string; year: number; month: number; amount: number | string }
+
+export function manualFor(manual: ManualSale[], ym: YM): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const m of manual) {
+    if (m.year !== ym.year || m.month !== ym.month || !(Number(m.amount) > 0)) continue
+    out[m.salesperson] = (out[m.salesperson] || 0) + Number(m.amount)
+  }
+  return out
+}
+
+export function withManual(sold: Record<string, number>, manual: Record<string, number>): Record<string, number> {
+  const out = { ...sold }
+  for (const [p, v] of Object.entries(manual)) out[p] = (out[p] || 0) + v
+  return out
+}
+
+export const sumOf = (r: Record<string, number>) => Object.values(r).reduce((a, b) => a + b, 0)
