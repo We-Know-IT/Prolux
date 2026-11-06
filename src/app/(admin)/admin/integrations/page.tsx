@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import { Plug, Check, AlertTriangle, RefreshCw, LogOut, ExternalLink } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { callVisma } from '@/lib/visma'
+import EmailSettings from '@/components/admin/EmailSettings'
 import { formatDateTime } from '@/lib/utils'
 
 const supabase = createClient()
@@ -97,7 +98,7 @@ export default function IntegrationsPage() {
   return (
     <div style={{ padding: 32, maxWidth: 880 }}>
       <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 24, fontWeight: 500, color: 'var(--text)', margin: '0 0 4px' }}>Integrationer</h1>
-      <p style={{ fontSize: 13, color: 'var(--text2)', margin: '0 0 24px' }}>Koppla webbshoppen och CRM:et till ProLuxShines bokföring.</p>
+      <p style={{ fontSize: 13, color: 'var(--text2)', margin: '0 0 24px' }}>Koppla webbshoppen och CRM:et till ProLuxShines bokföring och e-post.</p>
 
       {msg && (
         <div role={msg.ok ? 'status' : 'alert'} style={{ padding: '12px 14px', borderRadius: 10, marginBottom: 20, fontSize: 13,
@@ -200,6 +201,8 @@ export default function IntegrationsPage() {
           </div>
         ))}
       </section>
+
+      <EmailSettings card={card} />
     </div>
   )
 }
