@@ -86,10 +86,17 @@ function ImportCustomers({ onClose, onImported }: { onClose: () => void; onImpor
       if (error) {
         // Retry one by one so a single bad row does not stop the rest.
         for (const r of chunk) {
-          const row = base(r.values as Record<string, string>)
+          const row: Record<string, string | null> = base(r.values as Record<string, string>)
           let { error: e1 } = await supabase.from('customers').insert(row)
-          // An empty e-mail that clashes with another: save it without (migration 0028).
-          if (e1 && !row.email && /duplicate|unique/i.test(e1.message)) ({ error: e1 } = await supabase.from('customers').insert({ ...row, email: null }))
+          for (let tries = 0; e1 && tries < 4; tries++) {
+            // A required column the file has no value for: save it empty.
+            const col = e1.message.match(/null value in column "([^"]+)"/)?.[1]
+            if (col && row[col] == null) row[col] = ''
+            // An empty e-mail that clashes with another: save it without (migration 0028).
+            else if (!row.email && /duplicate|unique/i.test(e1.message) && /email/i.test(e1.message + (e1.details || ''))) row.email = null
+            else break
+            ;({ error: e1 } = await supabase.from('customers').insert(row))
+          }
           if (e1) failed.push(`Rad ${r.line}: ${e1.message}`); else created++
         }
       } else created += chunk.length

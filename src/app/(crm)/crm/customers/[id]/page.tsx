@@ -18,6 +18,7 @@ import { useLiveRefresh } from '@/hooks/useLiveRefresh'
 import { useTeam, teamOptions } from '@/hooks/useTeam'
 import { nextBirthday, formatBirthday } from '@/lib/birthdays'
 import { useMe } from '@/hooks/useMe'
+import { deleteCustomer } from '@/lib/delete-customer'
 import { isoDay } from '@/lib/visits'
 import CreateLeadModal from '@/components/crm/CreateLeadModal'
 import OrderDrawer from '@/components/orders/OrderDrawer'
@@ -56,6 +57,25 @@ export default function CustomerDetailPage() {
   const me = useMe()
   const { id } = useParams<{ id: string }>()
   const router  = useRouter()
+  const [removing, setRemoving] = useState(false)
+
+  // Admin: delete the card. With orders it is made inactive so the history stays.
+  async function removeCustomer() {
+    if (!customer) return
+    const hasOrders = orders.some((o: any) => !['draft', 'quote'].includes(o.status))
+    if (!confirm(hasOrders
+      ? `${customer.company} har ordrar. Kundkortet görs inaktivt så att orderhistoriken sparas. Fortsätta?`
+      : `Ta bort ${customer.company}? Anteckningar, to dos och leads för kunden tas också bort. Det går inte att ångra.`)) return
+    setRemoving(true)
+    try {
+      const r = await deleteCustomer(customer)
+      alert(r === 'deleted' ? `${customer.company} är borttagen.` : `${customer.company} är nu inaktiv.`)
+      router.push('/admin/customers')
+    } catch (e) {
+      alert('Kunde inte ta bort kunden: ' + (e instanceof Error ? e.message : String(e)))
+      setRemoving(false)
+    }
+  }
 
   const [customer, setCustomer]           = useState<Customer | null>(null)
   const [orders, setOrders]               = useState<Order[]>([])
@@ -391,6 +411,12 @@ export default function CustomerDetailPage() {
             <button onClick={planVisit} title="Lägg kunden i dagens besökslista" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--bg4)', border: '1px solid rgba(94,196,154,.4)', borderRadius: 7, color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
               <MapPin size={13} color="#5EC49A" /> Besök idag
             </button>
+            {me.role === 'admin' && (
+              <button onClick={removeCustomer} disabled={removing} title="Ta bort kunden"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'transparent', border: '1px solid rgba(224,82,82,.45)', borderRadius: 7, color: 'var(--red)', fontSize: 12, fontWeight: 700, cursor: 'pointer', opacity: removing ? .6 : 1 }}>
+                <Trash2 size={13} /> {removing ? 'Tar bort…' : 'Ta bort kund'}
+              </button>
+            )}
             {lastSold && (
               <button onClick={() => router.push(`/crm/orders?reorder=${lastSold.id}`)} title={`Samma produkter som order #${lastSold.order_nr}, med dagens priser`}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--bg4)', border: '1px solid var(--line)', borderRadius: 7, color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>

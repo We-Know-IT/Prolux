@@ -2,6 +2,7 @@
 import OrgNrLookup from '@/components/crm/OrgNrLookup'
 import { useCustomerFilters } from '@/components/crm/CustomerFilters'
 import { ImportCustomersButton } from '@/components/customers/ImportCustomers'
+import { deleteCustomers } from '@/lib/delete-customer'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -50,6 +51,21 @@ export default function AdminCustomers() {
   const [toast, setToast]               = useState('')
   const [form, setForm]                 = useState({ ...EMPTY_FORM })
   const [removing, setRemoving]         = useState(false)
+  const [selected, setSelected]         = useState<Set<string>>(new Set())
+  const [bulkDone, setBulkDone]         = useState<number | null>(null)
+
+  // Delete the ticked customers (e.g. after an import that went wrong).
+  async function removeSelected() {
+    const list = customers.filter(c => selected.has(c.id))
+    const withOrders = list.filter(c => orders.some(o => o.customer_id === c.id)).length
+    if (!confirm(`Ta bort ${list.length} kunder?` + (withOrders ? ` ${withOrders} av dem har ordrar och görs inaktiva i stället, så att orderhistoriken sparas.` : '') + ' Det går inte att ångra.')) return
+    setBulkDone(0)
+    const r = await deleteCustomers(list, n => setBulkDone(n))
+    setBulkDone(null)
+    setSelected(new Set())
+    load()
+    showToast(`${r.deleted.length} borttagna${r.inactive.length ? `, ${r.inactive.length} inaktiverade` : ''}${r.failed.length ? `, ${r.failed.length} gick inte att ta bort` : ''}`)
+  }
 
   // Removes the customer's login and the card (kept as inactive if it has orders).
   async function removeCustomer(c: any) {
@@ -188,12 +204,27 @@ export default function AdminCustomers() {
         {filters}
         <span style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--text2)' }}>{filtered.length} kunder</span>
       </div>
+      {selected.size > 0 && (
+        <div style={{ position: 'sticky', top: 58, zIndex: 20, padding: '12px 40px', background: 'rgba(224,82,82,.10)', borderBottom: '1px solid rgba(224,82,82,.35)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', backdropFilter: 'blur(12px)' }}>
+          <strong style={{ fontSize: 14, color: 'var(--text)' }}>{selected.size} markerade</strong>
+          <button onClick={removeSelected} disabled={bulkDone !== null}
+            style={{ padding: '9px 16px', borderRadius: 8, background: 'var(--red)', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: bulkDone !== null ? .7 : 1 }}>
+            {bulkDone !== null ? `Tar bort… ${bulkDone} av ${selected.size}` : 'Ta bort markerade'}
+          </button>
+          <button onClick={() => setSelected(new Set())} disabled={bulkDone !== null} style={{ padding: '9px 14px', borderRadius: 8, background: 'transparent', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, cursor: 'pointer' }}>Avmarkera</button>
+        </div>
+      )}
 
       {/* Table */}
       <div style={{ padding: '0 40px' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
+              <th style={{ width: 44, padding: '14px 0', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
+                <input type="checkbox" aria-label="Markera alla som visas" checked={filtered.length > 0 && filtered.every(c => selected.has(c.id))}
+                  onChange={e => setSelected(e.target.checked ? new Set([...selected, ...filtered.map(c => c.id)]) : new Set([...selected].filter(id => !filtered.some(c => c.id === id))))}
+                  style={{ width: 20, height: 20, accentColor: '#E05252', cursor: 'pointer' }} />
+              </th>
               {['Företag', 'Kontakt', 'Ort', 'Säljare', 'Prislista', 'Status', 'Ordrar', 'Omsättning'].map(h => (
                 <th key={h} style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.08em', padding: '14px 0', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>{h}</th>
               ))}
@@ -209,6 +240,11 @@ export default function AdminCustomers() {
                   onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'rgba(255,255,255,.03)'}
                   onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}
                 >
+                  <td style={{ padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,.04)' }} onClick={e => e.stopPropagation()}>
+                    <input type="checkbox" aria-label={`Markera ${c.company}`} checked={selected.has(c.id)}
+                      onChange={e => setSelected(prev => { const n = new Set(prev); if (e.target.checked) n.add(c.id); else n.delete(c.id); return n })}
+                      style={{ width: 20, height: 20, accentColor: '#E05252', cursor: 'pointer' }} />
+                  </td>
                   <td style={{ padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
                     <strong style={{ fontSize: 13, color: 'var(--text)', display: 'block' }}>{c.company}</strong>
                     <span style={{ fontSize: 10, color: 'var(--text3)' }}>{c.org_nr || ''}</span>
