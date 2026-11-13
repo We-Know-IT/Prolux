@@ -884,7 +884,7 @@ export default function CustomerDetailPage() {
       {leadOpen && customer && (<Portal>
         <CreateLeadModal customer={customer} me={me.name} onClose={() => setLeadOpen(false)} onCreated={() => { showToast('Lead skapad – den syns i översikten och pipelinen'); loadData() }} />
       </Portal>)}
-      {drawerId && <OrderDrawer orderId={drawerId} onClose={() => setDrawerId(null)} onChanged={() => loadData()} />}
+      {drawerId && <OrderDrawer orderId={drawerId} onClose={() => setDrawerId(null)} onChanged={() => loadData()} onDeleted={() => loadData()} />}
 
       {toast && (
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--bg3)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', padding: '12px 20px', fontSize: 13, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 4px 20px rgba(0,0,0,.4)' }}>

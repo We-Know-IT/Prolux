@@ -6,7 +6,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { X, RefreshCw, ExternalLink, Check, Car, PackageCheck, Truck, ShoppingBag, CircleDot } from 'lucide-react'
+import { X, RefreshCw, ExternalLink, Check, Car, PackageCheck, Truck, ShoppingBag, CircleDot, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { fmt, formatDateTime } from '@/lib/utils'
 import { ORDER_STATUS_LABEL, type OrderStatus, type Product } from '@/types'
@@ -23,10 +23,11 @@ import ShipOrderForm from '@/components/orders/ShipOrderForm'
 const LIVE = ['pending', 'confirmed', 'packed', 'shipped', 'delivered']
 const STATUS_ORDER: OrderStatus[] = ['pending', 'confirmed', 'packed', 'shipped', 'delivered', 'cancelled']
 
-export default function OrderDrawer({ orderId, onClose, onChanged, extra }: {
+export default function OrderDrawer({ orderId, onClose, onChanged, onDeleted, extra }: {
   orderId: string
   onClose: () => void
   onChanged?: (order: any) => void
+  onDeleted?: (id: string) => void      // after admin has deleted the order
   extra?: (order: any) => ReactNode     // e.g. the CRM's quote buttons (PDF, mail)
 }) {
   const sb = createClient()
@@ -39,6 +40,27 @@ export default function OrderDrawer({ orderId, onClose, onChanged, extra }: {
   const [customers, setCustomers] = useState<{ id: string; company: string; city: string | null }[]>([])
   const [msg, setMsg] = useState('')
   const [vismaBusy, setVismaBusy] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  // Admin: delete the order for good (stock comes back as the lines go).
+  async function removeOrder() {
+    if (!o) return
+    const kind = o.status === 'quote' ? 'offerten' : o.status === 'draft' ? 'varukorgen' : 'ordern'
+    const visma = o.visma_invoice_id || o.visma_invoice_number
+      ? `\n\nObs! Ordern är fakturerad i Visma${o.visma_invoice_number ? ` (nr ${o.visma_invoice_number})` : ''}. Fakturan finns kvar där och måste krediteras i Visma.`
+      : o.visma_draft_id ? '\n\nFakturautkastet i Visma finns kvar och tas bort där.' : ''
+    if (!confirm(`Ta bort ${kind} #${o.order_nr}${o.customers?.company ? ` (${o.customers.company})` : ''} för gott? Varorna läggs tillbaka i lagret. Det går inte att ångra.${visma}`)) return
+    setDeleting(true)
+    try {
+      const { deleteOrder } = await import('@/lib/delete-order')
+      await deleteOrder(o.id)
+      onDeleted?.(o.id)
+      onClose()
+    } catch (e) {
+      setDeleting(false)
+      alert('Kunde inte ta bort ordern: ' + (e instanceof Error ? e.message : String(e)))
+    }
+  }
 
   async function load() {
     const { data } = await sb.from('orders').select('*,customers(id,company,contact_name,email,phone,city)').eq('id', orderId).maybeSingle()
@@ -229,6 +251,12 @@ export default function OrderDrawer({ orderId, onClose, onChanged, extra }: {
                 )}
               </div>
               <div style={{ marginTop: 10, fontSize: 13, color: 'var(--text2)' }}>Summa {fmt(o.total || 0)} kr inkl. moms</div>
+              {isAdmin && (
+                <button onClick={removeOrder} disabled={deleting}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 7, marginTop: 22, padding: '10px 14px', borderRadius: 9, background: 'transparent', border: '1px solid rgba(224,82,82,.45)', color: 'var(--red)', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: deleting ? .6 : 1 }}>
+                  <Trash2 size={15} /> {deleting ? 'Tar bort…' : o.status === 'quote' ? 'Ta bort offerten' : o.status === 'draft' ? 'Ta bort varukorgen' : 'Ta bort ordern'}
+                </button>
+              )}
             </>)}
           </div>
         </aside>

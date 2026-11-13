@@ -908,6 +908,7 @@ export default function CrmOrdersPage() {
       {expandedOrderId && (
         <OrderDrawer orderId={expandedOrderId} onClose={() => setExpandedOrderId(null)}
           onChanged={o => setOrders(os => os.map(x => x.id === o.id ? { ...x, ...o } : x))}
+          onDeleted={id => setOrders(os => os.filter(x => x.id !== id))}
           extra={o => (o.status === 'draft' || o.status === 'quote') ? (
             <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
               {o.status === 'quote' && <button onClick={() => downloadQuote(o)} style={drawerAction}>Ladda ner PDF</button>}

@@ -125,7 +125,7 @@ export default function QuotesPage() {
           </tbody>
         </table>
       </div>
-      {openId && <OrderDrawer orderId={openId} onClose={() => setOpenId(null)} onChanged={() => load()} />}
+      {openId && <OrderDrawer orderId={openId} onClose={() => setOpenId(null)} onChanged={() => load()} onDeleted={() => load()} />}
     </div>
   )
 }

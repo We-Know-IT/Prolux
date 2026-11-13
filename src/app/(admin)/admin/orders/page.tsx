@@ -231,7 +231,8 @@ export default function AdminOrders() {
       {/* One order: the same detailed view as everywhere else */}
       {selectedOrder && (
         <OrderDrawer orderId={selectedOrder.id} onClose={() => setSelectedOrder(null)}
-          onChanged={o => setOrders(prev => prev.map(x => x.id === o.id ? { ...x, ...o } : x))} />
+          onChanged={o => setOrders(prev => prev.map(x => x.id === o.id ? { ...x, ...o } : x))}
+          onDeleted={id => setOrders(prev => prev.filter(x => x.id !== id))} />
       )}
 
       {/* Toast */}
