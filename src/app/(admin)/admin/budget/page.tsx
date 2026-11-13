@@ -322,6 +322,32 @@ export default function BudgetPage() {
       <p style={help}>Lägg in en årsbudget för bolaget så fördelas den på månader och arbetsdagar, eller skriv in budgeten för varje månad själv – för bolaget och för varje säljare. Säljarna ser sin månadsbudget, dagsbudget, vad de sålt och vad som är kvar på sin översikt i CRM:et.</p>
       {missingTable && <p role="alert" style={{ ...help, color: '#E0A85A', fontWeight: 600 }}>Kör migration 0027 i Supabase (SQL Editor) för att kunna spara bolagets budget och årsbudgetar. Säljarnas budget fungerar redan.</p>}
 
+      {/* The company has a budget but the salespeople do not: they see nothing. */}
+      {(() => {
+        const unsplit = months.filter(ym => num(company[ymKey(ym)]) > 0 && sellerSum(ymKey(ym)) === 0)
+        if (!unsplit.length) return null
+        return (
+          <div role="alert" style={{ ...card, border: '1px solid rgba(224,168,90,.6)', background: 'rgba(224,168,90,.08)' }}>
+            <strong style={{ fontSize: 15, color: 'var(--text)' }}>Bolagets budget är inte fördelad på säljarna för {unsplit.length === months.length ? 'någon månad' : `${unsplit.length} månader`}.</strong>
+            <p style={{ margin: '6px 0 12px', fontSize: 14, color: 'var(--text2)' }}>Säljarna ser bara sin egen budget. Ange hur många procent varje säljare ska ha (0 för den som inte säljer), tryck på knappen och sedan Spara budget.</p>
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+              {people.map(p => (
+                <label key={p} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: 'var(--text)' }}>
+                  {p}
+                  <input inputMode="decimal" aria-label={`Andel ${p}`} value={shares[p] ?? ''} onChange={e => setShares(s => ({ ...s, [p]: e.target.value }))}
+                    style={{ width: 64, padding: '8px 9px', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 14, textAlign: 'right' }} />
+                  %
+                </label>
+              ))}
+              <button onClick={() => { applyShares(); setMsg({ ok: true, text: 'Fördelat på säljarna. Tryck Spara budget.' }) }}
+                style={{ padding: '10px 16px', borderRadius: 9, background: 'var(--gold)', border: 'none', color: '#111', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                Fördela på säljarna
+              </button>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Shortcuts to the parts of the page */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
         {[['#arsbudget', 'Fördela årsbudget'], ['#manader', 'Budget per månad och säljare'], ['#manuell', 'Registrera försäljning manuellt']].map(([h, l]) => (
