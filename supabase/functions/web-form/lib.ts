@@ -56,7 +56,7 @@ export function parseForm(body: string): Record<string, unknown> {
   return out
 }
 
-const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
+const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
 
 // Keys that are noise from the form plugins, not something the visitor wrote.
 const SKIP = /^(_|form id|form_id|form name|form_name|entry id|entry_id|serial|status|source url|user agent|ip|browser|device|created|updated|date|time|page url|remote ip|referer|referrer|nonce|token|g recaptcha|recaptcha|hcaptcha|cf turnstile|website$)/
