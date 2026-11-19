@@ -10,7 +10,7 @@ import nodemailer from 'npm:nodemailer@6.9.16'
 
 const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 const APP_URL = Deno.env.get('APP_URL') || 'https://crm.proluxshine.com'
-const SITE_URL = Deno.env.get('SITE_URL') || 'https://www.proluxshine.com'
+const SITE_URL = Deno.env.get('SITE_URL') || 'https://www.proluxshine.se'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -24,7 +24,7 @@ const kr = (n: number) => `${Math.round(n || 0).toLocaleString('sv-SE')} kr`
 // bcc: copies (Bashar, the salesperson) the customer does not see.
 async function sendEmail(to: string[], subject: string, html: string, config: any, bcc: string[] = []): Promise<boolean> {
   const replyTo = (config?.reply_to || '').trim()
-  if (!config || config.provider === 'pending') throw new Error('e-post är inte inställd ännu (Admin → Automationer)')
+  if (!config || config.provider === 'pending') throw new Error('e-post är inte inställd ännu (Admin → Integrationer → E-post)')
   if (config.provider === 'outlook') {
     const tokenRes = await fetch(`https://login.microsoftonline.com/${config.tenant_id}/oauth2/v2.0/token`, {
       method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
