@@ -6,11 +6,11 @@ import { useEffect, useState } from 'react'
 import { Mail, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
-interface Form { from_name: string; from_email: string; smtp_host: string; smtp_port: string; smtp_user: string; password: string }
+interface Form { from_name: string; from_email: string; smtp_host: string; smtp_port: string; smtp_user: string; password: string; reply_to: string; copy_to: string; copy_seller: boolean }
 
 export default function EmailSettings({ card }: { card: React.CSSProperties }) {
   const sb = createClient()
-  const [form, setForm] = useState<Form>({ from_name: 'ProLuxShine', from_email: '', smtp_host: 'send.one.com', smtp_port: '465', smtp_user: '', password: '' })
+  const [form, setForm] = useState<Form>({ from_name: 'ProLuxShine', from_email: '', smtp_host: 'send.one.com', smtp_port: '465', smtp_user: '', password: '', reply_to: '', copy_to: '', copy_seller: true })
   const [exists, setExists] = useState(false)
   const [provider, setProvider] = useState<string | null>(null)
   const [hasPassword, setHasPassword] = useState(false)
@@ -18,7 +18,7 @@ export default function EmailSettings({ card }: { card: React.CSSProperties }) {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   useEffect(() => {
-    sb.from('email_config').select('provider,from_name,from_email,smtp_host,smtp_port,smtp_user,smtp_password').eq('id', 'default').maybeSingle()
+    sb.from('email_config').select('*').eq('id', 'default').maybeSingle()
       .then(({ data }) => {
         if (!data) { setProvider('pending'); return }
         setExists(true)
@@ -31,16 +31,23 @@ export default function EmailSettings({ card }: { card: React.CSSProperties }) {
           smtp_host: data.smtp_host || f.smtp_host,
           smtp_port: data.smtp_port ? String(data.smtp_port) : f.smtp_port,
           smtp_user: data.smtp_user || '',
+          reply_to: data.reply_to || '',
+          copy_to: data.copy_to || '',
+          copy_seller: data.copy_seller !== false,
         }))
       })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (k: keyof Form) => (e: React.ChangeEvent<HTMLInputElement>) => { setForm(f => ({ ...f, [k]: e.target.value })); setMsg(null) }
+  const emailList = (v: string) => v.split(/[,;\s]+/).map(x => x.trim().toLowerCase()).filter(Boolean)
 
   async function save() {
     const email = form.from_email.trim().toLowerCase()
     if (!/^\S+@\S+\.\S+$/.test(email)) { setMsg({ ok: false, text: 'Fyll i en giltig avsändaradress, t.ex. order@proluxshine.com.' }); return }
     if (!hasPassword && !form.password) { setMsg({ ok: false, text: 'Fyll i lösenordet till e-postkontot.' }); return }
+    const copies = emailList(form.copy_to)
+    const badCopy = [form.reply_to.trim(), ...copies].filter(Boolean).find(x => !/^\S+@\S+\.\S+$/.test(x))
+    if (badCopy) { setMsg({ ok: false, text: `Ogiltig e-postadress: ${badCopy}` }); return }
     setBusy(true); setMsg(null)
     const patch: Record<string, unknown> = {
       provider: 'smtp',
@@ -49,13 +56,16 @@ export default function EmailSettings({ card }: { card: React.CSSProperties }) {
       smtp_host: form.smtp_host.trim() || 'send.one.com',
       smtp_port: parseInt(form.smtp_port, 10) || 465,
       smtp_user: form.smtp_user.trim() || email,
+      reply_to: form.reply_to.trim().toLowerCase() || null,
+      copy_to: copies.join(', ') || null,
+      copy_seller: form.copy_seller,
     }
     if (form.password) patch.smtp_password = form.password
     const { error } = exists
       ? await sb.from('email_config').update(patch).eq('id', 'default')
       : await sb.from('email_config').insert({ id: 'default', ...patch })
     setBusy(false)
-    if (error) { setMsg({ ok: false, text: /smtp_/.test(error.message) ? 'Kör migration 0025 i Supabase först.' : `Kunde inte spara: ${error.message}` }); return }
+    if (error) { setMsg({ ok: false, text: /reply_to|copy_/.test(error.message) ? 'Kör migration 0030 i Supabase först.' : /smtp_/.test(error.message) ? 'Kör migration 0025 i Supabase först.' : `Kunde inte spara: ${error.message}` }); return }
     setExists(true); setProvider('smtp'); if (form.password) setHasPassword(true)
     setForm(f => ({ ...f, password: '' }))
     setMsg({ ok: true, text: 'Sparat. Orderbekräftelser och automationer skickas nu från ' + email + '.' })
@@ -86,6 +96,19 @@ export default function EmailSettings({ card }: { card: React.CSSProperties }) {
         <label style={label}>Användarnamn (om annat än adressen)<input value={form.smtp_user} onChange={set('smtp_user')} placeholder={form.from_email || 'samma som adressen'} style={field} autoComplete="off" /></label>
         <label style={label}>Utgående server (SMTP)<input value={form.smtp_host} onChange={set('smtp_host')} style={field} /></label>
         <label style={label}>Port<input inputMode="numeric" value={form.smtp_port} onChange={set('smtp_port')} style={field} /></label>
+      </div>
+      <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Svar och kopior av orderbekräftelser</div>
+        <p style={{ fontSize: 13, color: 'var(--text2)', margin: '0 0 12px' }}>Kunden ser inte kopiorna.</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+          <label style={label}>Svar från kunder går till (valfritt)<input type="email" value={form.reply_to} onChange={set('reply_to')} placeholder="t.ex. info@proluxshine.se" style={field} autoComplete="off" /></label>
+          <label style={label}>Skicka alltid en kopia till<input value={form.copy_to} onChange={set('copy_to')} placeholder="t.ex. bashar@proluxshine.se" style={field} autoComplete="off" />
+            <span style={{ fontWeight: 400 }}>Flera adresser: skilj med kommatecken.</span></label>
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, fontSize: 14, color: 'var(--text)', cursor: 'pointer' }}>
+          <input type="checkbox" checked={form.copy_seller} onChange={e => { setForm(f => ({ ...f, copy_seller: e.target.checked })); setMsg(null) }} style={{ width: 20, height: 20, accentColor: '#E8B84B' }} />
+          Skicka också en kopia till säljaren som lade ordern
+        </label>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 14 }}>
         <button onClick={save} disabled={busy} style={{ padding: '11px 18px', borderRadius: 8, background: 'var(--gold)', border: 'none', color: '#111', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: busy ? .6 : 1 }}>

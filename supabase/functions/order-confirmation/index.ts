@@ -21,7 +21,9 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]!))
 const kr = (n: number) => `${Math.round(n || 0).toLocaleString('sv-SE')} kr`
 
-async function sendEmail(to: string[], subject: string, html: string, config: any): Promise<boolean> {
+// bcc: copies (Bashar, the salesperson) the customer does not see.
+async function sendEmail(to: string[], subject: string, html: string, config: any, bcc: string[] = []): Promise<boolean> {
+  const replyTo = (config?.reply_to || '').trim()
   if (!config || config.provider === 'pending') throw new Error('e-post är inte inställd ännu (Admin → Automationer)')
   if (config.provider === 'outlook') {
     const tokenRes = await fetch(`https://login.microsoftonline.com/${config.tenant_id}/oauth2/v2.0/token`, {
@@ -31,7 +33,8 @@ async function sendEmail(to: string[], subject: string, html: string, config: an
     const { access_token } = await tokenRes.json()
     const res = await fetch(`https://graph.microsoft.com/v1.0/users/${config.from_email}/sendMail`, {
       method: 'POST', headers: { Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: { subject, body: { contentType: 'HTML', content: html }, toRecipients: to.map(address => ({ emailAddress: { address } })) } }),
+      body: JSON.stringify({ message: { subject, body: { contentType: 'HTML', content: html }, toRecipients: to.map(address => ({ emailAddress: { address } })),
+        ...(bcc.length ? { bccRecipients: bcc.map(address => ({ emailAddress: { address } })) } : {}), ...(replyTo ? { replyTo: [{ emailAddress: { address: replyTo } }] } : {}) } }),
     })
     return res.ok
   }
@@ -43,13 +46,13 @@ async function sendEmail(to: string[], subject: string, html: string, config: an
       host: config.smtp_host || 'send.one.com', port, secure: port === 465,
       auth: { user: config.smtp_user || config.from_email, pass: config.smtp_password },
     })
-    await transport.sendMail({ from: { name: config.from_name || 'ProLuxShine', address: config.from_email }, to: to, subject, html: html })
+    await transport.sendMail({ from: { name: config.from_name || 'ProLuxShine', address: config.from_email }, to, subject, html, ...(bcc.length ? { bcc } : {}), ...(replyTo ? { replyTo } : {}) })
     return true
   }
   if (config.provider === 'sendgrid') {
     const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
       method: 'POST', headers: { Authorization: `Bearer ${config.api_key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ personalizations: [{ to: to.map(email => ({ email })) }], from: { email: config.from_email, name: config.from_name }, subject, content: [{ type: 'text/html', value: html }] }),
+      body: JSON.stringify({ personalizations: [{ to: to.map(email => ({ email })), ...(bcc.length ? { bcc: bcc.map(email => ({ email })) } : {}) }], from: { email: config.from_email, name: config.from_name }, ...(replyTo ? { reply_to: { email: replyTo } } : {}), subject, content: [{ type: 'text/html', value: html }] }),
     })
     return res.ok || res.status === 202
   }
@@ -83,6 +86,14 @@ Deno.serve(async req => {
   const { data: staff } = await sb.from('staff_members').select('email,full_name')
   const first = (n: string) => (n || '').trim().split(/\s+/)[0]
   const seller = (staff ?? []).find(s => first(s.full_name) === (order.assigned_to || order.created_by))
+  // Copies: the fixed addresses in the settings (e.g. Bashar) and the
+  // salesperson who placed the order (else the one it counts for).
+  const placedBy = (staff ?? []).find(s => first(s.full_name) === (order.created_by || order.assigned_to))
+  const copies = [
+    ...String(config?.copy_to || '').split(/[,;\s]+/),
+    ...(config?.copy_seller !== false && placedBy?.email ? [placedBy.email] : []),
+  ].map(e => e.trim().toLowerCase()).filter(e => /^\S+@\S+\.\S+$/.test(e) && e !== String(c.email).toLowerCase())
+  const bcc = [...new Set(copies)]
 
   const lines = items ?? []
   const fromCar = lines.some(l => l.delivery === 'car'), toShip = lines.some(l => l.delivery !== 'car')
@@ -109,9 +120,9 @@ Deno.serve(async req => {
     </div>`
 
   let ok = false, error = ''
-  try { ok = await sendEmail([c.email], `Orderbekräftelse #${order.order_nr} – ProLuxShine`, html, config) }
+  try { ok = await sendEmail([c.email], `Orderbekräftelse #${order.order_nr} – ProLuxShine`, html, config, bcc) }
   catch (e) { error = e instanceof Error ? e.message : String(e) }
-  await sb.from('integration_log').insert({ order_id: orderId, type: 'order-confirmation', status: ok ? 'success' : 'error', payload: { to: c.email }, response: error ? { error } : null }).then(() => null, () => null)
+  await sb.from('integration_log').insert({ order_id: orderId, type: 'order-confirmation', status: ok ? 'success' : 'error', payload: { to: c.email, bcc }, response: error ? { error } : null }).then(() => null, () => null)
   if (!ok) return json({ error: error || 'e-postleverantören tog inte emot mejlet' }, 502)
-  return json({ sent: true, to: c.email })
+  return json({ sent: true, to: c.email, copies: bcc })
 })
