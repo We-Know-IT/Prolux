@@ -57,13 +57,13 @@ function ProductDetailContent() {
   }
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--shop-text2)' }}>
       Laddar produkt...
     </div>
   )
 
   if (!product) return (
-    <div style={{ minHeight: '100vh', padding: '80px 48px', textAlign: 'center', color: '#aaa' }}>
+    <div style={{ minHeight: '100vh', padding: '80px 48px', textAlign: 'center', color: 'var(--shop-text2)' }}>
       <p style={{ fontSize: 18 }}>Produkten hittades inte.</p>
       <Link href="/produkter" style={{ color: '#E8B84B', fontWeight: 600 }}>← Tillbaka till produkter</Link>
     </div>
@@ -80,23 +80,23 @@ function ProductDetailContent() {
       `}</style>
 
       {/* Breadcrumb */}
-      <div style={{ padding: '14px 48px', borderBottom: '1px solid rgba(0,0,0,.08)', background: 'rgba(255,255,255,.7)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <Link href="/" style={{ color: '#888', fontSize: 13, textDecoration: 'none' }}>Hem</Link>
+      <div style={{ padding: '14px 48px', borderBottom: '1px solid var(--shop-line)', background: 'transparent', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <Link href="/" style={{ color: 'var(--shop-text2)', fontSize: 13, textDecoration: 'none' }}>Hem</Link>
         <ChevronRight size={12} color="#ccc" />
-        <Link href="/produkter" style={{ color: '#888', fontSize: 13, textDecoration: 'none' }}>Produkter</Link>
+        <Link href="/produkter" style={{ color: 'var(--shop-text2)', fontSize: 13, textDecoration: 'none' }}>Produkter</Link>
         <ChevronRight size={12} color="#ccc" />
-        <Link href="/produkter" style={{ color: '#888', fontSize: 13, textDecoration: 'none' }}>Alla Produkter</Link>
+        <Link href="/produkter" style={{ color: 'var(--shop-text2)', fontSize: 13, textDecoration: 'none' }}>Alla Produkter</Link>
         <ChevronRight size={12} color="#ccc" />
-        <span style={{ color: '#111', fontSize: 13, fontWeight: 600 }}>{product.name}</span>
+        <span style={{ color: 'var(--shop-text)', fontSize: 13, fontWeight: 600 }}>{product.name}</span>
       </div>
 
       {/* Main product layout */}
-      <div className="pd-card" style={{ maxWidth: 1160, margin: '24px auto', padding: '40px 32px', background: '#fff', borderRadius: 16, boxShadow: '0 1px 6px rgba(0,0,0,.05)' }}>
+      <div className="pd-card" style={{ maxWidth: 1160, margin: '24px auto', padding: '40px 32px', background: 'var(--shop-surface)', border: '1px solid var(--shop-line)', borderRadius: 10, boxShadow: '0 1px 6px rgba(0,0,0,.05)' }}>
         <div className="pd-grid">
 
           {/* Left — Image */}
           <div>
-            <div style={{ background: '#f4f4f4', borderRadius: 8, aspectRatio: '1/1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, overflow: 'hidden' }}>
+            <div style={{ background: '#fff', borderRadius: 8, aspectRatio: '1/1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, overflow: 'hidden' }}>
               {product.image_url ? (
                 <img src={product.image_url} alt={product.name} style={{ maxWidth: '85%', maxHeight: '85%', objectFit: 'contain' }} />
               ) : (
@@ -107,14 +107,14 @@ function ProductDetailContent() {
 
           {/* Right — Info */}
           <div>
-            <p style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '.1em', margin: '0 0 8px' }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--shop-text2)', textTransform: 'uppercase', letterSpacing: '.1em', margin: '0 0 8px' }}>
               {product.brand || 'ProLuxShine'}
             </p>
-            <h1 style={{ fontSize: 'clamp(24px, 3vw, 36px)', fontWeight: 800, color: '#111', margin: '0 0 10px', lineHeight: 1.15 }}>
+            <h1 style={{ fontSize: 'clamp(24px, 3vw, 36px)', fontWeight: 800, color: 'var(--shop-text)', margin: '0 0 10px', lineHeight: 1.15 }}>
               {product.name}
             </h1>
 
-            {authUser && <p style={{ fontSize: 12, color: '#777', marginBottom: 16 }}>{isPrivate ? 'Inkl. moms' : 'Exkl. moms'} · Exkl. frakt</p>}
+            {authUser && <p style={{ fontSize: 12, color: 'var(--shop-text2)', marginBottom: 16 }}>{isPrivate ? 'Inkl. moms' : 'Exkl. moms'} · Exkl. frakt</p>}
 
             {intro && (
               <p style={{ fontSize: 14, color: '#444', lineHeight: 1.7, marginBottom: 28, maxWidth: 440 }}>{intro}</p>
@@ -128,12 +128,12 @@ function ProductDetailContent() {
 
             {/* Qty + Add to cart (logged-in customers only) */}
             {canShop && <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #e0e0e0', borderRadius: 8, overflow: 'hidden' }}>
-                <button onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 42, height: 52, border: 'none', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555' }}>
+              <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--shop-line)', borderRadius: 8, overflow: 'hidden' }}>
+                <button onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 42, height: 52, border: 'none', background: 'var(--shop-surface2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--shop-text2)' }}>
                   <Minus size={16} />
                 </button>
-                <span style={{ width: 48, textAlign: 'center', fontSize: 16, fontWeight: 600, color: '#111' }}>{qty}</span>
-                <button onClick={() => setQty(q => q + 1)} style={{ width: 42, height: 52, border: 'none', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555' }}>
+                <span style={{ width: 48, textAlign: 'center', fontSize: 16, fontWeight: 600, color: 'var(--shop-text)' }}>{qty}</span>
+                <button onClick={() => setQty(q => q + 1)} style={{ width: 42, height: 52, border: 'none', background: 'var(--shop-surface2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--shop-text2)' }}>
                   <Plus size={16} />
                 </button>
               </div>
@@ -145,7 +145,7 @@ function ProductDetailContent() {
                 {added ? 'Tillagd!' : 'Lägg i varukorg'}
               </button>
             </div>}
-            {!authUser && <p style={{ fontSize: 13, color: '#555', margin: '0 0 20px' }}>Logga in eller skapa ett konto för att se priset och beställa.</p>}
+            {!authUser && <p style={{ fontSize: 13, color: 'var(--shop-text2)', margin: '0 0 20px' }}>Logga in eller skapa ett konto för att se priset och beställa.</p>}
 
             {/* Trust badges */}
             <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
@@ -153,8 +153,8 @@ function ProductDetailContent() {
                 { icon: Truck, text: 'Fri frakt över 2 000 kr' },
                 { icon: ShieldCheck, text: 'Betala mot faktura' },
               ].map(({ icon: Icon, text }) => (
-                <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666' }}>
-                  <Icon size={14} color="#888" />
+                <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--shop-text2)' }}>
+                  <Icon size={14} color="var(--shop-text2)" />
                   {text}
                 </div>
               ))}
@@ -163,12 +163,12 @@ function ProductDetailContent() {
         </div>
 
         {/* Tabs */}
-        <div style={{ marginTop: 56, borderBottom: '1px solid #e8e8e8', display: 'flex', gap: 32 }}>
+        <div style={{ marginTop: 56, borderBottom: '1px solid var(--shop-line)', display: 'flex', gap: 32 }}>
           {([['beskrivning', 'Beskrivning'], ['specifikationer', 'Specifikationer']] as const).map(([key, label]) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
-              style={{ paddingBottom: 14, fontSize: 15, fontWeight: activeTab === key ? 700 : 400, color: activeTab === key ? '#111' : '#888', background: 'none', border: 'none', borderBottom: activeTab === key ? '2px solid #111' : '2px solid transparent', cursor: 'pointer', marginBottom: -1 }}
+              style={{ paddingBottom: 14, fontSize: 15, fontWeight: activeTab === key ? 700 : 400, color: activeTab === key ? 'var(--shop-text)' : 'var(--shop-text2)', background: 'none', border: 'none', borderBottom: activeTab === key ? '2px solid #E8B84B' : '2px solid transparent', cursor: 'pointer', marginBottom: -1 }}
             >
               {label}
             </button>
@@ -180,7 +180,7 @@ function ProductDetailContent() {
             product.description ? (
               <div style={{ fontSize: 14, color: '#444', lineHeight: 1.8, whiteSpace: 'pre-line' }}>{product.description}</div>
             ) : (
-              <p style={{ fontSize: 14, color: '#666', lineHeight: 1.8, margin: 0 }}>
+              <p style={{ fontSize: 14, color: 'var(--shop-text2)', lineHeight: 1.8, margin: 0 }}>
                 Produktbeskrivning kommer snart. Kontakta oss om du har frågor om produkten.
               </p>
             )
@@ -194,9 +194,9 @@ function ProductDetailContent() {
                 ['Enhet', product.unit],
                 ['Lagerstatus', stock.label],
               ].filter(([, v]) => v).map(([k, v]) => (
-                <div key={k} style={{ display: 'flex', gap: 24, padding: '12px 0', borderBottom: '1px solid #f0f0f0', fontSize: 14 }}>
-                  <span style={{ color: '#888', minWidth: 140 }}>{k}</span>
-                  <span style={{ color: '#111', fontWeight: 500 }}>{v}</span>
+                <div key={k} style={{ display: 'flex', gap: 24, padding: '12px 0', borderBottom: '1px solid var(--shop-line)', fontSize: 14 }}>
+                  <span style={{ color: 'var(--shop-text2)', minWidth: 140 }}>{k}</span>
+                  <span style={{ color: 'var(--shop-text)', fontWeight: 500 }}>{v}</span>
                 </div>
               ))}
             </div>
@@ -205,19 +205,19 @@ function ProductDetailContent() {
 
         {/* Related products */}
         {related.length > 0 && (
-          <div style={{ borderTop: '1px solid #e8e8e8', paddingTop: 48 }}>
+          <div style={{ borderTop: '1px solid var(--shop-line)', paddingTop: 48 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-              <h2 style={{ fontSize: 22, fontWeight: 800, color: '#111', margin: 0 }}>Kunder köpte även</h2>
-              <Link href="/produkter" style={{ fontSize: 14, color: '#555', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--shop-text)', margin: 0 }}>Kunder köpte även</h2>
+              <Link href="/produkter" style={{ fontSize: 14, color: 'var(--shop-text2)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
                 Visa alla produkter <ChevronRight size={14} />
               </Link>
             </div>
             <div className="rel-grid">
               {related.map(p => {
                 return (
-                  <div key={p.id} style={{ border: '1px solid #e8e8e8', borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
+                  <div key={p.id} style={{ border: '1px solid var(--shop-line)', borderRadius: 8, overflow: 'hidden', background: 'var(--shop-surface)' }}>
                     <Link href={`/produkter/${p.id}`} style={{ textDecoration: 'none', display: 'block' }}>
-                      <div style={{ background: '#f4f4f4', aspectRatio: '1/1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                      <div style={{ background: '#fff', aspectRatio: '1/1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
                         {p.image_url ? (
                           <img src={p.image_url} alt={p.name} style={{ maxWidth: '80%', maxHeight: '80%', objectFit: 'contain' }} />
                         ) : <Package size={40} strokeWidth={1} color="#bbb" />}
@@ -225,11 +225,11 @@ function ProductDetailContent() {
                     </Link>
                     <div style={{ padding: '12px 16px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                        <p style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '.08em', margin: 0 }}>{p.brand || 'ProLuxShine'}</p>
+                        <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--shop-text2)', textTransform: 'uppercase', letterSpacing: '.08em', margin: 0 }}>{p.brand || 'ProLuxShine'}</p>
                         {(() => { const st = stockStatus(p.stock_qty); return <span style={{ fontSize: 10, fontWeight: 700, color: st.color, background: st.bg, padding: '2px 8px', borderRadius: 20 }}>{st.label}</span> })()}
                       </div>
                       <Link href={`/produkter/${p.id}`} style={{ textDecoration: 'none' }}>
-                        <p style={{ fontSize: 13, fontWeight: 600, color: '#111', margin: '4px 0 12px', lineHeight: 1.3 }}>{p.name}</p>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--shop-text)', margin: '4px 0 12px', lineHeight: 1.3 }}>{p.name}</p>
                       </Link>
                       <div style={{ marginBottom: 10 }}><Price listPrice={p.list_price} size="sm" /></div>
                       {canShop && <button
@@ -252,7 +252,7 @@ function ProductDetailContent() {
 
 export default function ProductDetailPage() {
   return (
-    <PublicShell>
+    <PublicShell tone="dark">
       <ProductDetailContent />
     </PublicShell>
   )

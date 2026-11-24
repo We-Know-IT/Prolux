@@ -394,57 +394,42 @@ function HeroSlider({ openLogin, loggedIn, heroImages, heroText, paused = false 
   const slide = heroText[current]
 
   return (
-    <section style={{ position: 'relative', height: 'clamp(560px, 80vh, 860px)', overflow: 'hidden', marginTop: 0 }}>
-
+    <section className="hero">
       {/* Background images — smooth crossfade, all always mounted */}
       {slides.map((src, i) => (
         <div key={i} style={{ position: 'absolute', inset: 0, opacity: i === current ? 1 : 0, transition: 'opacity 1.2s ease-in-out', zIndex: i === current ? 1 : 0 }}>
-          <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'right center', display: 'block' }} />
         </div>
       ))}
 
       <EditableImage doc="home" path={`hero.${current}.image_url`} bucket="hero-images" top={140} />
 
-      {/* Fallback dark bg when no images */}
-      {slides.length === 0 && <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, #0a0c10, #1a1400)' }} />}
+      {slides.length === 0 && <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(80% 90% at 80% 40%, #3a2a08 0%, #0D0D0F 70%)' }} />}
 
-      {/* Dark overlay */}
-      <div style={{ position: 'absolute', inset: 0, zIndex: 2, background: 'linear-gradient(100deg, rgba(8,9,12,.86) 0%, rgba(8,9,12,.55) 42%, rgba(8,9,12,.15) 75%, rgba(8,9,12,.05) 100%)' }} />
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 220, zIndex: 2, background: 'linear-gradient(to top, rgba(0,0,0,.65), transparent)' }} />
+      {/* Dark on the left, where the text is */}
+      <div style={{ position: 'absolute', inset: 0, zIndex: 2, background: 'linear-gradient(90deg, rgba(9,9,11,.94) 0%, rgba(9,9,11,.75) 38%, rgba(9,9,11,.2) 70%, rgba(9,9,11,0) 100%)' }} />
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 160, zIndex: 2, background: 'linear-gradient(to top, #0D0D0F, transparent)' }} />
 
-      {/* Content — bottom left */}
-      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end', zIndex: 3 }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 48px 80px', width: '100%' }}>
-          <div key={current} style={{ animation: 'fadeUp .5s ease' }}>
-            <p style={{ margin: '0 0 14px', fontSize: 12, fontWeight: 700, color: '#E8B84B', textTransform: 'uppercase', letterSpacing: '.22em' }}>
-              <EditableText doc="home" path={`hero.${current}.label`} value={slide.label} />
-            </p>
-            <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(40px, 5.4vw, 76px)', fontWeight: 700, color: '#fff', margin: '0 0 18px', lineHeight: 1.08, letterSpacing: '-.01em', whiteSpace: 'pre-line', textShadow: '0 2px 24px rgba(0,0,0,.35)' }}>
-              <EditableText doc="home" path={`hero.${current}.heading`} value={slide.heading} multiline />
-            </h1>
-            <p style={{ fontSize: 17, color: 'rgba(255,255,255,.85)', lineHeight: 1.65, margin: '0 0 32px', maxWidth: 520 }}>
-              <EditableText doc="home" path={`hero.${current}.sub`} value={slide.sub} multiline />
-            </p>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <Link href="/produkter" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 32px', borderRadius: 40, background: '#E8B84B', color: '#0F1115', fontSize: 14, fontWeight: 700, textDecoration: 'none', letterSpacing: '.02em' }}>
-                Utforska produkter <ArrowRight size={15} />
-              </Link>
-              <Link href="/aterforsaljare" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 28px', borderRadius: 40, background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.3)', color: '#fff', fontSize: 14, fontWeight: 600, textDecoration: 'none', backdropFilter: 'blur(6px)' }}>
-                Bli återförsäljare
-              </Link>
-            </div>
+      <div className="hero-inner">
+        <div key={current} style={{ animation: 'fadeUp .5s ease', maxWidth: 760 }}>
+          <p className="hero-label"><EditableText doc="home" path={`hero.${current}.label`} value={slide.label} /></p>
+          <h1 className="hero-title"><EditableText doc="home" path={`hero.${current}.heading`} value={slide.heading} multiline /></h1>
+          <p className="hero-sub"><EditableText doc="home" path={`hero.${current}.sub`} value={slide.sub} multiline /></p>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <Link href="/produkter" className="btn-white">Se alla produkter <ArrowRight size={17} /></Link>
+            {!loggedIn && <Link href="/aterforsaljare" className="btn-ghost">Bli återförsäljare</Link>}
           </div>
         </div>
       </div>
 
-      {/* Slide dots */}
-      <div style={{ position: 'absolute', bottom: 32, right: 48, display: 'flex', gap: 8, zIndex: 4 }}>
-        {Array.from({ length: total }).map((_, i) => (
-          <button key={i} onClick={() => setCurrent(i)}
-            style={{ width: i === current ? 24 : 8, height: 8, borderRadius: 4, background: i === current ? '#E8B84B' : 'rgba(255,255,255,.4)', border: 'none', cursor: 'pointer', padding: 0, transition: 'all .3s ease' }}
-          />
-        ))}
-      </div>
+      {total > 1 && (
+        <div className="hero-dots">
+          {Array.from({ length: total }).map((_, i) => (
+            <button key={i} onClick={() => setCurrent(i)} aria-label={`Bild ${i + 1}`}
+              style={{ width: i === current ? 28 : 8, height: 8, borderRadius: 4, background: i === current ? '#E8B84B' : 'rgba(255,255,255,.35)', border: 'none', cursor: 'pointer', padding: 0, transition: 'all .3s ease' }} />
+          ))}
+        </div>
+      )}
     </section>
   )
 }
@@ -853,75 +838,77 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
   // Keep each item's position in the saved list (`at`) for editing; empty
   // items are hidden from visitors but stay editable in edit mode.
   const trust = (siteHome.trust ?? DEFAULT_TRUST).map((t, at) => ({ ...t, at })).filter(t => editingSite || t.title.trim())
+  // Newest first (products marked "Ny" lead), and best sellers (marked "Storsäljare" first).
+  const newest = [...products].sort((a, b) => Number(b.badge === 'new') - Number(a.badge === 'new') || String(b.created_at || '').localeCompare(String(a.created_at || ''))).slice(0, 12)
+  const bestsellers = [...products].sort((a, b) => Number(b.badge === 'top') - Number(a.badge === 'top') || (a.sort_order ?? 0) - (b.sort_order ?? 0)).slice(0, 12)
 
   return (
     <>
       {/* ── HERO — image slider ── */}
       <HeroSlider openLogin={openLogin} loggedIn={!!authUser} heroImages={siteHome.hero.map(h => h.image_url)} heroText={siteHome.hero} paused={editingSite} />
 
-      {/* ── TRUST STRIP ── */}
-      <section style={{ background: 'transparent', borderBottom: '1px solid rgba(0,0,0,.07)' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px' }}>
-          <div className="trust-grid" style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(trust.length, 1)},1fr)` }}>
-            {trust.map(({ icon, title, sub, at }, i) => { const Icon = featureIcon(icon); return (
-              <div key={at} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 16px', borderRight: i < trust.length - 1 ? '1px solid rgba(0,0,0,.07)' : 'none' }}>
-                <Icon size={20} color="#C9971A" strokeWidth={1.5} />
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '.06em' }}><EditableText doc="home" path={`trust.${at}.title`} value={title} /></div>
-                  {(sub || editingSite) && <div style={{ fontSize: 12, color: '#555', marginTop: 1 }}><EditableText doc="home" path={`trust.${at}.sub`} value={sub} /></div>}
-                </div>
+      {/* ── USP ROW ── */}
+      <section className="usp-band">
+        <div className="usp-grid" style={{ gridTemplateColumns: `repeat(${Math.max(trust.length, 1)}, minmax(0, 1fr))` }}>
+          {trust.map(({ icon, title, sub, at }) => { const Icon = featureIcon(icon); return (
+            <div key={at} className="usp">
+              <span className="usp-icon"><Icon size={18} color="#E8B84B" strokeWidth={1.8} /></span>
+              <div>
+                <div className="usp-title"><EditableText doc="home" path={`trust.${at}.title`} value={title} /></div>
+                {(sub || editingSite) && <div className="usp-sub"><EditableText doc="home" path={`trust.${at}.sub`} value={sub} /></div>}
               </div>
-            ) })}
-          </div>
+            </div>
+          ) })}
         </div>
       </section>
 
-      {/* ── CATEGORIES ── */}
-      <section style={{ background: 'transparent', padding: '48px 24px 56px' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-          <h2 style={{ margin: '0 0 24px', fontSize: 22, fontWeight: 800, color: '#111' }}>Utvalda kategorier</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }} className="cat-grid">
-            {siteHome.categories.map((cat, i) => (
-              <Reveal key={i} delay={i * 50}>
-                <Link href="/produkter" style={{ display: 'block', position: 'relative', borderRadius: 12, overflow: 'hidden', textDecoration: 'none', aspectRatio: '16/10', background: '#1a1a1a', transition: 'transform .2s', containerType: 'inline-size' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'scale(1.02)' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'none' }}>
-                  {/* The photos carry a small name in the bottom corner: crop it off and write the name large instead. */}
-                  <img src={cat.img} alt="" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '128%', objectFit: 'cover', objectPosition: 'top' }} />
-                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.72) 0%, rgba(0,0,0,.35) 40%, rgba(0,0,0,0) 70%)' }} />
-                  <span style={{ position: 'absolute', left: '7cqw', right: '6cqw', bottom: '6cqw', color: '#fff', fontSize: 'clamp(15px, 9cqw, 28px)', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-.01em', textShadow: '0 2px 10px rgba(0,0,0,.45)', overflowWrap: 'anywhere' }}>{cat.name}</span>
-                  <EditableImage doc="home" path={`categories.${i}.img`} bucket="category-images" />
-                </Link>
-              </Reveal>
-            ))}
+      {/* ── NEWEST PRODUCTS ── */}
+      {(newest.length > 0 || editingSite) && (
+        <section className="home-sec">
+          <div className="sec-head">
+            <h2 className="sec-title">Senast inkommet</h2>
+            <Link href="/produkter" className="sec-link">Se alla produkter</Link>
           </div>
+          <div className="pcard-row">
+            {newest.map(p => <ProductCard key={p.id} p={p} />)}
+            <AddProductCard minHeight={300} onCreated={p => onProductCreated?.(p)} />
+          </div>
+        </section>
+      )}
+
+      {/* ── CATEGORIES: from dirty to showroom ── */}
+      <section className="home-sec">
+        <div className="sec-head sec-head-split">
+          <h2 className="sec-title sec-title-xl">Från smutsig<br />till showroom</h2>
+          <p className="sec-lead">Välj var du vill börja. Vi har produkterna för varje steg – från förtvätt och avfettning till polering och lackskydd.</p>
+        </div>
+        <div className="cat-row">
+          {siteHome.categories.map((cat, i) => (
+            <Link key={i} href={`/produkter?kat=${encodeURIComponent(cat.name)}`} className="cat-tile">
+              <img src={cat.img} alt="" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '118%', objectFit: 'cover', objectPosition: 'top' }} />
+              <span className="cat-shade" />
+              <span className="cat-name">{cat.name} <ArrowRight size={18} /></span>
+              <EditableImage doc="home" path={`categories.${i}.img`} bucket="category-images" />
+            </Link>
+          ))}
         </div>
       </section>
 
-      {/* ── PRODUCTS — Populära produkter ── */}
-      {(products.length > 0 || editingSite) && (
-        <section style={{ background: 'transparent', padding: '0 24px 64px' }}>
-          <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, paddingBottom: 16, borderBottom: '2px solid rgba(0,0,0,.12)' }}>
-              <h2 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#111', textTransform: 'uppercase', letterSpacing: '.08em' }}>Storsäljare just nu</h2>
-              <Link href="/produkter" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#C9971A', fontSize: 13, fontWeight: 700, textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-                Se alla produkter <ArrowRight size={14} />
-              </Link>
-            </div>
-            <div className="pcard-grid">
-              {products.map((p, i) => (
-                <Reveal key={p.id} delay={i * 40}>
-                  <ProductCard p={p} />
-                </Reveal>
-              ))}
-              <AddProductCard minHeight={300} onCreated={p => onProductCreated?.(p)} />
-            </div>
+      {/* ── BEST SELLERS ── */}
+      {bestsellers.length > 0 && (
+        <section className="home-sec">
+          <div className="sec-head">
+            <h2 className="sec-title">Bästsäljare</h2>
+            <Link href="/produkter" className="sec-link">Se alla produkter</Link>
+          </div>
+          <div className="pcard-row">
+            {bestsellers.map(p => <ProductCard key={p.id} p={p} />)}
           </div>
         </section>
       )}
 
       {/* ── PRO CENTER — full-width dark banner ── */}
-      <section id="pro-center" style={{ background: '#0D0F13', position: 'relative', overflow: 'hidden' }}>
+      <section id="pro-center" style={{ background: '#141417', borderTop: '1px solid rgba(255,255,255,.06)', borderBottom: '1px solid rgba(255,255,255,.06)', position: 'relative', overflow: 'hidden', marginTop: 24 }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', display: 'grid', gridTemplateColumns: '420px 1fr', alignItems: 'center', minHeight: 360 }} className="b2b-grid">
           {/* Left — image placeholder with product */}
           <div className="b2b-img" style={{ height: '100%', position: 'relative', overflow: 'hidden', minHeight: 320 }}>
@@ -982,11 +969,11 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
           <Reveal delay={100}>
             <div>
               <p style={{ fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.14em', marginBottom: 14 }}><EditableText doc="home" path={'brandStory.eyebrow'} value={siteHome.brandStory.eyebrow} /></p>
-              <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(24px,3.5vw,40px)', fontWeight: 700, color: '#111', margin: '0 0 18px', lineHeight: 1.15 }}>
+              <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(24px,3.5vw,40px)', fontWeight: 700, color: 'var(--shop-text)', margin: '0 0 18px', lineHeight: 1.15 }}>
                 <EditableText doc="home" path={'brandStory.heading'} value={siteHome.brandStory.heading} />
               </h2>
               {siteHome.brandStory.paragraphs.map((p, i) => (
-                <p key={i} style={{ fontSize: 14, color: '#555', lineHeight: 1.8, marginBottom: i === siteHome.brandStory.paragraphs.length - 1 ? 28 : 20 }}>
+                <p key={i} style={{ fontSize: 15, color: 'var(--shop-text2)', lineHeight: 1.8, marginBottom: i === siteHome.brandStory.paragraphs.length - 1 ? 28 : 20 }}>
                   <EditableText doc="home" path={`brandStory.paragraphs.${i}`} value={p} multiline />
                 </p>
               ))}
@@ -996,8 +983,8 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
                   const on = storyBrand === brand
                   return (
                     <div key={key} role="button" tabIndex={0} aria-pressed={on} onClick={() => setStoryBrand(brand)} onKeyDown={e => { if (e.key === 'Enter') setStoryBrand(brand) }}
-                      style={{ paddingBottom: 8, borderBottom: `2px solid ${on ? '#111' : 'transparent'}`, cursor: 'pointer' }}>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: on ? '#111' : '#777' }}><EditableText doc="home" path={`brandStory.${key}`} value={label} /></span>
+                      style={{ paddingBottom: 8, borderBottom: `2px solid ${on ? '#E8B84B' : 'transparent'}`, cursor: 'pointer' }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: on ? 'var(--shop-text)' : 'var(--shop-text2)' }}><EditableText doc="home" path={`brandStory.${key}`} value={label} /></span>
                     </div>
                   )
                 })}
@@ -1010,20 +997,20 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
       {/* ── WHY PROLUX — feature grid ── */}
       <section style={{ padding: '64px 24px' }}>
         <div style={{ maxWidth: 1160, margin: '0 auto' }}>
-          <h2 style={{ fontSize: 'clamp(20px, 2.5vw, 28px)', fontWeight: 800, color: '#111', marginBottom: 36, textAlign: 'center' }}>
+          <h2 className="sec-title" style={{ marginBottom: 36 }}>
             <EditableText doc="home" path={'why.heading'} value={siteHome.why.heading} />
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 28 }} className="features-grid">
             {siteHome.why.features.map((f, i) => (
               <Reveal key={i}>
-                <div style={{ background: '#fff', borderRadius: 12, padding: '28px 24px', border: '1px solid #e8e8e8', height: '100%', boxSizing: 'border-box' }}>
+                <div style={{ background: 'var(--shop-surface)', borderRadius: 10, padding: '28px 24px', border: '1px solid var(--shop-line)', height: '100%', boxSizing: 'border-box' }}>
                   {(() => { const Icon = featureIcon(f.icon); return (
-                    <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(201,151,26,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                      <Icon size={22} color="#A67C12" strokeWidth={1.75} />
+                    <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(232,184,75,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                      <Icon size={22} color="#E8B84B" strokeWidth={1.75} />
                     </div>
                   ) })()}
-                  <div style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 8 }}><EditableText doc="home" path={`why.features.${i}.title`} value={f.title} /></div>
-                  <div style={{ fontSize: 13, color: '#666', lineHeight: 1.7 }}><EditableText doc="home" path={`why.features.${i}.desc`} value={f.desc} multiline /></div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--shop-text)', marginBottom: 8 }}><EditableText doc="home" path={`why.features.${i}.title`} value={f.title} /></div>
+                  <div style={{ fontSize: 14, color: 'var(--shop-text2)', lineHeight: 1.7 }}><EditableText doc="home" path={`why.features.${i}.desc`} value={f.desc} multiline /></div>
                 </div>
               </Reveal>
             ))}
@@ -1032,7 +1019,7 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
       </section>
 
       {/* ── B2B CTA banner ── */}
-      <section style={{ background: '#0D0F13', padding: '40px 24px' }}>
+      <section style={{ background: '#141417', borderTop: '1px solid rgba(255,255,255,.06)', padding: '44px 24px' }}>
         <div style={{ maxWidth: 1160, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 20 }}>
           <div>
             <p style={{ fontSize: 11, fontWeight: 700, color: '#C9971A', textTransform: 'uppercase', letterSpacing: '.14em', marginBottom: 8 }}>Partner &amp; Distributör</p>
@@ -1056,20 +1043,20 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
 
       {/* ── CTA (not logged in) ── */}
       {!authUser && (
-        <section id="om-prolux" style={{ background: 'transparent', padding: '64px 24px', borderTop: '1px solid rgba(0,0,0,.07)' }}>
+        <section id="om-prolux" style={{ background: 'transparent', padding: '72px 24px' }}>
           <Reveal>
             <div style={{ maxWidth: 600, margin: '0 auto', textAlign: 'center' }}>
-              <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(26px,4vw,44px)', fontWeight: 700, color: '#111', margin: '0 0 12px', lineHeight: 1.1 }}>
+              <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(26px,4vw,44px)', fontWeight: 700, color: 'var(--shop-text)', margin: '0 0 12px', lineHeight: 1.1 }}>
                 Redo att beställa?
               </h2>
-              <p style={{ fontSize: 15, color: '#888', margin: '0 0 28px', lineHeight: 1.7 }}>
+              <p style={{ fontSize: 15, color: 'var(--shop-text2)', margin: '0 0 28px', lineHeight: 1.7 }}>
                 Logga in på din kundportal och beställ med dina avtalspriser.
               </p>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <button onClick={openLogin} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '13px 32px', borderRadius: 7, background: '#111', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                <button onClick={openLogin} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '13px 32px', borderRadius: 7, background: '#E8B84B', color: '#111', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '.06em' }}>
                   Logga in <ArrowRight size={15} />
                 </button>
-                <a href="mailto:info@proluxshine.com" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '13px 24px', borderRadius: 7, background: 'transparent', border: '2px solid rgba(0,0,0,.15)', color: '#111', fontSize: 14, fontWeight: 600, textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                <a href="mailto:info@proluxshine.com" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '13px 24px', borderRadius: 7, background: 'transparent', border: '2px solid rgba(255,255,255,.2)', color: 'var(--shop-text)', fontSize: 14, fontWeight: 600, textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '.06em' }}>
                   Kontakta oss
                 </a>
               </div>
@@ -1082,7 +1069,45 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
         @keyframes fadeUp  { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:none} }
         @keyframes slideIn { from{opacity:0;transform:scale(1.04)} to{opacity:1;transform:scale(1)} }
         @keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:.4} }
-        .trust-grid        { grid-template-columns: repeat(4,1fr); }
+        .hero { position: relative; height: clamp(500px, 74vh, 780px); overflow: hidden; background: #0D0D0F; }
+        .hero-inner { position: absolute; inset: 0; z-index: 3; display: flex; align-items: center; max-width: 1320px; margin: 0 auto; padding: 0 24px; }
+        .hero-label { margin: 0 0 14px; font-size: 13px; font-weight: 700; color: #E8B84B; text-transform: uppercase; letter-spacing: .2em; }
+        .hero-title { margin: 0 0 18px; font-family: var(--font-sans); font-size: clamp(44px, 7.4vw, 112px); font-weight: 900; line-height: .95; letter-spacing: -.035em; color: #fff; white-space: pre-line; }
+        .hero-sub { margin: 0 0 32px; max-width: 560px; font-size: clamp(16px, 1.6vw, 20px); line-height: 1.55; color: rgba(237,237,234,.88); }
+        .hero-dots { position: absolute; bottom: 32px; right: 32px; z-index: 4; display: flex; gap: 8px; }
+        .btn-white { display: inline-flex; align-items: center; gap: 10px; padding: 16px 24px; border-radius: 4px; background: #fff; color: #111; font-size: 16px; font-weight: 700; text-decoration: none; }
+        .btn-white:hover { background: #E8B84B; }
+        .btn-ghost { display: inline-flex; align-items: center; gap: 10px; padding: 16px 24px; border-radius: 4px; border: 1px solid rgba(255,255,255,.35); color: #fff; font-size: 16px; font-weight: 600; text-decoration: none; }
+        .btn-ghost:hover { border-color: #fff; }
+        .usp-band { background: #141417; border-top: 1px solid rgba(255,255,255,.07); border-bottom: 1px solid rgba(255,255,255,.07); }
+        .usp-grid { max-width: 1320px; margin: 0 auto; padding: 0 24px; display: grid; }
+        .usp { display: flex; align-items: center; gap: 14px; padding: 24px 12px; }
+        .usp-icon { width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,.05); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .usp-title { font-size: 14px; font-weight: 600; color: var(--shop-text); }
+        .usp-sub { font-size: 13px; color: var(--shop-text2); margin-top: 2px; }
+        .home-sec { max-width: 1320px; margin: 0 auto; padding: 72px 24px 0; }
+        .sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+        .sec-head-split { align-items: flex-end; margin-bottom: 36px; }
+        .sec-title { margin: 0; font-family: var(--font-sans); font-size: clamp(30px, 4vw, 52px); font-weight: 800; letter-spacing: -.03em; line-height: 1.02; color: var(--shop-text); }
+        .sec-title-xl { font-size: clamp(36px, 5vw, 64px); }
+        .sec-lead { margin: 0; max-width: 460px; font-size: 16px; line-height: 1.65; color: var(--shop-text2); }
+        .sec-link { font-size: 15px; color: var(--shop-text); text-decoration: underline; text-underline-offset: 4px; white-space: nowrap; }
+        .sec-link:hover { color: #E8B84B; }
+        .cat-row { display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 3 * 12px) / 4); gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+        .cat-row::-webkit-scrollbar { display: none; }
+        .cat-tile { position: relative; display: block; aspect-ratio: 3 / 4; border-radius: 6px; overflow: hidden; background: #1a1a1d; scroll-snap-align: start; text-decoration: none; }
+        .cat-tile img { transition: transform .5s ease; }
+        .cat-tile:hover img { transform: scale(1.05); }
+        .cat-shade { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.8) 0%, rgba(0,0,0,.2) 45%, rgba(0,0,0,0) 70%); }
+        .cat-name { position: absolute; left: 20px; right: 20px; bottom: 18px; display: flex; align-items: center; justify-content: space-between; color: #fff; font-size: clamp(20px, 2vw, 28px); font-weight: 800; letter-spacing: -.02em; }
+        @media (max-width: 860px) {
+          .usp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+          .sec-head-split { flex-direction: column; align-items: flex-start; }
+          .cat-row { grid-auto-columns: 46%; }
+          .home-sec { padding-top: 52px; }
+          .hero-inner { align-items: flex-end; padding-bottom: 64px; }
+        }
+        @media (max-width: 480px) { .usp-grid { grid-template-columns: 1fr !important; } .usp { padding: 14px 4px; } .cat-row { grid-auto-columns: 72%; } }
         .cat-grid          { grid-template-columns: repeat(4,1fr); }
         .b2b-grid          { grid-template-columns: 420px 1fr; }
         .brand-story-grid  { grid-template-columns: 1fr 1fr; }
@@ -1136,7 +1161,7 @@ function HomeContent() {
         setCustomer(null)
       }
     })
-    sb.from('products').select('id,name,brand,list_price,image_url,unit,badge,stock_qty').eq('active', true).order('sort_order').limit(12)
+    sb.from('products').select('*').eq('active', true).order('sort_order').limit(40)
       .then(({ data }) => {
         if (data) {
           setProducts(data)
@@ -1173,5 +1198,5 @@ function HomeContent() {
 }
 
 export default function HomePage() {
-  return <PublicShell><HomeContent /></PublicShell>
+  return <PublicShell tone="dark"><HomeContent /></PublicShell>
 }

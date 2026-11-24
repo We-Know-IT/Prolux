@@ -22,7 +22,7 @@ export default function Price({ listPrice, size = 'md', showListPrice = false }:
   if (authLoading) return <div style={{ height: s.main + s.sub + 6 }} />
   if (!authUser) return (
     <button type="button" onClick={e => { e.preventDefault(); e.stopPropagation(); openLogin() }}
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: size === 'lg' ? '10px 18px' : '7px 12px', borderRadius: 8, background: '#F5F2ED', border: '1px solid rgba(0,0,0,.1)', color: '#111', fontSize: size === 'lg' ? 14 : 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: size === 'lg' ? '10px 18px' : '7px 12px', borderRadius: 8, background: 'var(--shop-surface2, #F5F2ED)', border: '1px solid var(--shop-line, rgba(0,0,0,.1))', color: 'var(--shop-text, #111)', fontSize: size === 'lg' ? 14 : 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
       <Lock size={size === 'lg' ? 14 : 12} /> Logga in för pris
     </button>
   )
@@ -31,18 +31,18 @@ export default function Price({ listPrice, size = 'md', showListPrice = false }:
   const discounted = net < listPrice
   if (isPrivate) return (
     <div>
-      <div style={{ fontSize: s.main, fontWeight: 800, color: '#111', lineHeight: 1.15 }}>{fmt(withVat(net))} kr</div>
-      <div style={{ fontSize: s.sub, color: '#777' }}>inkl. moms</div>
+      <div style={{ fontSize: s.main, fontWeight: 800, color: 'var(--shop-text, #111)', lineHeight: 1.15 }}>{fmt(withVat(net))} kr</div>
+      <div style={{ fontSize: s.sub, color: 'var(--shop-text2, #777)' }}>inkl. moms</div>
     </div>
   )
   return (
     <div>
-      <div style={{ fontSize: s.main, fontWeight: 800, color: '#111', lineHeight: 1.15 }}>
-        {fmt(net)} kr <span style={{ fontSize: s.sub, fontWeight: 600, color: '#777' }}>exkl. moms</span>
+      <div style={{ fontSize: s.main, fontWeight: 800, color: 'var(--shop-text, #111)', lineHeight: 1.15 }}>
+        {fmt(net)} kr <span style={{ fontSize: s.sub, fontWeight: 600, color: 'var(--shop-text2, #777)' }}>exkl. moms</span>
       </div>
-      <div style={{ fontSize: s.sub, color: '#777' }}>
+      <div style={{ fontSize: s.sub, color: 'var(--shop-text2, #777)' }}>
         {fmt(withVat(net))} kr inkl. moms
-        {showListPrice && discounted && <> · <s>{fmt(listPrice)} kr</s></>}
+        {showListPrice && discounted && <> · <s style={{ color: 'var(--shop-sale, #C0392B)' }}>{fmt(listPrice)} kr</s></>}
       </div>
     </div>
   )

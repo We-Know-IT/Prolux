@@ -1,6 +1,7 @@
 'use client'
 export const dynamic = 'force-dynamic'
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PublicShell, useLoginModal, usePublicCart } from '@/components/layout/PublicShell'
 import { Search, Package, ShoppingCart, ChevronRight, ChevronLeft, LayoutGrid } from 'lucide-react'
@@ -12,7 +13,7 @@ import ProductCard from '@/components/shop/ProductCard'
 
 const SORT_OPTIONS = ['Populärast', 'Lägsta pris', 'Högsta pris', 'Namn A–Ö']
 
-const PAGE_SIZE = 8
+const PAGE_SIZE = 24
 
 function ProductsContent() {
   const openLogin = useLoginModal()
@@ -25,6 +26,8 @@ function ProductsContent() {
   const [justAdded, setJustAdded] = useState<string | null>(null)
   const [sort, setSort]           = useState('Popularast')
   const [page, setPage]           = useState(1)
+  const [onlySale, setOnlySale]   = useState(false)
+  const params = useSearchParams()
 
   useEffect(() => {
     const sb = createClient()
@@ -40,9 +43,22 @@ function ProductsContent() {
 
   const { customer, priceList } = cart
 
+  // The header's search, category menu and Kampanj link arrive as ?q=, ?kategori=
+  // (id), ?kat= (name) and ?kampanj=1 – also while already on this page.
+  useEffect(() => {
+    const kat = params.get('kat')?.toLowerCase()
+    const byName = kat ? categories.find(c => String(c.name).toLowerCase() === kat)?.id : null
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setSelectedCat(params.get('kategori') || byName || 'all')
+    setSearch(params.get('q') || '')
+    setOnlySale(params.get('kampanj') === '1')
+    setPage(1)
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [params, categories])
+
   // Filter
   let filtered = products.filter(p => {
-    const matchCat = selectedCat === 'all' || p.category_id === selectedCat
+    const matchCat = (selectedCat === 'all' || p.category_id === selectedCat) && (!onlySale || p.badge === 'sale')
     const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.brand || '').toLowerCase().includes(search.toLowerCase())
     return matchCat && matchSearch
   })
@@ -66,174 +82,108 @@ function ProductsContent() {
     setPage(1)
   }
 
+  const catName = categories.find(c => c.id === selectedCat)?.name
+  const title = onlySale ? 'Kampanj' : catName || (search ? `Sök: ”${search}”` : 'Alla produkter')
+
   return (
-    <div style={{ minHeight: '100vh', position: 'relative' }}>
+    <div className="shop-page">
       <style>{`
-        .prod-page-content { position: relative; z-index: 1; }
-        .prod-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 20px; }
-        @media (max-width:1100px) { .prod-grid { grid-template-columns: repeat(3,1fr); } }
-        @media (max-width:720px)  { .prod-grid { grid-template-columns: repeat(2,1fr); } }
-        @media (max-width:480px)  { .prod-grid { grid-template-columns: 1fr 1fr; } }
+        .shop-page { max-width: 1320px; margin: 0 auto; padding: 36px 24px 80px; }
+        .shop-crumbs { font-size: 13px; color: var(--shop-text2); margin-bottom: 10px; }
+        .shop-crumbs a { color: var(--shop-text2); text-decoration: none; }
+        .shop-crumbs a:hover { color: var(--shop-text); }
+        .shop-title { margin: 0; font-size: clamp(34px, 5vw, 60px); font-weight: 800; letter-spacing: -.03em; line-height: 1.02; color: var(--shop-text); }
+        .shop-chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 26px 0 18px; padding-bottom: 2px; }
+        .shop-chips::-webkit-scrollbar { display: none; }
+        .shop-chip { flex-shrink: 0; padding: 9px 16px; border-radius: 999px; border: 1px solid var(--shop-line); background: var(--shop-surface); color: var(--shop-text); font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; font-family: inherit; }
+        .shop-chip:hover { border-color: rgba(255,255,255,.3); }
+        .shop-chip.is-on { background: #EDEDEA; color: #111; border-color: #EDEDEA; font-weight: 700; }
+        .shop-chip.is-sale.is-on { background: #E50019; border-color: #E50019; color: #fff; }
+        .shop-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 0; border-top: 1px solid var(--shop-line); border-bottom: 1px solid var(--shop-line); margin-bottom: 24px; }
+        .shop-count { font-size: 14px; color: var(--shop-text2); }
+        .shop-search { flex: 1; min-width: 200px; max-width: 420px; position: relative; margin-left: auto; }
+        .shop-search input { width: 100%; padding: 11px 36px; border-radius: 6px; border: 1px solid var(--shop-line); background: var(--shop-surface); color: var(--shop-text); font-size: 14px; outline: none; box-sizing: border-box; font-family: inherit; }
+        .shop-search input:focus { border-color: #E8B84B; }
+        .shop-select { padding: 11px 12px; border-radius: 6px; border: 1px solid var(--shop-line); background: var(--shop-surface); color: var(--shop-text); font-size: 14px; cursor: pointer; outline: none; font-family: inherit; color-scheme: dark; }
+        .shop-pages { display: flex; justify-content: center; align-items: center; gap: 8px; padding-top: 40px; }
+        .shop-page-btn { min-width: 40px; height: 40px; border-radius: 6px; border: 1px solid var(--shop-line); background: var(--shop-surface); color: var(--shop-text); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; font-family: inherit; }
+        .shop-page-btn.is-on { background: #E8B84B; border-color: #E8B84B; color: #111; font-weight: 800; }
+        .shop-page-btn:disabled { opacity: .35; cursor: default; }
+        .shop-b2b { margin-top: 56px; background: linear-gradient(110deg, #1d1708 0%, #141417 60%); border: 1px solid rgba(232,184,75,.25); border-radius: 10px; padding: 34px 36px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; }
+        @media (max-width: 760px) { .shop-page { padding: 24px 14px 60px; } .shop-search { max-width: none; margin-left: 0; flex-basis: 100%; order: 3; } }
       `}</style>
 
-      <div className="prod-page-content">
+      <div className="shop-crumbs"><Link href="/">Hem</Link> / <Link href="/produkter">Produkter</Link>{catName ? <> / {catName}</> : null}</div>
+      <h1 className="shop-title">{title}</h1>
 
-      {/* ── HERO ── */}
-      <div style={{ position: 'relative', overflow: 'hidden', background: '#0a0c10' }}>
-        <img
-          src="https://fopshubqliboxgokbhnr.supabase.co/storage/v1/object/public/hero-images/category-hero.png"
-          alt="Alla Produkter"
-          style={{ width: '100%', display: 'block', objectFit: 'cover' }}
-        />
+      {/* Categories */}
+      <div className="shop-chips" role="tablist" aria-label="Kategorier">
+        <button role="tab" aria-selected={selectedCat === 'all' && !onlySale} className={`shop-chip${selectedCat === 'all' && !onlySale ? ' is-on' : ''}`} onClick={() => { selectCat('all'); setOnlySale(false) }}>Alla</button>
+        {categories.map(cat => (
+          <button key={cat.id} role="tab" aria-selected={selectedCat === cat.id} className={`shop-chip${selectedCat === cat.id ? ' is-on' : ''}`} onClick={() => selectCat(cat.id)}>{cat.name}</button>
+        ))}
+        <button role="tab" aria-selected={onlySale} className={`shop-chip is-sale${onlySale ? ' is-on' : ''}`} onClick={() => { setOnlySale(o => !o); setPage(1) }}>Kampanj</button>
       </div>
 
-      {/* ── TRUST STRIP ── */}
-      <div style={{ background: 'rgba(255,255,255,.85)', borderBottom: '1px solid rgba(0,0,0,.08)', padding: '32px 48px' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 32 }} className="trust-strip">
-          {[
-            { title: 'Säker för alla ytor', text: 'Skonsamma men extremt effektiva formuleringar utvecklade för att aldrig skada känsliga material.' },
-            { title: 'pH-balanserat', text: 'Perfekt komponerade pH-värden som skapar optimal rengöringseffekt utan att slita på befintliga lackskydd.' },
-            { title: 'Effektiv avfettning', text: 'Våra kända alkaliska och kallavfettningar biter på nordisk vintervägssmuts med oöverträffad kraft.' },
-            { title: 'Högsta kvalitet', text: 'Formulerat och tillverkat i Italien av ledande kemister med högsta certifieringar.' },
-          ].map(({ title, text }) => (
-            <div key={title} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(232,184,75,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="#C9971A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </div>
-              <p style={{ fontSize: 14, fontWeight: 700, color: '#111', margin: 0 }}>{title}</p>
-              <p style={{ fontSize: 13, color: '#777', margin: 0, lineHeight: 1.55 }}>{text}</p>
-            </div>
-          ))}
+      {/* Count, search and sorting */}
+      <div className="shop-bar">
+        <span className="shop-count">{loading ? 'Laddar…' : `${filtered.length} produkter`}</span>
+        <div className="shop-search">
+          <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--shop-text2)' }} />
+          <input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} placeholder="Sök produkt eller varumärke" aria-label="Sök produkt" />
+          {search && <button onClick={() => setSearch('')} aria-label="Rensa sökningen" style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--shop-text2)', fontSize: 18, lineHeight: 1 }}>×</button>}
         </div>
-      </div>
-      <style>{`.trust-strip { } @media(max-width:800px){.trust-strip{grid-template-columns:1fr 1fr!important}} @media(max-width:500px){.trust-strip{grid-template-columns:1fr!important}}`}</style>
-
-      {/* ── CATEGORY ICONS ── */}
-      <div style={{ borderBottom: '1px solid rgba(0,0,0,.08)', padding: '28px 48px', overflowX: 'auto', background: 'transparent' }}>
-        <div style={{ display: 'flex', gap: 28, minWidth: 'max-content' }}>
-          <button
-            onClick={() => selectCat('all')}
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', minWidth: 110 }}
-          >
-            <div style={{
-              width: 110, height: 110, borderRadius: '50%',
-              background: selectedCat === 'all' ? 'rgba(232,184,75,.15)' : '#f2f2f2',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: selectedCat === 'all' ? '2.5px solid #E8B84B' : '2px solid #e0e0e0',
-              transition: 'all .2s', overflow: 'hidden',
-            }}>
-              <LayoutGrid size={30} strokeWidth={1.5} color="#555" />
-            </div>
-            <span style={{ fontSize: 13, color: selectedCat === 'all' ? '#111' : '#555', fontWeight: selectedCat === 'all' ? 700 : 500, textAlign: 'center', lineHeight: 1.3 }}>Alla</span>
-          </button>
-
-          {categories.map(cat => {
-            const isActive = selectedCat === cat.id
-            return (
-              <button
-                key={cat.id}
-                onClick={() => selectCat(cat.id)}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', minWidth: 110 }}
-              >
-                <div style={{
-                  width: 110, height: 110, borderRadius: '50%',
-                  background: isActive ? 'rgba(232,184,75,.12)' : '#f2f2f2',
-                  border: isActive ? '2.5px solid #E8B84B' : '2px solid #e0e0e0',
-                  transition: 'all .2s', overflow: 'hidden',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  {cat.image_url ? (
-                    <img src={cat.image_url} alt={cat.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
-                  ) : (
-                    <Package size={36} color={isActive ? '#C9971A' : '#ccc'} strokeWidth={1.2} />
-                  )}
-                </div>
-                <span style={{ fontSize: 13, color: isActive ? '#111' : '#555', fontWeight: isActive ? 700 : 500, textAlign: 'center', lineHeight: 1.3, maxWidth: 110 }}>
-                  {cat.name}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+        <select value={sort} onChange={e => setSort(e.target.value)} aria-label="Sortera" className="shop-select">
+          {SORT_OPTIONS.map(s => <option key={s}>{s}</option>)}
+        </select>
       </div>
 
-      {/* ── TOOLBAR: count + search + sort ── */}
-      <div style={{ padding: '16px 48px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', borderBottom: '1px solid #e8e8e8' }}>
-        <span style={{ fontSize: 14, color: '#555', flexShrink: 0 }}>
-          {loading ? '...' : `${filtered.length} produkter`}
-        </span>
-        <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
-          <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#aaa' }} />
-          <input
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1) }}
-            placeholder="Sök produkt..."
-            style={{ width: '100%', padding: '8px 36px 8px 36px', border: '1px solid #e0e0e0', borderRadius: 6, fontSize: 14, color: '#111', background: 'rgba(255,255,255,.8)', outline: 'none', boxSizing: 'border-box' }}
-          />
-          {search && <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: 16, lineHeight: 1 }}>×</button>}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 14, color: '#555' }}>Sortera:</span>
-          <select value={sort} onChange={e => setSort(e.target.value)} style={{ padding: '8px 12px', border: '1px solid #e0e0e0', borderRadius: 6, fontSize: 14, color: '#111', background: '#fff', cursor: 'pointer', outline: 'none' }}>
-            {SORT_OPTIONS.map(s => <option key={s}>{s}</option>)}
-          </select>
-        </div>
-      </div>
-
-      {/* ── PRODUCT GRID ── */}
+      {/* Products */}
       {loading ? (
-        <div style={{ padding: '80px 48px', textAlign: 'center', color: '#aaa' }}>Laddar produkter...</div>
+        <div style={{ padding: '80px 0', textAlign: 'center', color: 'var(--shop-text2)' }}>Laddar produkter…</div>
       ) : paged.length === 0 ? (
-        <div style={{ padding: '80px 48px', textAlign: 'center', color: '#aaa' }}>
+        <div style={{ padding: '80px 0', textAlign: 'center', color: 'var(--shop-text2)' }}>
           <Package size={48} style={{ marginBottom: 16 }} />
           <p>Inga produkter hittades.</p>
         </div>
       ) : (
-        <div className="pcard-grid prod-grid-pad">
+        <div className="pcard-grid">
           {paged.map(p => <ProductCard key={p.id} p={p} />)}
           <AddProductCard onCreated={p => setProducts(ps => [...ps, p])} />
         </div>
       )}
 
-      {/* ── PAGINATION ── */}
       {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, padding: '40px 48px' }}>
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid #e0e0e0', background: '#fff', cursor: page === 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: page === 1 ? .4 : 1 }}>
-            <ChevronLeft size={16} color="#555" />
-          </button>
+        <div className="shop-pages">
+          <button className="shop-page-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} aria-label="Föregående sida"><ChevronLeft size={16} /></button>
           {Array.from({ length: totalPages }).map((_, i) => (
-            <button key={i} onClick={() => setPage(i + 1)} style={{ width: 36, height: 36, borderRadius: '50%', border: page === i + 1 ? 'none' : '1px solid #e0e0e0', background: page === i + 1 ? '#E8B84B' : '#fff', color: page === i + 1 ? '#111' : '#555', fontWeight: page === i + 1 ? 700 : 400, fontSize: 14, cursor: 'pointer' }}>
-              {i + 1}
-            </button>
+            <button key={i} className={`shop-page-btn${page === i + 1 ? ' is-on' : ''}`} onClick={() => setPage(i + 1)}>{i + 1}</button>
           ))}
-          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid #e0e0e0', background: '#fff', cursor: page === totalPages ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: page === totalPages ? .4 : 1 }}>
-            <ChevronRight size={16} color="#555" />
-          </button>
+          <button className="shop-page-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} aria-label="Nästa sida"><ChevronRight size={16} /></button>
         </div>
       )}
 
-      {/* ── B2B PROMPT ── */}
+      {/* Company customers */}
       {!cart.authLoading && !customer && (
-        <div style={{ margin: '0 40px 48px', background: '#0D0F13', borderRadius: 12, padding: '36px 40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 20 }}>
+        <div className="shop-b2b">
           <div>
-            <p style={{ color: '#E8B84B', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 6 }}>B2B-partner</p>
-            <h3 style={{ color: '#F0EDE8', fontSize: 20, fontWeight: 700, margin: '0 0 6px' }}>Handla till grossistpris</h3>
-            <p style={{ color: '#9BA0AB', fontSize: 14, margin: 0 }}>Registrera dig som företagskund och få upp till 40% rabatt.</p>
+            <p style={{ color: '#E8B84B', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.12em', margin: '0 0 6px' }}>För företag</p>
+            <h3 style={{ color: 'var(--shop-text)', fontSize: 24, fontWeight: 800, margin: '0 0 6px', letterSpacing: '-.01em' }}>Handla till företagspris</h3>
+            <p style={{ color: 'var(--shop-text2)', fontSize: 15, margin: 0 }}>Registrera dig som företagskund och få upp till 40 % rabatt.</p>
           </div>
-          <button onClick={() => openLogin(true, 'business')} style={{ padding: '13px 28px', background: '#E8B84B', color: '#0F1115', borderRadius: 8, border: 'none', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
-            Bli B2B-kund
+          <button onClick={() => openLogin(true, 'business')} style={{ padding: '14px 26px', background: '#E8B84B', color: '#111', borderRadius: 6, border: 'none', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}>
+            Bli företagskund
           </button>
         </div>
       )}
-      </div>{/* end prod-page-content */}
     </div>
   )
 }
 
 export default function ProdukterPage() {
   return (
-    <PublicShell>
-      <ProductsContent />
+    <PublicShell tone="dark">
+      <Suspense fallback={null}><ProductsContent /></Suspense>
     </PublicShell>
   )
 }
