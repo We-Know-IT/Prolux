@@ -7,7 +7,7 @@ import { useState } from 'react'
 import { DEFAULT_GUIDES, GuidesContent, GuideItem, TAG_COLORS } from '@/lib/site-content'
 import { useSiteContent, EditableText } from '@/components/site-edit/SiteEdit'
 import { SearchX } from 'lucide-react'
-import { featureIcon } from '@/lib/feature-icons'
+import { guideStockImage } from '@/lib/stock-images'
 
 function guideBg(tag: string) {
   const color = TAG_COLORS[tag] || TAG_COLORS.Tips
@@ -112,7 +112,8 @@ function GuiderContent() {
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}
                 >
                   <div style={{ position: 'relative', aspectRatio: '16/9', overflow: 'hidden', background: guideBg(guide.tag), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {(() => { const Icon = featureIcon(guide.emoji); return <Icon size={52} strokeWidth={1.25} color="rgba(255,255,255,.75)" /> })()}
+                    <img src={guide.image_url || guideStockImage(guide.category)} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.45), transparent 60%)' }} />
                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 60%)' }} />
                     <span style={{ position: 'absolute', top: 12, left: 12, background: TAG_COLORS[guide.tag] || TAG_COLORS.Tips, color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, letterSpacing: '0.05em' }}>
                       {guide.tag}

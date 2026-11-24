@@ -9,7 +9,7 @@ import { PublicShell, useLoginModal, usePublicCart } from '@/components/layout/P
 import Price from '@/components/shop/Price'
 import ProductCard from '@/components/shop/ProductCard'
 import { fmt, formatDate } from '@/lib/utils'
-import { DEFAULT_HOME, DEFAULT_TRUST, HomeContent as SiteHomeContent } from '@/lib/site-content'
+import { DEFAULT_HOME, DEFAULT_TRUST, DEFAULT_PROMO, DEFAULT_TEAM, DEFAULT_GUIDES, TAG_COLORS, HomeContent as SiteHomeContent, GuidesContent } from '@/lib/site-content'
 import { useSiteContent, useIsEditingSite, EditableText, EditableImage } from '@/components/site-edit/SiteEdit'
 import {
   ArrowRight, ChevronRight, Package,
@@ -20,6 +20,7 @@ import OrderTracking from '@/components/portal/OrderTracking'
 import { userRole } from '@/lib/roles'
 import { featureIcon } from '@/lib/feature-icons'
 import { popElement } from '@/lib/pop'
+import { STOCK, guideStockImage } from '@/lib/stock-images'
 import { PRODUCT_BADGE } from '@/lib/product-badge'
 import AddProductCard from '@/components/site-edit/AddProductCard'
 
@@ -838,6 +839,9 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
   // Keep each item's position in the saved list (`at`) for editing; empty
   // items are hidden from visitors but stay editable in edit mode.
   const trust = (siteHome.trust ?? DEFAULT_TRUST).map((t, at) => ({ ...t, at })).filter(t => editingSite || t.title.trim())
+  const promo = siteHome.promo ?? DEFAULT_PROMO
+  const team = siteHome.team ?? DEFAULT_TEAM
+  const guides = useSiteContent<GuidesContent>('guides', DEFAULT_GUIDES).items.slice(0, 3)
   // Newest first (products marked "Ny" lead), and best sellers (marked "Storsäljare" first).
   const newest = [...products].sort((a, b) => Number(b.badge === 'new') - Number(a.badge === 'new') || String(b.created_at || '').localeCompare(String(a.created_at || ''))).slice(0, 12)
   const bestsellers = [...products].sort((a, b) => Number(b.badge === 'top') - Number(a.badge === 'top') || (a.sort_order ?? 0) - (b.sort_order ?? 0)).slice(0, 12)
@@ -862,6 +866,15 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
         </div>
       </section>
 
+      {/* ── BRANDS ── */}
+      <section className="brand-strip">
+        <span className="brand-strip-label">Officiell distributör i Norden</span>
+        <Image src="/brands/frescura.svg" alt="Frescura" width={220} height={20} style={{ height: 20, width: 'auto' }} />
+        <span className="brand-strip-dot" />
+        <Image src="/brands/virtus.svg" alt="Virtus" width={44} height={46} style={{ height: 44, width: 'auto' }} />
+        <span className="brand-strip-label">Italiensk kvalitet sedan 1957</span>
+      </section>
+
       {/* ── NEWEST PRODUCTS ── */}
       {(newest.length > 0 || editingSite) && (
         <section className="home-sec">
@@ -875,6 +888,25 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
           </div>
         </section>
       )}
+
+      {/* ── CAMPAIGN BANNER ── */}
+      <section className="home-sec">
+        <div className="promo">
+          <div className="promo-img">
+            {promo.image_url
+              ? <img src={promo.image_url} alt="" />
+              : <div className="promo-graphic"><Image src="/brands/virtus.svg" alt="" width={120} height={124} style={{ height: '46%', width: 'auto', opacity: .9 }} /></div>}
+            <span className="promo-tape">{promo.label} · {promo.label} · {promo.label} · {promo.label} · {promo.label}</span>
+            <EditableImage doc="home" path="promo.image_url" bucket="hero-images" />
+          </div>
+          <div className="promo-text">
+            <p className="hero-label"><EditableText doc="home" path="promo.label" value={promo.label} /></p>
+            <h2 className="sec-title"><EditableText doc="home" path="promo.heading" value={promo.heading} /></h2>
+            <p className="sec-lead" style={{ margin: '16px 0 26px' }}><EditableText doc="home" path="promo.sub" value={promo.sub} multiline /></p>
+            <Link href={promo.ctaHref || '/produkter?kampanj=1'} className="btn-white"><EditableText doc="home" path="promo.ctaLabel" value={promo.ctaLabel} /> <ArrowRight size={17} /></Link>
+          </div>
+        </div>
+      </section>
 
       {/* ── CATEGORIES: from dirty to showroom ── */}
       <section className="home-sec">
@@ -907,12 +939,64 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
         </section>
       )}
 
+      {/* ── GUIDES ── */}
+      {guides.length > 0 && (
+        <section className="home-sec">
+          <div className="sec-head">
+            <h2 className="sec-title">Bilvårdstips</h2>
+            <Link href="/guider" className="sec-link">Alla guider</Link>
+          </div>
+          <div className="guide-row">
+            {guides.map((g, i) => { const Icon = featureIcon(g.emoji); const color = TAG_COLORS[g.tag] || TAG_COLORS.Tips; return (
+              <Link key={g.id} href="/guider" className="guide-card">
+                <div className="guide-img" style={{ background: `radial-gradient(90% 90% at 70% 30%, ${color}40 0%, #141417 70%)` }}>
+                  {(g.image_url || guideStockImage(g.category)) ? <img src={g.image_url || guideStockImage(g.category)} alt="" loading="lazy" /> : <Icon size={64} color={color} strokeWidth={1.2} />}
+                  <span className="guide-tag" style={{ background: color }}>{g.tag}</span>
+                  <EditableImage doc="guides" path={`items.${i}.image_url`} bucket="category-images" />
+                </div>
+                <div className="guide-body">
+                  <div className="guide-meta">{g.category} · {g.readTime} läsning</div>
+                  <h3 className="guide-title">{g.title}</h3>
+                  <p className="guide-desc">{g.desc}</p>
+                </div>
+              </Link>
+            ) })}
+          </div>
+        </section>
+      )}
+
+      {/* ── TEAM ── */}
+      <section className="home-sec">
+        <div className="sec-head sec-head-split">
+          <h2 className="sec-title"><EditableText doc="home" path="team.heading" value={team.heading} /></h2>
+          <p className="sec-lead"><EditableText doc="home" path="team.sub" value={team.sub} multiline /></p>
+        </div>
+        <div className="team-row">
+          {team.people.map((p, i) => (
+            <div key={i} className="team-card">
+              <div className="team-img">
+                {p.image_url ? <img src={p.image_url} alt={p.name} /> : <span className="team-initial">{(p.name || '?')[0]}</span>}
+                <EditableImage doc="home" path={`team.people.${i}.image_url`} bucket="om-oss-images" />
+              </div>
+              <div className="team-name"><EditableText doc="home" path={`team.people.${i}.name`} value={p.name} /></div>
+              <div className="team-role"><EditableText doc="home" path={`team.people.${i}.role`} value={p.role} /> · <EditableText doc="home" path={`team.people.${i}.area`} value={p.area} /></div>
+            </div>
+          ))}
+          <a href="/om-oss#kontakta-oss" className="team-card team-contact">
+            <span className="team-contact-title">Vill du ha ett besök?</span>
+            <span className="team-contact-sub">Vi kommer ut till din verkstad eller tvätthall och visar produkterna på plats.</span>
+            <span className="sec-link" style={{ marginTop: 'auto' }}>Kontakta oss</span>
+          </a>
+        </div>
+      </section>
+
       {/* ── PRO CENTER — full-width dark banner ── */}
       <section id="pro-center" style={{ background: '#141417', borderTop: '1px solid rgba(255,255,255,.06)', borderBottom: '1px solid rgba(255,255,255,.06)', position: 'relative', overflow: 'hidden', marginTop: 24 }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', display: 'grid', gridTemplateColumns: '420px 1fr', alignItems: 'center', minHeight: 360 }} className="b2b-grid">
           {/* Left — image placeholder with product */}
           <div className="b2b-img" style={{ height: '100%', position: 'relative', overflow: 'hidden', minHeight: 320 }}>
-            <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 40% 45%, rgba(255,255,255,.07) 0%, transparent 65%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 34, paddingBottom: 40 }}>
+            <img src={STOCK.cleanBlackCar} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: .45 }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 40% 45%, rgba(9,9,11,.35) 0%, rgba(9,9,11,.85) 75%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 34, paddingBottom: 40 }}>
               <Image src="/brands/frescura.svg" alt="Frescura" width={260} height={24} style={{ width: '62%', height: 'auto', maxWidth: 260 }} />
               <Image src="/brands/virtus.svg" alt="Virtus" width={110} height={114} style={{ width: 'auto', height: 110 }} />
             </div>
@@ -1100,6 +1184,41 @@ function MarketingHome({ products, allImages, openLogin, authUser, customer, onP
         .cat-tile:hover img { transform: scale(1.05); }
         .cat-shade { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.8) 0%, rgba(0,0,0,.2) 45%, rgba(0,0,0,0) 70%); }
         .cat-name { position: absolute; left: 20px; right: 20px; bottom: 18px; display: flex; align-items: center; justify-content: space-between; color: #fff; font-size: clamp(20px, 2vw, 28px); font-weight: 800; letter-spacing: -.02em; }
+        .brand-strip { display: flex; align-items: center; justify-content: center; gap: 28px; flex-wrap: wrap; padding: 26px 24px; border-bottom: 1px solid rgba(255,255,255,.07); }
+        .brand-strip-label { font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--shop-text2); }
+        .brand-strip-dot { width: 5px; height: 5px; border-radius: 50%; background: #E8B84B; }
+        .promo { display: grid; grid-template-columns: 1.15fr 1fr; background: #141417; border: 1px solid rgba(255,255,255,.08); border-radius: 10px; overflow: hidden; }
+        .promo-img { position: relative; min-height: 380px; overflow: hidden; background: #0D0D0F; }
+        .promo-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+        .promo-graphic { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(70% 80% at 40% 40%, rgba(232,184,75,.28) 0%, rgba(232,184,75,.06) 45%, #0D0D0F 80%), repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 2px, transparent 2px 14px); }
+        .promo-tape { position: absolute; left: -12%; right: -12%; bottom: 34px; transform: rotate(-6deg); background: repeating-linear-gradient(90deg, #E8B84B 0 34px, #111 34px 40px); color: #111; font-size: 13px; font-weight: 900; letter-spacing: .3em; text-transform: uppercase; white-space: nowrap; overflow: hidden; padding: 9px 0; text-align: center; box-shadow: 0 6px 18px rgba(0,0,0,.4); }
+        .promo-tape { background: #E8B84B; }
+        .promo-text { padding: clamp(28px, 4vw, 56px); display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
+        .guide-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+        .guide-card { display: flex; flex-direction: column; background: #141417; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; overflow: hidden; text-decoration: none; transition: border-color .2s, transform .2s; }
+        .guide-card:hover { border-color: rgba(232,184,75,.45); transform: translateY(-3px); }
+        .guide-img { position: relative; aspect-ratio: 16 / 9; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .guide-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+        .guide-tag { position: absolute; top: 12px; left: 12px; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; color: #111; }
+        .guide-body { padding: 18px 20px 22px; }
+        .guide-meta { font-size: 12px; color: var(--shop-text2); margin-bottom: 8px; }
+        .guide-title { margin: 0 0 8px; font-size: 19px; font-weight: 700; line-height: 1.3; color: var(--shop-text); }
+        .guide-desc { margin: 0; font-size: 14px; line-height: 1.6; color: var(--shop-text2); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        .team-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+        .team-card { display: flex; flex-direction: column; text-decoration: none; }
+        .team-img { position: relative; aspect-ratio: 4 / 5; border-radius: 8px; overflow: hidden; background: linear-gradient(160deg, #26262b 0%, #141417 70%); display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+        .team-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+        .team-initial { font-size: 96px; font-weight: 900; color: rgba(232,184,75,.35); letter-spacing: -.04em; }
+        .team-name { font-size: 20px; font-weight: 800; color: var(--shop-text); }
+        .team-role { font-size: 14px; color: var(--shop-text2); margin-top: 2px; }
+        .team-contact { background: linear-gradient(140deg, #2a2110 0%, #141417 70%); border: 1px solid rgba(232,184,75,.3); border-radius: 8px; padding: 26px 24px; aspect-ratio: auto; min-height: 260px; }
+        .team-contact-title { font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--shop-text); margin-bottom: 10px; }
+        .team-contact-sub { font-size: 15px; line-height: 1.6; color: var(--shop-text2); margin-bottom: 20px; }
+        @media (max-width: 860px) {
+          .promo { grid-template-columns: 1fr; }
+          .promo-img { min-height: 240px; }
+          .guide-row { grid-template-columns: 1fr; }
+        }
         @media (max-width: 860px) {
           .usp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
           .sec-head-split { flex-direction: column; align-items: flex-start; }

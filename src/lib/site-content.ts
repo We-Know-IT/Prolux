@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { STOCK } from '@/lib/stock-images'
 
 // All editable marketing-site content lives in one Supabase table,
 // `site_content` (id text primary key, data jsonb). Each id below is one
@@ -48,6 +49,38 @@ export interface HomeContent {
   brandStory: BrandStoryContent
   why: WhyContent
   trust?: TrustItem[]   // missing in content saved before the strip was editable
+  promo?: PromoContent  // added later: older saved content falls back to the defaults
+  team?: TeamContent
+}
+
+// The campaign banner on the start page (picture + text + button).
+export interface PromoContent {
+  image_url: string
+  label: string
+  heading: string
+  sub: string
+  ctaLabel: string
+  ctaHref: string
+}
+// "Möt dina säljare": the people behind the shop.
+export interface TeamPerson { name: string; role: string; area: string; image_url: string }
+export interface TeamContent { heading: string; sub: string; people: TeamPerson[] }
+
+export const DEFAULT_PROMO: PromoContent = {
+  image_url: STOCK.foamBlackCar,
+  label: 'Kampanj',
+  heading: 'Vinterpaketet för proffs',
+  sub: 'Avfettning, schampo och lackskydd som klarar nordisk vinter – till kampanjpris för företagskunder.',
+  ctaLabel: 'Se kampanjerna',
+  ctaHref: '/produkter?kampanj=1',
+}
+export const DEFAULT_TEAM: TeamContent = {
+  heading: 'Möt dina säljare',
+  sub: 'Personlig service hela vägen – vi hjälper dig välja rätt produkter, besöker din verkstad och visar hur de används.',
+  people: [
+    { name: 'Bashar', role: 'Försäljningschef', area: 'Hela Sverige', image_url: '' },
+    { name: 'Ranin',  role: 'Säljare',           area: 'Mellansverige', image_url: '' },
+  ],
 }
 
 // The promises shown in the bar under the menu and the strip under the hero.
@@ -62,6 +95,8 @@ export const DEFAULT_TRUST: TrustItem[] = [
 
 export const DEFAULT_HOME: HomeContent = {
   trust: DEFAULT_TRUST,
+  promo: DEFAULT_PROMO,
+  team: DEFAULT_TEAM,
   hero: [
     { image_url: 'https://fopshubqliboxgokbhnr.supabase.co/storage/v1/object/public/hero-images/hero-1.png', label: 'Kvalitetsgaranti från Italien', heading: 'Prolux Shine', sub: 'Premiumleverantör av italienska bilvårdsprodukter — skapade för proffs och entusiaster.' },
     { image_url: 'https://fopshubqliboxgokbhnr.supabase.co/storage/v1/object/public/hero-images/hero-2.png', label: 'Professionell bilvård', heading: 'Rätt teknik.\nRätt produkter.', sub: 'Komplett sortiment för handtvätt, maskinpolering och lackskydd.' },
@@ -121,6 +156,7 @@ export interface GuideItem {
   emoji: string   // icon key, see lib/feature-icons (named emoji for older content)
   readTime: string
   tag: string
+  image_url?: string   // optional photo on the guide card
 }
 export interface GuidesContent {
   items: GuideItem[]
